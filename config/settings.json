@@ -1,0 +1,53 @@
+{
+  "description": "User-modifiable settings (separate from core config.json)",
+  "version": "1.0.0",
+  "voice": {
+    "tts_enabled": true,
+    "tts_rate": 150,
+    "tts_volume": 1.0,
+    "stt_enabled": false,
+    "stt_sensitivity": 0.5,
+    "wake_word": "cora",
+    "push_to_talk_key": "ctrl+shift+space"
+  },
+  "display": {
+    "colors": false,
+    "unicode": true,
+    "show_timestamps": false,
+    "compact_mode": false
+  },
+  "notifications": {
+    "enabled": true,
+    "sound": true,
+    "toast": true,
+    "reminder_sound": "default"
+  },
+  "ai": {
+    "model": "llama3.2",
+    "temperature": 0.7,
+    "max_tokens": 500,
+    "context_window": 4096
+  },
+  "hotkeys": {
+    "push_to_talk": "ctrl+shift+space",
+    "toggle_listen": "ctrl+shift+l",
+    "quick_task": "ctrl+shift+t",
+    "quick_note": "ctrl+shift+n"
+  },
+  "privacy": {
+    "save_chat_history": true,
+    "max_history_days": 30,
+    "telemetry": false
+  },
+  "theme": {
+    "name": "default",
+    "accent_color": "#7c3aed"
+  },
+  "screenshots": {
+    "directory": "",
+    "format": "png",
+    "auto_open": false
+  },
+  "author": "Unity AI Lab",
+  "created": "2025-12-23"
+}

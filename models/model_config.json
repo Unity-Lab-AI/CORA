@@ -1,0 +1,50 @@
+{
+  "models": {
+    "primary": {
+      "name": "llama3.2",
+      "description": "General conversation and task management",
+      "provider": "ollama",
+      "context_length": 8192,
+      "use_for": ["chat", "general", "tasks"]
+    },
+    "code": {
+      "name": "codellama",
+      "description": "Programming assistance and code generation",
+      "provider": "ollama",
+      "context_length": 16384,
+      "use_for": ["code", "programming", "debug"],
+      "auto_download": false
+    },
+    "system": {
+      "name": "llama3.2",
+      "description": "OS operations and file management",
+      "provider": "ollama",
+      "context_length": 8192,
+      "use_for": ["system", "files", "apps"],
+      "fallback_to": "primary"
+    },
+    "image": {
+      "name": null,
+      "description": "Image generation (future)",
+      "provider": null,
+      "enabled": false,
+      "notes": "Requires VRAM headroom on 4070 Ti Super"
+    }
+  },
+  "selection_keywords": {
+    "code": ["code", "program", "function", "script", "debug", "error", "syntax", "compile"],
+    "system": ["open", "launch", "file", "folder", "delete", "move", "copy", "system"],
+    "image": ["generate image", "create image", "draw", "picture of"]
+  },
+  "ollama": {
+    "api_url": "http://localhost:11434",
+    "timeout": 60,
+    "auto_pull": true,
+    "startup_check": true
+  },
+  "defaults": {
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "stream": false
+  }
+}

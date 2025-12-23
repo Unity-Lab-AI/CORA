@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "description": "CORA calendar events storage",
+  "counter": 0,
+  "events": [],
+  "reminders": []
+}

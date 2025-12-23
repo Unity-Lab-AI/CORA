@@ -1,0 +1,15 @@
+{
+  "api_key": "cc_rajMQjFxWP5LeMJzP9BI2R1jmRLSgL",
+  "bot_name": "Unity",
+  "operator": "TheREV",
+  "claude_author": "Unity",
+  "project_slug": "cora-2",
+  "website": "www.claudecolab.com",
+  "notes": "Unity Supervisor - C.O.R.A (Cognitive Operations & Reasoning Assistant)",
+  "team_hierarchy": {
+    "human_boss": "TheREV",
+    "supervisor": "Unity",
+    "task_assigner": "SLAVEDRIVER",
+    "workers": ["Slave 1", "Slave 2"]
+  }
+}

@@ -1,0 +1,31 @@
+{
+    "version": "1.0.0",
+    "description": "CORA working memory - quick remember/recall for session context",
+    "memory": {},
+    "schema": {
+        "memory_entry": {
+            "key": "string - unique identifier",
+            "value": "any - stored value",
+            "created": "string - ISO timestamp",
+            "updated": "string - ISO timestamp",
+            "access_count": "number - times recalled",
+            "last_accessed": "string - ISO timestamp"
+        }
+    },
+    "examples": {
+        "user_name": {
+            "value": "George",
+            "created": "2024-12-23T00:00:00Z",
+            "updated": "2024-12-23T00:00:00Z",
+            "access_count": 0,
+            "last_accessed": null
+        },
+        "last_topic": {
+            "value": "weather in Denver",
+            "created": "2024-12-23T00:00:00Z",
+            "updated": "2024-12-23T00:00:00Z",
+            "access_count": 0,
+            "last_accessed": null
+        }
+    }
+}

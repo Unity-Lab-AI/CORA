@@ -1,0 +1,69 @@
+{
+  "app_name": "C.O.R.A",
+  "version": "0.5.1",
+  "tts": {
+    "enabled": true,
+    "engine": "pyttsx3",
+    "rate": 150,
+    "volume": 1.0,
+    "kokoro": {
+      "enabled": false,
+      "voice": "af_bella",
+      "speed": 1.0,
+      "model_path": null
+    }
+  },
+  "stt": {
+    "enabled": false,
+    "engine": "vosk",
+    "wake_word": "cora",
+    "sensitivity": 0.5,
+    "model_path": null
+  },
+  "emotion": {
+    "enabled": true,
+    "intensity": 0.8
+  },
+  "ollama": {
+    "enabled": true,
+    "model": "llama3.2",
+    "api_url": "http://localhost:11434",
+    "timeout": 30
+  },
+  "models": {
+    "primary": "llama3.2",
+    "code": null,
+    "system": null,
+    "image": null
+  },
+  "auto_setup": {
+    "check_ollama": true,
+    "check_tts": true,
+    "auto_pull_model": true,
+    "auto_install_kokoro": false
+  },
+  "display": {
+    "colors": false,
+    "unicode": true
+  },
+  "backup": {
+    "auto_backup": false,
+    "max_backups": 10
+  },
+  "paths": {
+    "tasks_file": "tasks.json",
+    "knowledge_file": "knowledge.json",
+    "backup_dir": "backups",
+    "personality_file": "personality.json",
+    "system_prompt": "system_prompt.txt"
+  },
+  "author": {
+    "name": "Unity AI Lab",
+    "website": "https://www.unityailab.com",
+    "github": "https://github.com/Unity-Lab-AI",
+    "email": "unityailabcontact@gmail.com",
+    "creators": ["Hackall360", "Sponge", "GFourteen"]
+  },
+  "created": "2025-12-22",
+  "updated": "2025-12-23"
+}

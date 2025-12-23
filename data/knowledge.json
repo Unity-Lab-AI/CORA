@@ -1,0 +1,23 @@
+{
+  "counter": 2,
+  "entries": [
+    {
+      "id": "K001",
+      "content": "Python datetime module is useful for date manipulation",
+      "tags": [
+        "python",
+        "programming"
+      ],
+      "created": "2025-12-22T23:11:28.905560"
+    },
+    {
+      "id": "K002",
+      "content": "JSON is great for data storage",
+      "tags": [
+        "python",
+        "storage"
+      ],
+      "created": "2025-12-22T23:11:34.177385"
+    }
+  ]
+}

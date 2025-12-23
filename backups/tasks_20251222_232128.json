@@ -1,0 +1,44 @@
+{
+  "counter": 5,
+  "tasks": [
+    {
+      "id": "T001",
+      "text": "Test task from SLAVEDRIVER",
+      "status": "pending",
+      "priority": 1,
+      "created": "2025-12-22T22:53:25.228776",
+      "notes": [
+        {
+          "text": "This is a test note",
+          "created": "2025-12-22T23:07:42.191159"
+        }
+      ],
+      "due": "2025-12-29"
+    },
+    {
+      "id": "T002",
+      "text": "Test priority feature",
+      "status": "pending",
+      "priority": 5,
+      "created": "2025-12-22T23:04:23.082075",
+      "notes": []
+    },
+    {
+      "id": "T003",
+      "text": "Test task for done command verification",
+      "status": "done",
+      "priority": 5,
+      "created": "2025-12-22T23:07:08.802938",
+      "notes": [],
+      "completed": "2025-12-22T23:07:14.669305"
+    },
+    {
+      "id": "T005",
+      "text": "New task after delete",
+      "status": "pending",
+      "priority": 5,
+      "created": "2025-12-22T23:07:52.679991",
+      "notes": []
+    }
+  ]
+}

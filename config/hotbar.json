@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "description": "CORA Query Panel hotbar button configuration",
+  "hotbars": [
+    {
+      "name": "Quick Responses",
+      "buttons": [
+        {"label": "YES", "response": "YES"},
+        {"label": "NO", "response": "NO"},
+        {"label": "DUNNO", "response": "DUNNO"},
+        {"label": "LATER", "response": "LATER"},
+        {"label": "", "response": ""},
+        {"label": "", "response": ""}
+      ]
+    },
+    {
+      "name": "Development",
+      "buttons": [
+        {"label": "APPROVED", "response": "APPROVED"},
+        {"label": "REJECTED", "response": "REJECTED"},
+        {"label": "NEEDS WORK", "response": "NEEDS WORK"},
+        {"label": "SKIP", "response": "SKIP"},
+        {"label": "", "response": ""},
+        {"label": "", "response": ""}
+      ]
+    },
+    {
+      "name": "Feedback",
+      "buttons": [
+        {"label": "GOOD", "response": "GOOD - looks correct"},
+        {"label": "BAD", "response": "BAD - fix this"},
+        {"label": "PERFECT", "response": "PERFECT!"},
+        {"label": "MEH", "response": "MEH - not important"},
+        {"label": "", "response": ""},
+        {"label": "", "response": ""}
+      ]
+    },
+    {
+      "name": "Actions",
+      "buttons": [
+        {"label": "PUSH", "response": "Push to GitHub"},
+        {"label": "TEST", "response": "Run tests first"},
+        {"label": "PAUSE", "response": "Pause and wait"},
+        {"label": "CONTINUE", "response": "Continue working"},
+        {"label": "", "response": ""},
+        {"label": "", "response": ""}
+      ]
+    }
+  ],
+  "default_buttons": ["YES", "NO", "DUNNO", "LATER"],
+  "button_style": {
+    "font_family": "Segoe UI",
+    "font_size": 11,
+    "font_weight": "bold",
+    "bg_color": "#0f3460",
+    "hover_color": "#533483",
+    "text_color": "#eeeeee",
+    "padding_x": 15,
+    "padding_y": 8
+  },
+  "keyboard_shortcuts": {
+    "1": 0,
+    "2": 1,
+    "3": 2,
+    "4": 3,
+    "5": 4,
+    "6": 5
+  }
+}

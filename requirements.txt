@@ -1,0 +1,43 @@
+# C.O.R.A - Cognitive Operations & Reasoning Assistant
+# Dependencies for v2.2.0
+# Unity AI Lab - 2025
+#
+# Version pinning: Using ~= for compatible releases (allows patch updates)
+# Example: requests~=2.31.0 allows 2.31.x but not 2.32.0
+
+# Core
+requests~=2.31.0
+
+# Text-to-Speech
+pyttsx3~=2.90
+
+# Kokoro TTS (optional neural voice)
+kokoro-onnx~=0.4.0
+sounddevice~=0.4.6
+numpy~=1.26.0
+
+# Voice Recognition (optional)
+vosk~=0.3.45
+soundfile~=0.12.1
+
+# GUI
+customtkinter~=5.2.1
+pystray~=0.19.5
+Pillow~=10.2.0
+
+# Ollama AI integration
+ollama~=0.3.3
+
+# Utilities
+python-dateutil~=2.8.2
+colorama~=0.4.6
+
+# Screenshot/Window tools
+pygetwindow~=0.0.9
+pyautogui~=0.9.54
+
+# System monitoring (optional)
+psutil~=5.9.8
+
+# OpenCV for presence detection (optional)
+opencv-python~=4.9.0.80

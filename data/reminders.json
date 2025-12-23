@@ -1,0 +1,29 @@
+{
+    "version": "1.0.0",
+    "description": "Time-based reminders and alerts for CORA",
+    "reminders": [],
+    "schema": {
+        "reminder": {
+            "id": "string - unique identifier (R001, R002, etc.)",
+            "text": "string - reminder message",
+            "time": "string - ISO timestamp when to remind",
+            "repeat": "string - null, 'daily', 'weekly', 'monthly'",
+            "created": "string - ISO timestamp when created",
+            "last_triggered": "string - ISO timestamp or null",
+            "enabled": "boolean - whether reminder is active",
+            "urgent": "boolean - if true, use urgent notification style"
+        }
+    },
+    "examples": [
+        {
+            "id": "R001",
+            "text": "Stand up and stretch!",
+            "time": "2024-01-01T14:00:00Z",
+            "repeat": "daily",
+            "created": "2024-01-01T00:00:00Z",
+            "last_triggered": null,
+            "enabled": true,
+            "urgent": false
+        }
+    ]
+}
