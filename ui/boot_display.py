@@ -60,8 +60,37 @@ class BootPhase:
     message: str = ""
 
 
+# Global audio buffer for sharing between TTS and waveform
+_audio_buffer = None
+_audio_buffer_lock = None
+
+def get_audio_buffer():
+    """Get the shared audio buffer for waveform visualization."""
+    global _audio_buffer, _audio_buffer_lock
+    if _audio_buffer_lock is None:
+        import threading
+        _audio_buffer_lock = threading.Lock()
+    if _audio_buffer is None:
+        _audio_buffer = {'data': None, 'position': 0, 'active': False}
+    return _audio_buffer
+
+def set_audio_data(audio_array):
+    """Set audio data for waveform visualization (called by TTS)."""
+    buf = get_audio_buffer()
+    with _audio_buffer_lock:
+        buf['data'] = audio_array
+        buf['position'] = 0
+        buf['active'] = True
+
+def clear_audio_data():
+    """Clear audio data when done speaking."""
+    buf = get_audio_buffer()
+    with _audio_buffer_lock:
+        buf['active'] = False
+
+
 class AudioWaveform(tk.Canvas):
-    """Real-time audio waveform visualization that captures system audio output."""
+    """Real-time audio waveform visualization using shared audio buffer from TTS."""
 
     def __init__(self, parent, width=400, height=80, **kwargs):
         super().__init__(parent, width=width, height=height,
@@ -73,20 +102,12 @@ class AudioWaveform(tk.Canvas):
         self.num_bars = 50
         self.bar_width = max(2, (width - 20) // self.num_bars)
         self.animation_id = None
-        self.audio_stream = None
         self.audio_data = [0] * self.num_bars
         self.target_heights = [0] * self.num_bars
         self.current_heights = [0.0] * self.num_bars
         self.smoothing = 0.3  # Smoothing factor for animation
-
-        # Try to import audio capture
-        self.audio_available = False
-        try:
-            import sounddevice as sd
-            self.sd = sd
-            self.audio_available = True
-        except ImportError:
-            self.sd = None
+        self.sample_rate = 24000  # Kokoro TTS sample rate
+        self.samples_per_frame = self.sample_rate // 30  # ~30 FPS
 
         # Colors - goth/cyberpunk gradient
         self.color_low = (50, 0, 80)      # Dark purple
@@ -128,57 +149,9 @@ class AudioWaveform(tk.Canvas):
             b = int(self.color_mid[2] + (self.color_high[2] - self.color_mid[2]) * t)
         return f'#{r:02x}{g:02x}{b:02x}'
 
-    def _audio_callback(self, indata, frames, time_info, status):
-        """Callback for audio stream - processes audio data."""
-        if indata is not None and len(indata) > 0:
-            # Get audio amplitude
-            audio = indata[:, 0] if len(indata.shape) > 1 else indata
-
-            # Split into frequency bands (simple approach)
-            chunk_size = len(audio) // self.num_bars
-            if chunk_size > 0:
-                for i in range(self.num_bars):
-                    start = i * chunk_size
-                    end = start + chunk_size
-                    chunk = audio[start:end]
-                    # RMS of chunk
-                    rms = float(np.sqrt(np.mean(chunk**2)))
-                    # Scale to 0-1 range (adjust multiplier for sensitivity)
-                    self.target_heights[i] = min(1.0, rms * 15)
-
     def start(self):
-        """Start the waveform animation with audio capture."""
+        """Start the waveform animation."""
         self.is_playing = True
-
-        # Try to capture audio output
-        if self.audio_available:
-            try:
-                import numpy as np
-                global np
-                # Try to capture from loopback/output device
-                devices = self.sd.query_devices()
-                loopback_device = None
-
-                # Look for loopback or stereo mix device
-                for i, dev in enumerate(devices):
-                    name = dev['name'].lower()
-                    if 'loopback' in name or 'stereo mix' in name or 'what u hear' in name:
-                        loopback_device = i
-                        break
-
-                if loopback_device is not None:
-                    self.audio_stream = self.sd.InputStream(
-                        device=loopback_device,
-                        channels=1,
-                        samplerate=44100,
-                        blocksize=1024,
-                        callback=self._audio_callback
-                    )
-                    self.audio_stream.start()
-            except Exception as e:
-                # Fall back to simulated audio
-                self.audio_stream = None
-
         self._animate()
 
     def stop(self):
@@ -187,15 +160,6 @@ class AudioWaveform(tk.Canvas):
         if self.animation_id:
             self.after_cancel(self.animation_id)
             self.animation_id = None
-
-        # Stop audio stream
-        if self.audio_stream:
-            try:
-                self.audio_stream.stop()
-                self.audio_stream.close()
-            except:
-                pass
-            self.audio_stream = None
 
         # Animate bars back to flat
         self._fade_out()
@@ -221,28 +185,57 @@ class AudioWaveform(tk.Canvas):
             self.after(30, self._fade_out)
 
     def _animate(self):
-        """Animate the waveform with real or simulated audio."""
+        """Animate the waveform using real audio data from TTS."""
         if not self.is_playing:
             return
 
         center_y = self.height // 2
         max_height = (self.height // 2) - 5
 
-        # If no real audio, simulate based on "speaking" activity
-        if not self.audio_stream:
-            t = time.time()
+        # Try to get real audio data from shared buffer
+        has_real_audio = False
+        buf = get_audio_buffer()
+
+        if buf['active'] and buf['data'] is not None:
+            try:
+                with _audio_buffer_lock:
+                    audio = buf['data']
+                    pos = buf['position']
+
+                    if audio is not None and len(audio) > 0:
+                        # Get next chunk of audio samples
+                        end_pos = min(pos + self.samples_per_frame, len(audio))
+
+                        if pos < len(audio):
+                            chunk = audio[pos:end_pos]
+                            buf['position'] = end_pos
+
+                            if len(chunk) > 0:
+                                has_real_audio = True
+                                # Split chunk into bars
+                                samples_per_bar = max(1, len(chunk) // self.num_bars)
+
+                                for i in range(self.num_bars):
+                                    start = i * samples_per_bar
+                                    end = min(start + samples_per_bar, len(chunk))
+                                    if start < len(chunk):
+                                        bar_chunk = chunk[start:end]
+                                        # RMS amplitude
+                                        if HAS_NUMPY:
+                                            rms = float(np.sqrt(np.mean(bar_chunk**2)))
+                                        else:
+                                            rms = sum(abs(x) for x in bar_chunk) / len(bar_chunk)
+                                        # Scale to 0-1 (adjust multiplier for sensitivity)
+                                        self.target_heights[i] = min(1.0, rms * 8)
+                                    else:
+                                        self.target_heights[i] = 0
+            except Exception as e:
+                has_real_audio = False
+
+        # If no real audio data, show flat/idle state (not fake waves)
+        if not has_real_audio:
             for i in range(self.num_bars):
-                # Create organic wave pattern
-                wave1 = math.sin(t * 8 + i * 0.2) * 0.3
-                wave2 = math.sin(t * 12 + i * 0.15) * 0.2
-                wave3 = math.sin(t * 5 + i * 0.3) * 0.25
-                noise = random.uniform(-0.15, 0.15)
-
-                # Center bars are higher (voice-like pattern)
-                center_boost = 1.0 - abs(i - self.num_bars // 2) / (self.num_bars // 2) * 0.4
-
-                base = 0.4 + wave1 + wave2 + wave3 + noise
-                self.target_heights[i] = max(0, min(1, base * center_boost))
+                self.target_heights[i] = 0.02  # Nearly flat when not speaking
 
         # Smooth animation towards target
         for i, bar in enumerate(self.bars):

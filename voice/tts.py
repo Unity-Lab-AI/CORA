@@ -106,9 +106,23 @@ class KokoroTTS(TTSEngine):
             # Generate audio using Kokoro pipeline
             for result in self.pipeline(text, voice=self.voice, speed=speed):
                 if result.audio is not None:
+                    # Share audio data with waveform visualizer
+                    try:
+                        from ui.boot_display import set_audio_data, clear_audio_data
+                        set_audio_data(result.audio)
+                    except:
+                        pass
+
                     # Play audio at 24kHz sample rate
                     self.sd.play(result.audio, samplerate=24000)
                     self.sd.wait()
+
+                    # Clear audio data when done
+                    try:
+                        from ui.boot_display import clear_audio_data
+                        clear_audio_data()
+                    except:
+                        pass
             return True
         except Exception as e:
             print(f"[!] Kokoro TTS error: {e}")
