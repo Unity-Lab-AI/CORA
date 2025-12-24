@@ -205,7 +205,15 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         # Load CORA's full system prompt
         system_prompt = get_system_prompt()
 
-        prompt = f"Report this boot status: {context} - {result}"
+        # Build appropriate prompt based on context type
+        if "headline" in context.lower() or "news" in context.lower():
+            prompt = f"Announce these news headlines in your style: {result}"
+        elif "weather" in context.lower() or "forecast" in context.lower():
+            prompt = f"Announce this weather info in your style: {result}"
+        elif "location" in context.lower():
+            prompt = f"Announce this location in your style: {result}"
+        else:
+            prompt = f"Announce this boot phase result in your style: {context} - {result}"
 
         response = generate(
             prompt=prompt,
