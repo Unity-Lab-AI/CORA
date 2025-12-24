@@ -80,6 +80,17 @@ def speak(text: str):
     global _boot_display
     print(f"[CORA] {text}")
 
+    # Mark echo filter that we're speaking (prevents hearing ourselves)
+    try:
+        from voice.echo_filter import get_echo_filter
+        echo_filter = get_echo_filter()
+        # Estimate duration: ~0.4 seconds per word
+        word_count = len(text.split())
+        duration = max(1.0, word_count * 0.4)
+        echo_filter.start_speaking(duration=duration, text=text)
+    except:
+        pass
+
     # Start waveform animation before speaking
     if _boot_display:
         try:
@@ -99,6 +110,13 @@ def speak(text: str):
             _boot_display.stop_speaking()
         except:
             pass
+
+    # Clear echo filter now that we're done
+    try:
+        from voice.echo_filter import get_echo_filter
+        get_echo_filter().stop_speaking()
+    except:
+        pass
 
 
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
@@ -1535,13 +1553,23 @@ if __name__ == "__main__":
 
     print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
 
-    # Start STT listening for wake word "CORA"
+    # Start STT listening for wake word "CORA" with echo filtering
     stt_active = False
+    echo_filter = None
     try:
         from voice.stt import WakeWordDetector, SpeechRecognizer
+        from voice.echo_filter import get_echo_filter
+
+        # Get/create echo filter to prevent hearing ourselves
+        echo_filter = get_echo_filter(filter_duration=3.0)
 
         def on_wake_word():
             """Called when 'CORA' wake word detected."""
+            # Ignore if CORA is currently speaking (echo)
+            if echo_filter and echo_filter.is_speaking():
+                print("[STT] Ignoring wake word - CORA is speaking")
+                return
+
             print("[STT] Wake word detected!")
             if _boot_display:
                 _boot_display.log("Wake word detected - listening...", 'info')
@@ -1551,6 +1579,10 @@ if __name__ == "__main__":
                 if recognizer.initialize():
                     text = recognizer.listen_once(timeout=5, phrase_limit=10)
                     if text.strip():
+                        # Check if this is echo of what we just said
+                        if echo_filter and not echo_filter.should_process(text):
+                            print(f"[STT] Ignoring echo: {text}")
+                            return
                         print(f"[STT] Heard: {text}")
                         if _boot_display:
                             _boot_display._process_user_input(text)

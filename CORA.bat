@@ -1,19 +1,19 @@
 @echo off
+chcp 437 >nul
 title C.O.R.A - Cognitive Operations & Reasoning Assistant
 color 0D
 
 echo.
-echo   ██████╗ ██████╗ ██████╗  █████╗
-echo  ██╔════╝██╔═══██╗██╔══██╗██╔══██╗
-echo  ██║     ██║   ██║██████╔╝███████║
-echo  ██║     ██║   ██║██╔══██╗██╔══██║
-echo  ╚██████╗╚██████╔╝██║  ██║██║  ██║
-echo   ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
-echo.
-echo  Cognitive Operations ^& Reasoning Assistant
-echo  Version 2.4.0 - Unity AI Lab
-echo.
-echo ══════════════════════════════════════════════════════
+echo   +=========================================+
+echo   :   ____  ___  ____   _                   :
+echo   :  / ___]/ _ \[  _ \ / \                  :
+echo   : [ [__ [ [ ] ][ ][_][ o ]                :
+echo   : [ [__ [ [ ] ][ _ / /   \                :
+echo   :  \___] \___/[_] [_]_] [_]               :
+echo   :                                         :
+echo   :  Cognitive Operations ^& Reasoning       :
+echo   :  Assistant - v2.4.0 - Unity AI Lab      :
+echo   +=========================================+
 echo.
 
 :: Check Python
@@ -107,7 +107,7 @@ if errorlevel 1 (
 echo         Ollama service running
 echo.
 
-echo ══════════════════════════════════════════════════════
+echo ======================================================
 echo.
 echo [LAUNCH] Starting C.O.R.A Boot Sequence...
 echo.
