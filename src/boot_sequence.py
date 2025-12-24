@@ -1465,15 +1465,16 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     now = datetime.now()
     time_str = now.strftime("%I:%M %p").lstrip('0')
     day_str = now.strftime("%A")
+    date_str = now.strftime("%B %d")  # e.g., "December 24"
     hour = now.hour
 
-    # Time greeting
+    # Time greeting - natural phrasing
     if hour < 12:
-        greeting = f"Good morning. It's {time_str} on {day_str}."
+        greeting = f"Good morning. Today is {day_str}, {date_str}. It's {time_str}."
     elif hour < 17:
-        greeting = f"Good afternoon. It's {time_str}, {day_str}."
+        greeting = f"Good afternoon. Today is {day_str}, {date_str}. It's {time_str}."
     else:
-        greeting = f"Evening. It's {time_str} on {day_str}."
+        greeting = f"Evening. Today is {day_str}, {date_str}. It's {time_str}."
 
     display_log(greeting, "system")
 

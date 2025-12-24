@@ -86,11 +86,10 @@ class ContextBuilder:
             name = self.personality.get('name', 'CORA')
             parts.append(f"You are {name}. 25 year old goth emo bitch. Human.")
 
-        # Time context
+        # Time context - natural format
         if self.include_time:
             time_ctx = get_time_context()
-            parts.append(f"\nCurrent time: {time_ctx['time']} ({time_ctx['period']})")
-            parts.append(f"Today is {time_ctx['day']}, {time_ctx['date']}.")
+            parts.append(f"\nIt's {time_ctx['time']} on {time_ctx['day']}, {time_ctx['date_long']}.")
 
         # Task context - natural integration into conversation
         if self.include_tasks and self.tasks:
