@@ -100,11 +100,20 @@ class KokoroTTS(TTSEngine):
                 return False
 
         try:
+            # Clean text for TTS - remove action markers like *sighs* or *lights cigarette*
+            import re
+            clean_text = re.sub(r'\*[^*]+\*', '', text)  # Remove *action* markers
+            clean_text = re.sub(r'_[^_]+_', '', clean_text)  # Remove _italic_ markers
+            clean_text = re.sub(r'\s+', ' ', clean_text).strip()  # Clean up extra spaces
+
+            if not clean_text:
+                return True  # Nothing to speak after cleaning
+
             # Get speed modifier based on emotion
             speed = self._get_emotion_speed(emotion)
 
             # Generate audio using Kokoro pipeline
-            for result in self.pipeline(text, voice=self.voice, speed=speed):
+            for result in self.pipeline(clean_text, voice=self.voice, speed=speed):
                 if result.audio is not None:
                     # Share audio data with waveform visualizer
                     try:
