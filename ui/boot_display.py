@@ -38,7 +38,7 @@ class BootPhase:
 
 
 class AudioWaveform(tk.Canvas):
-    """Animated audio waveform visualization."""
+    """Real-time audio waveform visualization that captures system audio output."""
 
     def __init__(self, parent, width=400, height=80, **kwargs):
         super().__init__(parent, width=width, height=height,
@@ -47,12 +47,28 @@ class AudioWaveform(tk.Canvas):
         self.height = height
         self.is_playing = False
         self.bars = []
-        self.num_bars = 40
-        self.bar_width = width // self.num_bars - 2
+        self.num_bars = 50
+        self.bar_width = max(2, (width - 20) // self.num_bars)
         self.animation_id = None
+        self.audio_stream = None
+        self.audio_data = [0] * self.num_bars
+        self.target_heights = [0] * self.num_bars
+        self.current_heights = [0.0] * self.num_bars
+        self.smoothing = 0.3  # Smoothing factor for animation
 
-        # Colors - goth/cyberpunk aesthetic
-        self.colors = ['#ff00ff', '#ff44ff', '#cc00cc', '#9900ff', '#6600cc']
+        # Try to import audio capture
+        self.audio_available = False
+        try:
+            import sounddevice as sd
+            self.sd = sd
+            self.audio_available = True
+        except ImportError:
+            self.sd = None
+
+        # Colors - goth/cyberpunk gradient
+        self.color_low = (50, 0, 80)      # Dark purple
+        self.color_mid = (180, 0, 180)    # Magenta
+        self.color_high = (255, 50, 150)  # Hot pink
 
         self._create_bars()
 
@@ -60,19 +76,86 @@ class AudioWaveform(tk.Canvas):
         """Create the waveform bars."""
         self.delete("all")
         self.bars = []
+        gap = 2
+        total_width = self.num_bars * (self.bar_width + gap)
+        start_x = (self.width - total_width) // 2
 
         for i in range(self.num_bars):
-            x = i * (self.bar_width + 2) + 2
+            x = start_x + i * (self.bar_width + gap)
             bar = self.create_rectangle(
-                x, self.height // 2 - 2,
-                x + self.bar_width, self.height // 2 + 2,
-                fill='#333333', outline=''
+                x, self.height // 2 - 1,
+                x + self.bar_width, self.height // 2 + 1,
+                fill='#1a0a2a', outline=''
             )
             self.bars.append(bar)
 
+    def _get_color(self, intensity):
+        """Get color based on intensity (0-1)."""
+        if intensity < 0.5:
+            # Blend low to mid
+            t = intensity * 2
+            r = int(self.color_low[0] + (self.color_mid[0] - self.color_low[0]) * t)
+            g = int(self.color_low[1] + (self.color_mid[1] - self.color_low[1]) * t)
+            b = int(self.color_low[2] + (self.color_mid[2] - self.color_low[2]) * t)
+        else:
+            # Blend mid to high
+            t = (intensity - 0.5) * 2
+            r = int(self.color_mid[0] + (self.color_high[0] - self.color_mid[0]) * t)
+            g = int(self.color_mid[1] + (self.color_high[1] - self.color_mid[1]) * t)
+            b = int(self.color_mid[2] + (self.color_high[2] - self.color_mid[2]) * t)
+        return f'#{r:02x}{g:02x}{b:02x}'
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        """Callback for audio stream - processes audio data."""
+        if indata is not None and len(indata) > 0:
+            # Get audio amplitude
+            audio = indata[:, 0] if len(indata.shape) > 1 else indata
+
+            # Split into frequency bands (simple approach)
+            chunk_size = len(audio) // self.num_bars
+            if chunk_size > 0:
+                for i in range(self.num_bars):
+                    start = i * chunk_size
+                    end = start + chunk_size
+                    chunk = audio[start:end]
+                    # RMS of chunk
+                    rms = float(np.sqrt(np.mean(chunk**2)))
+                    # Scale to 0-1 range (adjust multiplier for sensitivity)
+                    self.target_heights[i] = min(1.0, rms * 15)
+
     def start(self):
-        """Start the waveform animation."""
+        """Start the waveform animation with audio capture."""
         self.is_playing = True
+
+        # Try to capture audio output
+        if self.audio_available:
+            try:
+                import numpy as np
+                global np
+                # Try to capture from loopback/output device
+                devices = self.sd.query_devices()
+                loopback_device = None
+
+                # Look for loopback or stereo mix device
+                for i, dev in enumerate(devices):
+                    name = dev['name'].lower()
+                    if 'loopback' in name or 'stereo mix' in name or 'what u hear' in name:
+                        loopback_device = i
+                        break
+
+                if loopback_device is not None:
+                    self.audio_stream = self.sd.InputStream(
+                        device=loopback_device,
+                        channels=1,
+                        samplerate=44100,
+                        blocksize=1024,
+                        callback=self._audio_callback
+                    )
+                    self.audio_stream.start()
+            except Exception as e:
+                # Fall back to simulated audio
+                self.audio_stream = None
+
         self._animate()
 
     def stop(self):
@@ -82,38 +165,79 @@ class AudioWaveform(tk.Canvas):
             self.after_cancel(self.animation_id)
             self.animation_id = None
 
-        # Reset bars to flat
-        for bar in self.bars:
-            self.coords(
-                bar,
-                self.coords(bar)[0], self.height // 2 - 2,
-                self.coords(bar)[2], self.height // 2 + 2
-            )
-            self.itemconfig(bar, fill='#333333')
+        # Stop audio stream
+        if self.audio_stream:
+            try:
+                self.audio_stream.stop()
+                self.audio_stream.close()
+            except:
+                pass
+            self.audio_stream = None
+
+        # Animate bars back to flat
+        self._fade_out()
+
+    def _fade_out(self):
+        """Smoothly fade bars to flat."""
+        center_y = self.height // 2
+        all_flat = True
+
+        for i, bar in enumerate(self.bars):
+            self.current_heights[i] *= 0.7
+            if self.current_heights[i] > 0.5:
+                all_flat = False
+
+            height = max(1, int(self.current_heights[i]))
+            x1, _, x2, _ = self.coords(bar)
+            self.coords(bar, x1, center_y - height, x2, center_y + height)
+
+            if height <= 1:
+                self.itemconfig(bar, fill='#1a0a2a')
+
+        if not all_flat and not self.is_playing:
+            self.after(30, self._fade_out)
 
     def _animate(self):
-        """Animate the waveform."""
+        """Animate the waveform with real or simulated audio."""
         if not self.is_playing:
             return
 
         center_y = self.height // 2
+        max_height = (self.height // 2) - 5
 
+        # If no real audio, simulate based on "speaking" activity
+        if not self.audio_stream:
+            t = time.time()
+            for i in range(self.num_bars):
+                # Create organic wave pattern
+                wave1 = math.sin(t * 8 + i * 0.2) * 0.3
+                wave2 = math.sin(t * 12 + i * 0.15) * 0.2
+                wave3 = math.sin(t * 5 + i * 0.3) * 0.25
+                noise = random.uniform(-0.15, 0.15)
+
+                # Center bars are higher (voice-like pattern)
+                center_boost = 1.0 - abs(i - self.num_bars // 2) / (self.num_bars // 2) * 0.4
+
+                base = 0.4 + wave1 + wave2 + wave3 + noise
+                self.target_heights[i] = max(0, min(1, base * center_boost))
+
+        # Smooth animation towards target
         for i, bar in enumerate(self.bars):
-            # Create wave-like motion with randomness
-            phase = time.time() * 5 + i * 0.3
-            base_height = abs(math.sin(phase)) * 30 + 5
-            random_height = random.uniform(0.7, 1.3)
-            height = int(base_height * random_height)
+            # Smooth interpolation
+            self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * self.smoothing
+
+            height = int(self.current_heights[i] * max_height)
+            height = max(2, height)
 
             x1, _, x2, _ = self.coords(bar)
             self.coords(bar, x1, center_y - height, x2, center_y + height)
 
             # Color based on height
-            intensity = min(255, int(height * 8))
-            color = f'#{intensity:02x}00{255-intensity//2:02x}'
+            intensity = self.current_heights[i]
+            color = self._get_color(intensity)
             self.itemconfig(bar, fill=color)
 
-        self.animation_id = self.after(50, self._animate)
+        self.animation_id = self.after(33, self._animate)  # ~30 FPS
 
 
 class BootDisplay:
