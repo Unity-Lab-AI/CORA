@@ -189,10 +189,25 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             # Remove CORA: prefix if present
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
-            # Remove any trailing incomplete sentences (end at last punctuation)
-            last_punct = max(text.rfind('.'), text.rfind('!'), text.rfind('?'))
-            if last_punct > 10:
-                text = text[:last_punct+1]
+            # Take first COMPLETE sentence - find first sentence ending
+            first_period = text.find('. ')
+            first_exclaim = text.find('! ')
+            first_question = text.find('? ')
+            # Get the earliest sentence ending (ignore -1 values)
+            endings = [e for e in [first_period, first_exclaim, first_question] if e > 0]
+            if endings:
+                first_end = min(endings)
+                text = text[:first_end+1]
+            elif text.endswith('.') or text.endswith('!') or text.endswith('?'):
+                # Already a complete sentence
+                pass
+            else:
+                # No sentence ending found, check if there's one at the end without space
+                for punct in ['.', '!', '?']:
+                    idx = text.rfind(punct)
+                    if idx > 10:
+                        text = text[:idx+1]
+                        break
 
             # VALIDATION: Check that key data appears in response
             text_lower = text.lower()
