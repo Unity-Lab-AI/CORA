@@ -912,9 +912,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             city_for_weather = city if city else None
             if location_str:
                 print(f"  [OK] Location: {location_str}")
-                display_result(f"Location: {location_str}")
+                display_result(f"We're in {location_str}")
                 BOOT_STATUS['location'] = loc
                 BOOT_STATUS['systems'].append({'name': 'Location', 'status': 'OK'})
+                # CORA announces location in her own words
+                response = cora_respond("Location check", f"We're currently in {location_str}", "ok")
+                speak(response)
             else:
                 print("  [WARN] Location data incomplete")
                 display_log("Location data incomplete", "warn")
@@ -1009,10 +1012,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         temp_str = temp_str.replace('F', '').replace('°', '').strip()
         return f"{temp_str} degrees"
 
-    # Build weather report with location and 3-day forecast - natural speech
+    # Build weather report with 3-day forecast - natural speech
+    # Location already announced separately, so just do weather
     weather_report = ""
-    if location_str:
-        weather_report = f"We're currently in {location_str}. "
     if weather_data and weather_data.get('success'):
         temp = weather_data.get('temp', '?')
         cond = weather_data.get('conditions', '?')
