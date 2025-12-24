@@ -1158,24 +1158,30 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 from ai.ollama import generate_with_image
                 display_action("Analyzing screenshot with AI vision...")
                 vision_result = generate_with_image(
-                    prompt="Describe what you see on this computer screen in 1-2 sentences. Be specific about any windows, apps, or content visible.",
+                    prompt="What do you see on this screen? Describe the specific windows, apps, content, or anything interesting. Be detailed.",
                     image_path=result.path,
+                    system=get_system_prompt(),
                     model="llava"
                 )
                 if vision_result and vision_result.content:
-                    screen_description = vision_result.content.strip()[:150]
-                    print(f"  CORA sees: {screen_description[:80]}...")
-                    display_result(f"Vision: {screen_description[:60]}...")
+                    screen_description = vision_result.content.strip()
+                    # Clean markdown
+                    screen_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', screen_description)
+                    screen_description = re.sub(r'\*([^*]+)\*', r'\1', screen_description)
+                    screen_description = re.sub(r'\n+', ' ', screen_description)
+                    screen_description = re.sub(r'\s+', ' ', screen_description).strip()
+                    print(f"  CORA sees: {screen_description}")
+                    display_result(f"Vision: {screen_description[:80]}...")
                     BOOT_STATUS['screenshot_description'] = screen_description
             except Exception as e:
                 print(f"  [INFO] Vision analysis skipped: {e}")
 
-            # CORA speaks what she sees on the screenshot - through AI
+            # CORA speaks what she sees - the actual description
             if screen_description:
-                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels. I can see: {screen_description}", "ok")
+                speak(screen_description)
             else:
-                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels", "ok")
-            speak(response)
+                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels but I couldn't analyze it", "warn")
+                speak(response)
         else:
             print(f"  [WARN] Screenshot failed: {result.error}")
             display_log(f"Screenshot failed: {result.error}", "warn")
@@ -1218,24 +1224,30 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                     from ai.ollama import generate_with_image
                     display_action("Analyzing camera with AI vision...")
                     vision_result = generate_with_image(
-                        prompt="Describe what you see through this webcam in 1-2 sentences. Mention the person, room, or objects visible.",
+                        prompt="What do you see through this camera? Describe the person, their appearance, the room, objects, or anything interesting. Be detailed and specific.",
                         image_path=str(cam_path),
+                        system=get_system_prompt(),
                         model="llava"
                     )
                     if vision_result and vision_result.content:
-                        camera_description = vision_result.content.strip()[:150]
-                        print(f"  CORA sees: {camera_description[:80]}...")
-                        display_result(f"Vision: {camera_description[:60]}...")
+                        camera_description = vision_result.content.strip()
+                        # Clean markdown
+                        camera_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', camera_description)
+                        camera_description = re.sub(r'\*([^*]+)\*', r'\1', camera_description)
+                        camera_description = re.sub(r'\n+', ' ', camera_description)
+                        camera_description = re.sub(r'\s+', ' ', camera_description).strip()
+                        print(f"  CORA sees: {camera_description}")
+                        display_result(f"Vision: {camera_description[:80]}...")
                         BOOT_STATUS['camera_description'] = camera_description
                 except Exception as e:
                     print(f"  [INFO] Camera vision analysis skipped: {e}")
 
-                # CORA speaks what she sees through the camera - through AI
+                # CORA speaks what she sees - the actual description
                 if camera_description:
-                    response = cora_respond("Camera system", f"Camera captured a {frame.shape[1]} by {frame.shape[0]} frame. I can see: {camera_description}", "ok")
+                    speak(camera_description)
                 else:
-                    response = cora_respond("Camera system", f"Camera is working. Captured a {frame.shape[1]} by {frame.shape[0]} frame", "ok")
-                speak(response)
+                    response = cora_respond("Camera system", f"Camera is working but I couldn't analyze the image", "warn")
+                    speak(response)
             else:
                 print("  [WARN] Camera opened but no frame")
                 display_log("Camera opened but no frame captured", "warn")

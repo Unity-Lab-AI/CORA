@@ -460,6 +460,7 @@ def generate_with_image(
     prompt: str,
     image_path: str,
     model: str = VISION_MODEL,
+    system: str = None,
     temperature: float = 0.7,
     max_tokens: int = 150,
     timeout: int = 60
@@ -470,6 +471,7 @@ def generate_with_image(
         prompt: Question about the image
         image_path: Path to the image file
         model: Vision model to use (default: llava)
+        system: System prompt for personality
         temperature: Sampling temperature
         max_tokens: Max response tokens
         timeout: Request timeout
@@ -494,16 +496,20 @@ def generate_with_image(
         with open(img_path, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode('utf-8')
 
+        # Build messages list
+        messages = []
+        if system:
+            messages.append({'role': 'system', 'content': system})
+        messages.append({
+            'role': 'user',
+            'content': prompt,
+            'images': [image_data]
+        })
+
         # Build payload with image
         payload = {
             'model': model,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': prompt,
-                    'images': [image_data]
-                }
-            ],
+            'messages': messages,
             'stream': False,
             'options': {
                 'temperature': temperature,
