@@ -605,8 +605,8 @@ class BootDisplay:
                 # MODE: Imagine - generate image from text
                 elif mode == 'imagine':
                     if text:
-                        self.log_action(f"Generating image: {text[:50]}...")
-                        self._speak(f"Creating {text[:30]}")
+                        self.log_action(f"Generating image: {text}")
+                        self._speak(f"Creating {text}")
                         try:
                             from tools.image_gen import generate_image
                             result = generate_image(text)
@@ -668,21 +668,21 @@ class BootDisplay:
 
                 if is_image_request:
                     # Route to image generation
-                    self.log_action(f"Generating image: {text[:50]}...")
+                    # Extract what to generate - strip the trigger words first
+                    prompt = text
+                    for trigger in ['show me a', 'show me an', 'show me', 'generate a', 'generate an',
+                                   'create a', 'create an', 'draw a', 'draw an', 'make me a', 'make me an',
+                                   'picture of', 'image of', 'photo of']:
+                        if trigger in text_lower:
+                            idx = text_lower.find(trigger)
+                            prompt = text[idx + len(trigger):].strip()
+                            break
+
+                    self.log_action(f"Generating image: {prompt}")
                     self._speak(f"Fine, I'll make your fucking picture")
                     try:
                         from tools.image_gen import generate_image
-                        # Extract what to generate - strip the trigger words
-                        prompt = text
-                        for trigger in ['show me a', 'show me an', 'show me', 'generate a', 'generate an',
-                                       'create a', 'create an', 'draw a', 'draw an', 'make me a', 'make me an',
-                                       'picture of', 'image of', 'photo of']:
-                            if trigger in text_lower:
-                                idx = text_lower.find(trigger)
-                                prompt = text[idx + len(trigger):].strip()
-                                break
-
-                        result = generate_image(prompt if prompt else text)
+                        result = generate_image(prompt)
                         if result.get('success'):
                             self.log_result(f"Image saved: {result.get('path')}")
                             self._speak("There. Your shitty image is done.")

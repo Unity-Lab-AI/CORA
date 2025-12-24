@@ -1261,11 +1261,11 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             )
 
             if result.content and len(result.content) > 20:
-                cora_prompt = result.content.strip()[:200]
+                cora_prompt = result.content.strip()
                 # Clean up any quotes or extra formatting
                 cora_prompt = cora_prompt.strip('"\'').strip()
-                print(f"  CORA's vision: {cora_prompt[:70]}...")
-                display_result(f"AI Vision: {cora_prompt[:60]}...")
+                print(f"  CORA's vision: {cora_prompt}")
+                display_result(f"AI Vision: {cora_prompt}")
         except Exception as e:
             print(f"  [INFO] AI prompt generation skipped: {e}")
             display_log(f"AI prompt skipped: {e}", "info")
@@ -1281,14 +1281,14 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 "cyberpunk goddess awakening, feminine form made of corrupted data and dying stars, dark ethereal glow"
             ]
             cora_prompt = random.choice(dark_themes)
-            print(f"  Using preset vision: {cora_prompt[:60]}...")
-            display_log(f"Using preset: {cora_prompt[:40]}...", "info")
+            print(f"  Using preset vision: {cora_prompt}")
+            display_log(f"Using preset: {cora_prompt}", "info")
 
         print("  Generating via Pollinations Flux model...")
         display_tool("Pollinations API", f"Generating 1280x720 image")
-        display_action(f"Prompt: {cora_prompt[:50]}...")
+        display_action(f"Prompt: {cora_prompt}")
         # CORA generates her own response about starting generation
-        response = cora_respond("Image Generation", f"Creating: {cora_prompt[:40]}...", "ok")
+        response = cora_respond("Image Generation", f"Creating: {cora_prompt}", "ok")
         speak(response)
 
         result = generate_image(
