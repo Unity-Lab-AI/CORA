@@ -63,12 +63,12 @@ def get_weather(location: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-def get_forecast(location: Optional[str] = None, days: int = 1) -> Dict[str, Any]:
+def get_forecast(location: Optional[str] = None, days: int = 3) -> Dict[str, Any]:
     """Get weather forecast.
 
     Args:
         location: City name or coordinates
-        days: Number of days (1-3)
+        days: Number of days (1-3, wttr.in max is 3)
 
     Returns:
         Dict with forecast data including high/low and precipitation
@@ -90,12 +90,32 @@ def get_forecast(location: Optional[str] = None, days: int = 1) -> Dict[str, Any
             forecast_days = []
 
             for i, day in enumerate(weather[:days]):
+                # Get day name from date
+                date_str = day.get('date', '')
+                day_name = ''
+                if date_str:
+                    try:
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                        day_name = date_obj.strftime('%A')  # Full day name
+                    except:
+                        day_name = f"Day {i+1}"
+
+                # Get weather description for the day
+                hourly = day.get('hourly', [])
+                conditions = 'N/A'
+                if hourly:
+                    # Get midday conditions (index 4 = noon)
+                    mid_idx = min(4, len(hourly) - 1)
+                    conditions = hourly[mid_idx].get('weatherDesc', [{}])[0].get('value', 'N/A')
+
                 forecast_days.append({
-                    'date': day.get('date', ''),
+                    'date': date_str,
+                    'day_name': day_name,
                     'high': day.get('maxtempF', 'N/A') + 'F',
                     'low': day.get('mintempF', 'N/A') + 'F',
                     'avg': day.get('avgtempF', 'N/A') + 'F',
-                    'hourly': day.get('hourly', [])
+                    'conditions': conditions,
+                    'hourly': hourly
                 })
 
             return {

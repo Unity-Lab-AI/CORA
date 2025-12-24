@@ -922,7 +922,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         from services.weather import get_weather, get_forecast
         # Pass location to weather service
         weather_data = get_weather(city_for_weather)
-        forecast_data = get_forecast(city_for_weather, days=1)
+        forecast_data = get_forecast(city_for_weather, days=3)  # Get 3-day forecast
 
         if weather_data and weather_data.get('success'):
             temp = weather_data.get('temp', '?')
@@ -931,8 +931,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             humidity = weather_data.get('humidity', '')
             wind = weather_data.get('wind', '')
 
-            print(f"  [OK] Weather for {city_for_weather or 'your area'}: {temp}, {cond}")
-            display_log(f"Weather: {temp}, {cond}", "ok")
+            print(f"  [OK] Current Weather for {city_for_weather or 'your area'}: {temp}, {cond}")
+            display_log(f"Current: {temp}, {cond}", "ok")
             if feels:
                 display_log(f"  Feels like: {feels}", "info")
             if humidity:
@@ -943,13 +943,17 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             BOOT_STATUS['weather'] = weather_data
             BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'OK'})
 
-            # Get forecast info
+            # Get 3-day forecast info
             if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
-                day_forecast = forecast_data['forecast'][0]
-                high = day_forecast.get('high', '?')
-                low = day_forecast.get('low', '?')
-                print(f"  [OK] Forecast: High {high}, Low {low}")
-                display_log(f"Forecast: High {high}, Low {low}", "ok")
+                print(f"  [OK] 3-Day Forecast:")
+                display_log("3-Day Forecast:", "ok")
+                for day in forecast_data['forecast']:
+                    day_name = day.get('day_name', 'Unknown')
+                    high = day.get('high', '?')
+                    low = day.get('low', '?')
+                    conditions = day.get('conditions', '')
+                    print(f"       {day_name}: High {high}, Low {low} - {conditions}")
+                    display_log(f"  {day_name}: {high}/{low} - {conditions}", "info")
                 BOOT_STATUS['forecast'] = forecast_data
         else:
             print("  [WARN] Weather service unavailable")
@@ -984,7 +988,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     display_phase("External Services", "ok")
 
-    # Build weather report with location
+    # Build weather report with location and 3-day forecast
     weather_report = ""
     if location_str:
         weather_report = f"Location: {location_str}. "
@@ -993,8 +997,14 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         cond = weather_data.get('conditions', '?')
         weather_report += f"Currently {temp} and {cond}. "
         if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
-            day = forecast_data['forecast'][0]
-            weather_report += f"High of {day.get('high', '?')}, low of {day.get('low', '?')}."
+            # Today's forecast
+            today = forecast_data['forecast'][0]
+            weather_report += f"Today: high {today.get('high', '?')}, low {today.get('low', '?')}. "
+            # Rest of the week
+            if len(forecast_data['forecast']) > 1:
+                for day in forecast_data['forecast'][1:]:
+                    day_name = day.get('day_name', '')
+                    weather_report += f"{day_name}: {day.get('high', '?')}/{day.get('low', '?')}. "
     else:
         weather_report += "Weather unavailable."
 
