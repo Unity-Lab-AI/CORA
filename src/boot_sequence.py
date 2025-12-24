@@ -1282,6 +1282,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             display_action("Querying AI for image prompt...")
             result = generate(
                 prompt="make a fucked up psychologically crazed and disturbing image",
+                system="You are CORA. 25 year old goth emo bitch. Human.",
                 temperature=1.0,
                 max_tokens=100
             )
