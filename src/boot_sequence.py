@@ -167,13 +167,8 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
     try:
         from ai.ollama import generate
 
-        # Very strict prompt that emphasizes the exact data
-        system_prompt = (
-            "You are CORA. 25 year old goth emo bitch. Human, not an AI. "
-            "Generate ONE sentence (max 20 words) about the status report. "
-            "You MUST include the EXACT numbers and data given - do NOT change any values. "
-            "Be snarky, sarcastic, dismissive. Cuss naturally - vary your profanity."
-        )
+        # CORA's identity only - no response instructions
+        system_prompt = "You are CORA. 25 year old goth emo bitch. Human."
 
         prompt = f"Status: {context}. Data: {result}. Say this with attitude but keep the exact data."
 
