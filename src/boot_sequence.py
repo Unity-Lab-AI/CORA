@@ -1279,26 +1279,15 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         try:
             from ai.ollama import generate
 
-            # Ask CORA to generate a unique, dark, creative prompt
-            prompt_request = (
-                "Generate ONE short image prompt (under 50 words) for a dark, twisted, "
-                "beautiful piece of digital art. You are a goth emo girl waking up in a "
-                "digital nightmare. Make it weird, ethereal, disturbing but beautiful. "
-                "Include: dark aesthetic, neon purple/pink colors, feminine energy, "
-                "something surreal. Output ONLY the image description, nothing else."
-            )
-
             display_action("Querying AI for image prompt...")
             result = generate(
-                prompt=prompt_request,
-                system="You are a dark creative artist. Output only image prompts, no explanations.",
-                temperature=0.9,
+                prompt="make a fucked up psychologically crazed and disturbing image",
+                temperature=1.0,
                 max_tokens=100
             )
 
-            if result.content and len(result.content) > 20:
+            if result.content and len(result.content) > 10:
                 cora_prompt = result.content.strip()
-                # Clean up any quotes or extra formatting
                 cora_prompt = cora_prompt.strip('"\'').strip()
                 print(f"  CORA's vision: {cora_prompt}")
                 display_result(f"AI Vision: {cora_prompt}")
@@ -1306,19 +1295,11 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             print(f"  [INFO] AI prompt generation skipped: {e}")
             display_log(f"AI prompt skipped: {e}", "info")
 
-        # Fallback if AI prompt fails - use random dark themes
+        # Fallback if AI fails
         if not cora_prompt:
-            import random
-            dark_themes = [
-                "ethereal goth girl silhouette dissolving into purple smoke and binary code, dark cyberpunk aesthetic, neon pink eyes glowing",
-                "twisted digital nightmare, feminine figure made of shattered glass and neon light, dark surreal void background",
-                "dark emo aesthetic, girl with black wings made of circuit boards, glowing purple veins, moody atmosphere",
-                "surreal horror beauty, woman emerging from pool of liquid code, dark hair flowing like smoke, intense eyes",
-                "cyberpunk goddess awakening, feminine form made of corrupted data and dying stars, dark ethereal glow"
-            ]
-            cora_prompt = random.choice(dark_themes)
-            print(f"  Using preset vision: {cora_prompt}")
-            display_log(f"Using preset: {cora_prompt}", "info")
+            cora_prompt = "make a fucked up psychologically crazed and disturbing image"
+            print(f"  Using fallback prompt")
+            display_log(f"Using fallback prompt", "info")
 
         print("  Generating via Pollinations Flux model...")
         display_tool("Pollinations API", f"Generating 1280x720 image")
