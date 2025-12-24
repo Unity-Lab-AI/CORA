@@ -724,13 +724,12 @@ class BootDisplay:
         threading.Thread(target=process, daemon=True).start()
 
     def _speak(self, text: str):
-        """Speak text via TTS - runs in background thread."""
+        """Speak text via TTS - shows text first, then speaks in background."""
+        # Show text in UI FIRST so user can read along while TTS plays
+        self.start_speaking(text)
+
         def speak_thread():
             try:
-                # Update UI safely from thread
-                if self.root:
-                    self.root.after(0, lambda: self.start_speaking(text))
-
                 from voice.tts import KokoroTTS
                 tts = KokoroTTS(voice='af_bella', speed=1.0)
                 if tts.initialize():
@@ -761,25 +760,20 @@ class BootDisplay:
 
     def _log_entry(self, text: str, tag: str = 'info'):
         """Add an entry to the scrolling log."""
-        def do_log():
-            if not self.log_text:
-                return
-            try:
-                timestamp = time.strftime("%H:%M:%S")
-                self.log_text.config(state='normal')
-                self.log_text.insert('end', f"[{timestamp}] ", 'timestamp')
-                self.log_text.insert('end', f"{text}\n", tag)
-                self.log_text.see('end')  # Auto-scroll to bottom
-                self.log_text.config(state='disabled')
-            except:
-                pass
-
-        # Schedule on main thread to avoid blocking
-        if self.root:
-            try:
-                self.root.after_idle(do_log)
-            except:
-                do_log()
+        if not self.log_text:
+            return
+        try:
+            timestamp = time.strftime("%H:%M:%S")
+            self.log_text.config(state='normal')
+            self.log_text.insert('end', f"[{timestamp}] ", 'timestamp')
+            self.log_text.insert('end', f"{text}\n", tag)
+            self.log_text.see('end')  # Auto-scroll to bottom
+            self.log_text.config(state='disabled')
+            # Force immediate update so text shows before TTS
+            if self.root:
+                self.root.update_idletasks()
+        except:
+            pass
 
     def log(self, text: str, level: str = 'info'):
         """Add a log entry with specified level (info, ok, warn, fail, system, speech)."""
