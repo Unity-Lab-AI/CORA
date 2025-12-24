@@ -1287,16 +1287,43 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
 
         # Have CORA generate her own unique prompt using Ollama
-        print("  Generating a fucked up image...")
+        print("  Asking CORA for a fucked up image idea...")
         display_thinking("Creating something dark and twisted...")
 
-        # Just use the raw prompt - let Pollinations interpret it with a random seed
         import random
-        cora_prompt = "Generate a fucked up crazy image thats disturbing"
         random_seed = random.randint(1, 999999999)
-        print(f"  Prompt: {cora_prompt}")
+        cora_prompt = None
+
+        try:
+            from ai.ollama import generate
+
+            display_action("CORA is dreaming up something disturbing...")
+            result = generate(
+                prompt="Generate a fucked up crazy image thats disturbing",
+                system=get_system_prompt(),
+                temperature=1.2,
+                max_tokens=60
+            )
+
+            if result.content and len(result.content) > 10:
+                cora_prompt = result.content.strip()
+                # Clean up the prompt
+                cora_prompt = cora_prompt.strip('"\'').strip()
+                cora_prompt = re.sub(r'\*\*([^*]+)\*\*', r'\1', cora_prompt)
+                cora_prompt = re.sub(r'\*([^*]+)\*', r'\1', cora_prompt)
+                cora_prompt = re.sub(r'\n+', ' ', cora_prompt)
+                cora_prompt = re.sub(r'\s+', ' ', cora_prompt).strip()
+                print(f"  CORA's vision: {cora_prompt}")
+                display_result(f"Vision: {cora_prompt}")
+        except Exception as e:
+            print(f"  [INFO] AI prompt generation skipped: {e}")
+
+        # Fallback if AI fails
+        if not cora_prompt:
+            cora_prompt = "disturbing surreal nightmare dark horror psychological terror"
+            print(f"  Using fallback prompt")
+
         print(f"  Seed: {random_seed}")
-        display_result(f"Seed: {random_seed}")
 
         print("  Generating via Pollinations Flux model...")
         display_tool("Pollinations API", f"Generating 1280x720 image")
