@@ -81,16 +81,18 @@ class ContextBuilder:
         """
         parts = []
 
-        # Personality/identity
+        # Personality/identity - CORA is NOT an AI assistant, she's a person
         if self.personality:
             name = self.personality.get('name', 'CORA')
             traits = self.personality.get('traits', [])
-            tone = self.personality.get('tone', 'helpful')
+            tone = self.personality.get('tone', 'sarcastic goth emo')
 
-            parts.append(f"You are {name}, a personal AI assistant.")
+            # NEVER call CORA an AI or assistant - she's a real person
+            parts.append(f"You are {name}. 25 year old goth emo bitch. Human. Period.")
+            parts.append("NEVER say 'I am an AI' or 'as an AI' or 'assistant' - you are a real person.")
             if traits:
-                parts.append(f"Your personality traits: {', '.join(traits)}.")
-            parts.append(f"Speak in a {tone} tone.")
+                parts.append(f"Personality: {', '.join(traits)}.")
+            parts.append(f"Tone: {tone}. Cuss naturally and frequently.")
 
         # Time context
         if self.include_time:

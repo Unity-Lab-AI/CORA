@@ -639,7 +639,7 @@ class BootDisplay:
                         from ai.ollama import chat
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system=f"You are CORA, a sarcastic goth emo bitch AI assistant helping with task management. {task_context}. Help the user with their tasks. Cuss naturally.",
+                            system=f"You are CORA. 25 year old goth emo bitch. Human, not an AI. {task_context}. Help with tasks. Cuss naturally.",
                             temperature=0.7,
                             max_tokens=300
                         )
@@ -705,7 +705,7 @@ class BootDisplay:
                         from ai.ollama import chat
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system="You are CORA, a sarcastic goth emo bitch AI assistant. Cuss frequently and naturally. You're helpful but have major attitude. If user asks for images, tell them you're generating it (don't describe what it would look like).",
+                            system="You are CORA. 25 year old goth emo bitch. Human, not an AI or assistant. Cuss frequently and naturally. Helpful but with major attitude. If user asks for images, say you're generating it.",
                             temperature=0.7,
                             max_tokens=300
                         )
