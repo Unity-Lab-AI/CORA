@@ -654,15 +654,29 @@ class BootDisplay:
 
                 # DEFAULT MODE: Normal AI chat - but detect image requests first
                 text_lower = text.lower()
-                image_triggers = ['show me', 'generate', 'create', 'draw', 'make me', 'picture of',
-                                  'image of', 'photo of', 'imagine', 'visualize', 'render']
-                is_image_request = any(trigger in text_lower for trigger in image_triggers) and \
-                                   any(word in text_lower for word in ['image', 'picture', 'photo', 'pic', 'drawing', 'art', 'selfie'])
 
-                # Also check for simple object requests like "show me an apple"
-                if any(trigger in text_lower for trigger in ['show me', 'draw', 'create', 'generate', 'make']):
-                    # Check if it's asking for a visual thing (not info)
-                    info_words = ['how', 'what is', 'explain', 'tell me', 'why', 'when', 'where', 'who']
+                # Detect image generation requests
+                is_image_request = False
+
+                # Direct image requests with keywords
+                image_triggers = ['show me', 'generate', 'create', 'draw', 'make me', 'make a',
+                                  'picture of', 'image of', 'photo of', 'imagine', 'visualize', 'render']
+                image_words = ['image', 'picture', 'photo', 'pic', 'drawing', 'art', 'selfie']
+
+                # Check for explicit image requests like "generate an image of..."
+                if any(trigger in text_lower for trigger in image_triggers):
+                    if any(word in text_lower for word in image_words):
+                        is_image_request = True
+
+                # Check for "show me X" or "draw X" patterns (visual object requests)
+                visual_triggers = ['show me a', 'show me an', 'show me the', 'show me',
+                                   'draw a', 'draw an', 'draw me', 'draw',
+                                   'create a', 'create an', 'generate a', 'generate an',
+                                   'make me a', 'make me an', 'make a', 'make an']
+                if any(trigger in text_lower for trigger in visual_triggers):
+                    # NOT an image request if asking for information
+                    info_words = ['how to', 'how do', 'what is', 'what are', 'explain', 'tell me about',
+                                  'why', 'when', 'where', 'who', 'help me', 'can you']
                     if not any(w in text_lower for w in info_words):
                         is_image_request = True
 
