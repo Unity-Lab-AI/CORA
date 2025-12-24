@@ -1078,20 +1078,18 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             # Announce top 3-4 headlines
             if headlines:
                 display_phase("News Headlines", "ok")
-                speak("Here's what's happening in the news today.")
-                time.sleep(0.2)
+                # Clean headlines for speech
+                clean_headlines = []
+                for hl in headlines[:4]:
+                    clean = hl.split(' - ')[0] if ' - ' in hl else hl
+                    if len(clean) > 100:
+                        clean = clean[:97] + "..."
+                    clean_headlines.append(clean)
 
-                # Read up to 4 headlines naturally
-                for i, hl in enumerate(headlines[:4], 1):
-                    # Clean for TTS (remove source attribution for smoother speech)
-                    clean_headline = hl.split(' - ')[0] if ' - ' in hl else hl
-                    # Keep it short for speech
-                    if len(clean_headline) > 100:
-                        clean_headline = clean_headline[:97] + "..."
-                    speak(clean_headline)
-                    time.sleep(0.1)
-
-                speak("That's the latest news.")
+                # Let CORA announce the news in her own style
+                news_data = "Here are today's top headlines: " + ". ".join(clean_headlines)
+                response = cora_respond("News Headlines", news_data, "ok")
+                speak(response)
             else:
                 display_phase("News Headlines", "warn")
                 response = cora_respond("News Headlines", "Couldn't get any news headlines. The feed came back empty", "warn")
@@ -1156,12 +1154,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             except Exception as e:
                 print(f"  [INFO] Vision analysis skipped: {e}")
 
-            # CORA speaks what she sees on the screenshot
+            # CORA speaks what she sees on the screenshot - through AI
             if screen_description:
-                speak(f"I can see your screen. {screen_description}")
+                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels. I can see: {screen_description}", "ok")
             else:
-                response = cora_respond("Screenshot capture", f"I grabbed a screenshot of your display. It's {result.width} by {result.height} pixels", "ok")
-                speak(response)
+                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels", "ok")
+            speak(response)
         else:
             print(f"  [WARN] Screenshot failed: {result.error}")
             display_log(f"Screenshot failed: {result.error}", "warn")
@@ -1216,12 +1214,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 except Exception as e:
                     print(f"  [INFO] Camera vision analysis skipped: {e}")
 
-                # CORA speaks what she sees through the camera
+                # CORA speaks what she sees through the camera - through AI
                 if camera_description:
-                    speak(f"I can see you through the camera. {camera_description}")
+                    response = cora_respond("Camera system", f"Camera captured a {frame.shape[1]} by {frame.shape[0]} frame. I can see: {camera_description}", "ok")
                 else:
-                    response = cora_respond("Camera system", f"Camera is working. I captured a {frame.shape[1]} by {frame.shape[0]} frame. I can see you", "ok")
-                    speak(response)
+                    response = cora_respond("Camera system", f"Camera is working. Captured a {frame.shape[1]} by {frame.shape[0]} frame", "ok")
+                speak(response)
             else:
                 print("  [WARN] Camera opened but no frame")
                 display_log("Camera opened but no frame captured", "warn")
@@ -1535,19 +1533,15 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         hw_warning = f"Memory is getting tight at {BOOT_STATUS['memory_percent']:.0f} percent used."
         display_log(hw_warning, "warn")
 
-    # Build final summary - natural speech
-    summary_parts = [greeting]
-    if weather_text:
-        summary_parts.append(weather_text)
-    summary_parts.append(status_text)
+    # Build final summary data and let CORA speak it her way
+    summary_data = f"Boot complete. {greeting} {status_text}"
     if hw_warning:
-        summary_parts.append(hw_warning)
-    summary_parts.append("I'm ready whenever you are.")
-
-    full_summary = " ".join(summary_parts)
+        summary_data += f" {hw_warning}"
+    summary_data += " Ready to go."
 
     display_phase("Final Check", "ok")
-    speak(full_summary)
+    response = cora_respond("Boot Complete", summary_data, "ok")
+    speak(response)
 
     print("")
     print("  +=========================================================+")
