@@ -545,12 +545,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         'creator': 'Unity AI Lab',
         'developers': 'Hackall360, Sponge, and GFourteen'
     }
-    # CORA generates her own unique intro
+    # CORA generates her own unique intro - natural speech
     response = cora_respond(
         "About Me Introduction",
-        f"I'm {about_data['name']}, version {about_data['version']}. {about_data['full_name']}. "
-        f"Built by {about_data['creator']}, created by {about_data['developers']}. "
-        f"AI assistant with voice, vision, and attitude.",
+        f"Hey, I'm {about_data['name']}. That stands for {about_data['full_name']}. "
+        f"Version {about_data['version']}. Made by {about_data['developers']} over at {about_data['creator']}. "
+        f"I've got voice, vision, and plenty of attitude. Let's get this boot going.",
         "ok"
     )
     speak(response)
@@ -584,14 +584,14 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             BOOT_STATUS['systems'].append({'name': f'AI Engine ({ai_model})', 'status': 'OK'})
             display_phase("AI Engine", "ok")
             # CORA generates her own response
-            response = cora_respond("AI Brain/Ollama", f"{ai_model} loaded and responding", "ok")
+            response = cora_respond("AI Brain/Ollama", f"My brain is online. Running on {ai_model} and ready to think", "ok")
             speak(response)
         else:
             print("  [WARN] AI Engine not responding")
             display_log("AI Engine not responding", "warn")
             BOOT_STATUS['systems'].append({'name': 'AI Engine', 'status': 'WARN'})
             display_phase("AI Engine", "warn")
-            response = cora_respond("AI Brain/Ollama", "Not responding to connection attempts", "warn")
+            response = cora_respond("AI Brain/Ollama", "My brain isn't responding. Ollama might be down or not running", "warn")
             speak(response)
 
     except Exception as e:
@@ -599,7 +599,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"AI Engine error: {e}", "warn")
         BOOT_STATUS['systems'].append({'name': 'AI Engine', 'status': 'WARN'})
         display_phase("AI Engine", "warn")
-        response = cora_respond("AI Brain/Ollama", f"Error: {e}", "fail")
+        response = cora_respond("AI Brain/Ollama", f"Something went wrong with my brain. Got an error: {e}", "fail")
         speak(response)
 
     time.sleep(0.3)
@@ -672,12 +672,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     BOOT_STATUS['systems'].append({'name': 'Hardware Check', 'status': 'OK'})
     display_phase("Hardware Check", "ok")
 
-    # CORA generates her own hardware summary response
-    hw_data = f"CPU {cpu:.0f}%, RAM {mem:.0f}%, Disk {disk:.0f}%"
+    # CORA generates her own hardware summary response - natural speech
+    hw_data = f"CPU is running at {cpu:.0f} percent, memory is at {mem:.0f} percent, and disk usage is {disk:.0f} percent"
     if BOOT_STATUS['gpu_available']:
-        hw_data += f", GPU: {stats['gpu_name']} at {stats['gpu']:.0f}% load with {stats.get('gpu_memory', 0):.0f}% VRAM"
+        hw_data += f". Got a {stats['gpu_name']} running at {stats['gpu']:.0f} percent load with {stats.get('gpu_memory', 0):.0f} percent VRAM used"
     else:
-        hw_data += ", No GPU detected"
+        hw_data += ". No GPU detected"
     response = cora_respond("PC Hardware scan", hw_data, "ok")
     speak(response)
 
@@ -818,8 +818,13 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['tools_tested'].append({'name': 'Code Analysis', 'status': 'WARN'})
 
     display_phase("Core Tools", "ok")
-    # CORA generates her own response about tools
-    tools_result = f"{tools_ok} of {tools_total} loaded successfully"
+    # CORA generates her own response about tools - natural speech
+    if tools_ok == tools_total:
+        tools_result = f"All {tools_total} tools loaded and ready to go"
+    elif tools_ok >= tools_total - 2:
+        tools_result = f"Got {tools_ok} out of {tools_total} tools working. Close enough"
+    else:
+        tools_result = f"Only {tools_ok} out of {tools_total} tools loaded. Some shit is broken"
     tools_status = "ok" if tools_ok >= tools_total - 2 else ("warn" if tools_ok >= tools_total // 2 else "fail")
     response = cora_respond("Core Tools check", tools_result, tools_status)
     speak(response)
@@ -867,8 +872,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['systems'].append({'name': 'Wake Word', 'status': 'INFO'})
 
     display_phase("Voice Systems", "ok")
-    # CORA generates her own response about voice systems
-    voice_result = "STT, Echo Filter, Wake Word all loaded"
+    # CORA generates her own response about voice systems - natural speech
+    voice_result = "Voice systems are up. I can hear you, filter out my own echo, and respond to my wake word"
     response = cora_respond("Voice Systems check", voice_result, "ok")
     speak(response)
     time.sleep(0.3)
@@ -1073,30 +1078,30 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             # Announce top 3-4 headlines
             if headlines:
                 display_phase("News Headlines", "ok")
-                speak("Here's what's happening in the news.")
+                speak("Here's what's happening in the news today.")
                 time.sleep(0.2)
 
-                # Read up to 4 headlines
+                # Read up to 4 headlines naturally
                 for i, hl in enumerate(headlines[:4], 1):
                     # Clean for TTS (remove source attribution for smoother speech)
                     clean_headline = hl.split(' - ')[0] if ' - ' in hl else hl
                     # Keep it short for speech
                     if len(clean_headline) > 100:
                         clean_headline = clean_headline[:97] + "..."
-                    speak(f"Headline {i}: {clean_headline}")
+                    speak(clean_headline)
                     time.sleep(0.1)
 
-                speak("That's the news.")
+                speak("That's the latest news.")
             else:
                 display_phase("News Headlines", "warn")
-                response = cora_respond("News Headlines", "Feed returned empty", "warn")
+                response = cora_respond("News Headlines", "Couldn't get any news headlines. The feed came back empty", "warn")
                 speak(response)
         else:
             print("  [WARN] News fetch failed")
             display_log(f"News fetch failed (HTTP {resp.status_code})", "warn")
             BOOT_STATUS['tools_tested'].append({'name': 'News Headlines', 'status': 'WARN'})
             display_phase("News Headlines", "warn")
-            response = cora_respond("News Headlines", f"HTTP {resp.status_code} error", "fail")
+            response = cora_respond("News Headlines", f"News fetch failed with a {resp.status_code} error", "fail")
             speak(response)
 
     except Exception as e:
@@ -1104,7 +1109,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"News fetch error: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Web Search', 'status': 'WARN'})
         display_phase("News Headlines", "warn")
-        response = cora_respond("News Headlines", f"Service error: {e}", "fail")
+        response = cora_respond("News Headlines", f"Something went wrong fetching the news", "fail")
         speak(response)
 
     time.sleep(0.3)
@@ -1153,9 +1158,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
             # CORA speaks what she sees on the screenshot
             if screen_description:
-                speak(f"Looking at your screen. {screen_description}")
+                speak(f"I can see your screen. {screen_description}")
             else:
-                response = cora_respond("Screenshot capture", f"Captured {result.width}x{result.height} display", "ok")
+                response = cora_respond("Screenshot capture", f"I grabbed a screenshot of your display. It's {result.width} by {result.height} pixels", "ok")
                 speak(response)
         else:
             print(f"  [WARN] Screenshot failed: {result.error}")
@@ -1213,9 +1218,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
                 # CORA speaks what she sees through the camera
                 if camera_description:
-                    speak(f"Looking at you through the camera. {camera_description}")
+                    speak(f"I can see you through the camera. {camera_description}")
                 else:
-                    response = cora_respond("Camera system", f"Captured {frame.shape[1]}x{frame.shape[0]} frame, you're on camera", "ok")
+                    response = cora_respond("Camera system", f"Camera is working. I captured a {frame.shape[1]} by {frame.shape[0]} frame. I can see you", "ok")
                     speak(response)
             else:
                 print("  [WARN] Camera opened but no frame")
@@ -1238,8 +1243,17 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'WARN'})
 
     display_phase("Vision Test", "ok")
-    # CORA generates her own overall vision response
-    vision_result = f"Screenshot: {'OK' if BOOT_STATUS.get('camera_available') or any(t['name'] == 'Screenshot Capture' and t['status'] == 'OK' for t in BOOT_STATUS['tools_tested']) else 'FAIL'}, Camera: {'OK' if BOOT_STATUS.get('camera_available') else 'N/A'}"
+    # CORA generates her own overall vision response - natural speech
+    screenshot_ok = any(t['name'] == 'Screenshot Capture' and t['status'] == 'OK' for t in BOOT_STATUS['tools_tested'])
+    camera_ok = BOOT_STATUS.get('camera_available', False)
+    if screenshot_ok and camera_ok:
+        vision_result = "Vision systems are fully online. I can see your screen and your camera is working"
+    elif screenshot_ok:
+        vision_result = "I can capture your screen but no camera detected"
+    elif camera_ok:
+        vision_result = "Camera is working but screenshot capture failed"
+    else:
+        vision_result = "Vision systems aren't working properly"
     response = cora_respond("Vision Systems summary", vision_result, "ok")
     speak(response)
     time.sleep(0.3)
@@ -1311,8 +1325,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         print("  Generating via Pollinations Flux model...")
         display_tool("Pollinations API", f"Generating 1280x720 image")
         display_action(f"Prompt: {cora_prompt}")
-        # CORA generates her own response about starting generation
-        response = cora_respond("Image Generation", f"Creating: {cora_prompt}", "ok")
+        # CORA generates her own response about starting generation - natural speech
+        response = cora_respond("Image Generation", f"I'm generating an image of {cora_prompt}", "ok")
         speak(response)
 
         result = generate_image(
@@ -1333,8 +1347,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             BOOT_STATUS['boot_image'] = img_path
 
             # Display the image
-            # CORA generates her own response about successful generation
-            response = cora_respond("Image Generation complete", f"Generated in {gen_time:.1f} seconds, showing my creation", "ok")
+            # CORA generates her own response about successful generation - natural speech
+            response = cora_respond("Image Generation complete", f"Done. That took {gen_time:.1f} seconds. Let me show you what I made", "ok")
             speak(response)
             print("  Displaying image (click or wait 8 seconds to close)...")
             display_action("Opening image display window...")
@@ -1392,8 +1406,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 display_log(f"Image display skipped: {e}", "info")
 
             display_phase("Image Generation", "ok")
-            # CORA generates final image gen summary
-            response = cora_respond("Image Generation test", f"Successfully created art in {gen_time:.1f}s", "ok")
+            # CORA generates final image gen summary - natural speech
+            response = cora_respond("Image Generation test", f"Image generation is working. Created that in {gen_time:.1f} seconds", "ok")
             speak(response)
         else:
             error = result.get('error', 'Unknown error')
@@ -1401,8 +1415,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             display_log(f"Image generation failed: {error}", "warn")
             BOOT_STATUS['tools_tested'].append({'name': 'Image Gen Test', 'status': 'WARN'})
             display_phase("Image Generation", "warn")
-            # CORA generates her own response about failure
-            response = cora_respond("Image Generation", f"Failed: {error}", "fail")
+            # CORA generates her own response about failure - natural speech
+            response = cora_respond("Image Generation", f"Image generation failed. Got this error: {error}", "fail")
             speak(response)
 
     except Exception as e:
@@ -1501,37 +1515,34 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             weather_text = f"Weather is {temp} and {cond.lower()}."
             display_log(weather_text, "info")
 
-    # System status
+    # System status - natural speech
     if fail_count > 0:
-        status_text = f"{fail_count} systems failed to load."
+        status_text = f"Got {fail_count} systems that failed to load. Something's broken."
         display_log(status_text, "fail")
     elif warn_count > 0:
-        status_text = f"All critical systems online. {warn_count} minor issues."
+        status_text = f"All the important stuff is working. Just {warn_count} minor issues, nothing serious."
         display_log(status_text, "warn")
     else:
-        status_text = "All systems fully operational."
+        status_text = "Everything is up and running perfectly."
         display_log(status_text, "ok")
 
-    # Tasks - only mention if there are real user tasks (not test tasks)
-    # Skipping task announcement for now - let user ask about tasks
-
-    # Hardware warnings
+    # Hardware warnings - natural speech
     hw_warning = ""
     if BOOT_STATUS['cpu_percent'] > 70:
-        hw_warning = f"CPU running hot at {BOOT_STATUS['cpu_percent']:.0f} percent."
+        hw_warning = f"Heads up, your CPU is running hot at {BOOT_STATUS['cpu_percent']:.0f} percent."
         display_log(hw_warning, "warn")
     elif BOOT_STATUS['memory_percent'] > 80:
-        hw_warning = f"Memory tight at {BOOT_STATUS['memory_percent']:.0f} percent."
+        hw_warning = f"Memory is getting tight at {BOOT_STATUS['memory_percent']:.0f} percent used."
         display_log(hw_warning, "warn")
 
-    # Build final summary
+    # Build final summary - natural speech
     summary_parts = [greeting]
     if weather_text:
         summary_parts.append(weather_text)
     summary_parts.append(status_text)
     if hw_warning:
         summary_parts.append(hw_warning)
-    summary_parts.append("Ready when you are.")
+    summary_parts.append("I'm ready whenever you are.")
 
     full_summary = " ".join(summary_parts)
 
