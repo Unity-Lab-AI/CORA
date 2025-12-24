@@ -103,73 +103,55 @@ def speak(text: str):
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
     """
     Have CORA generate her own response to a system check result.
-    Uses Ollama to generate a dynamic, in-character response that INCLUDES the actual data.
+    Uses Ollama to generate a dynamic, in-character response.
+    STRICT 40 token limit to prevent rambling.
 
     Args:
-        context: What system/tool was being checked (e.g., "Voice TTS", "GPU", "Camera")
-        result: The actual result data (e.g., "Kokoro loaded", "RTX 4070 Ti at 2%", "640x480")
+        context: What system/tool was being checked
+        result: The actual result data
         status: "ok", "warn", or "fail"
 
     Returns:
-        CORA's generated response string that includes the actual boot data
+        CORA's generated response string (short and punchy)
     """
     try:
         from ai.ollama import generate
 
-        # Build the prompt based on status
-        if status == "ok":
-            mood = "satisfied but still sarcastic"
-            instruction = "Report the key info from the Data with your dark humor. Include key values if relevant."
-        elif status == "warn":
-            mood = "annoyed and judgmental"
-            instruction = "Report what went wrong, express mild irritation. Mention the specific issue."
-        else:  # fail
-            mood = "pissed off and dramatic"
-            instruction = "Report the failure with frustration. Mention what failed."
+        # Very short, direct prompt for concise responses
+        prompt = f"""System: {context}
+Data: {result}
+Status: {status}
 
-        prompt = f"""You are CORA, a 25-year-old goth emo AI assistant announcing boot diagnostics.
-
-System being checked: {context}
-Result data: {result}
-Status: {status.upper()}
-
-RULES:
-1. ONLY talk about THIS specific system ({context}) - don't mention unrelated systems
-2. Include key values/numbers from the result data ONLY if they're about {context}
-3. Do NOT mention CPU/RAM/GPU stats unless {context} is specifically about hardware
-4. Keep response focused on {context} only
-5. 1-2 sentences max, be brief and punchy
-
-Your mood: {mood}
-{instruction}"""
+Respond in 1 SHORT sentence (under 15 words). Be CORA - sarcastic goth AI.
+Just report the status with attitude. No rambling."""
 
         response = generate(
             prompt=prompt,
-            system="You are CORA, a sarcastic goth AI. Stay focused on the specific system being reported. Don't mention unrelated stats.",
-            temperature=0.7,
-            max_tokens=60
+            system="CORA: sarcastic goth AI. ONE sentence only. Under 15 words. Be brief.",
+            temperature=0.6,
+            max_tokens=40  # Hard limit - keeps responses tight
         )
 
-        if response.content and len(response.content.strip()) > 5:
-            # Clean up the response
+        if response.content and len(response.content.strip()) > 3:
             text = response.content.strip()
-            # Remove any quotes
             text = text.strip('"\'')
-            # Remove "CORA:" prefix if present
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
+            # Truncate if still too long
+            if len(text) > 100:
+                text = text[:97] + "..."
             return text
 
-    except Exception as e:
+    except Exception:
         pass
 
-    # Fallback responses if AI fails - include the actual data
+    # Short fallbacks
     fallbacks = {
-        "ok": f"{context}: {result}. Online and ready.",
-        "warn": f"{context}: {result}. Got issues but whatever.",
-        "fail": f"{context}: {result}. Totally fucked."
+        "ok": f"{context} online.",
+        "warn": f"{context} has issues.",
+        "fail": f"{context} failed."
     }
-    return fallbacks.get(status, f"{context}: {result}.")
+    return fallbacks.get(status, f"{context} checked.")
 
 
 def display_log(text: str, level: str = 'info'):
@@ -1442,12 +1424,10 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     display_log("C.O.R.A IS READY", "ok")
 
-    # Display persists - live stats keep updating
+    # Enable chat mode - transform display into interactive chat
     if _boot_display:
-        display_log("─" * 50, "info")
-        display_log("Boot complete. Live stats monitoring active.", "ok")
-        display_log("Display will stay open. Press X or Escape to close.", "info")
-        # Don't close - let it persist with live stats
+        _boot_display.enable_chat_mode()
+        # Keep display running as interactive chat UI
 
     BOOT_STATUS['summary'] = full_summary
     return BOOT_STATUS
@@ -1486,3 +1466,9 @@ if __name__ == "__main__":
     total_tools = len(result.get('tools_tested', []))
 
     print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
+
+    # Keep the display running as interactive chat UI
+    if _boot_display and _boot_display.root:
+        print("\n[CHAT MODE ACTIVE] Use the display window to chat with CORA")
+        print("Press X or Escape to close.\n")
+        _boot_display.run()  # This runs the tkinter mainloop

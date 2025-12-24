@@ -142,6 +142,13 @@ class BootDisplay:
         self.net_label = None
         self.stats_update_id = None
 
+        # Chat input (appears after boot)
+        self.chat_frame = None
+        self.chat_input = None
+        self.send_button = None
+        self.boot_complete = False
+        self.on_user_input = None  # Callback for user input
+
         # Theme colors - dark goth/cyberpunk
         self.bg_color = '#0a0a0a'
         self.fg_color = '#ffffff'
@@ -381,14 +388,318 @@ class BootDisplay:
         )
         close_btn.place(x=1160, y=5)
 
-        # Bind escape to close
-        self.root.bind('<Escape>', lambda e: self.close())
+        # No hotkey bindings - user can close via X button only
 
         # Initial log entry
         self._log_entry("C.O.R.A Boot Sequence Initiated", 'phase')
         self._log_entry("─" * 50, 'info')
 
+        # Create chat input frame (hidden until boot complete)
+        self._create_chat_input()
+
         return self.root
+
+    def _create_chat_input(self):
+        """Create the chat input area at bottom of window."""
+        # Chat frame at bottom of window
+        self.chat_frame = tk.Frame(self.root, bg='#111111', height=60)
+        self.chat_frame.pack(side='bottom', fill='x', padx=15, pady=(0, 10))
+        self.chat_frame.pack_propagate(False)
+
+        # Tool buttons row - these modify the system prompt
+        btn_frame = tk.Frame(self.chat_frame, bg='#111111')
+        btn_frame.pack(fill='x', pady=(5, 3))
+
+        # Mode buttons - set the tool/action context
+        self.current_mode = None
+        self.mode_buttons = {}
+
+        tools = [
+            ("📸 Screenshot", "screenshot", "Take a screenshot and describe what you see"),
+            ("👁 Vision", "vision", "Look through the camera and describe what you see"),
+            ("🎨 Create", "imagine", "Generate an image based on the description"),
+            ("📋 Tasks", "tasks", "Help manage my tasks and todo list"),
+            ("💬 Chat", None, "Normal conversation"),
+        ]
+
+        for text, mode, desc in tools:
+            btn = tk.Button(
+                btn_frame,
+                text=text,
+                font=('Consolas', 8),
+                fg='#cccccc',
+                bg='#222222',
+                activebackground='#333333',
+                activeforeground=self.accent_color,
+                bd=0,
+                padx=8,
+                pady=2,
+                command=lambda m=mode, d=desc: self._set_mode(m, d)
+            )
+            btn.pack(side='left', padx=2)
+            self.mode_buttons[mode] = btn
+
+        # Mode indicator
+        self.mode_label = tk.Label(
+            btn_frame,
+            text="",
+            font=('Consolas', 8, 'italic'),
+            fg='#888888',
+            bg='#111111'
+        )
+        self.mode_label.pack(side='right', padx=5)
+
+        # Input row
+        input_frame = tk.Frame(self.chat_frame, bg='#111111')
+        input_frame.pack(fill='x', pady=(0, 3))
+
+        # Input field
+        self.chat_input = tk.Entry(
+            input_frame,
+            font=('Consolas', 11),
+            fg=self.fg_color,
+            bg='#1a1a1a',
+            insertbackground=self.accent_color,
+            relief='flat',
+            bd=0,
+            highlightthickness=1,
+            highlightbackground='#333333',
+            highlightcolor=self.accent_color
+        )
+        self.chat_input.pack(side='left', fill='x', expand=True, padx=(0, 5), ipady=5)
+        self.chat_input.insert(0, "Talk to CORA...")
+        self.chat_input.bind('<FocusIn>', self._on_input_focus)
+        self.chat_input.bind('<FocusOut>', self._on_input_unfocus)
+        self.chat_input.bind('<Return>', self._on_send)
+
+        # Send button
+        self.send_button = tk.Button(
+            input_frame,
+            text="Send",
+            font=('Consolas', 10, 'bold'),
+            fg='#000000',
+            bg=self.accent_color,
+            activebackground=self.accent2_color,
+            activeforeground='#000000',
+            bd=0,
+            padx=15,
+            pady=5,
+            command=self._on_send
+        )
+        self.send_button.pack(side='right')
+
+    def _on_input_focus(self, event=None):
+        """Clear placeholder when focused."""
+        if self.chat_input.get() == "Talk to CORA...":
+            self.chat_input.delete(0, 'end')
+            self.chat_input.config(fg=self.fg_color)
+
+    def _on_input_unfocus(self, event=None):
+        """Restore placeholder if empty."""
+        if not self.chat_input.get():
+            self.chat_input.insert(0, "Talk to CORA...")
+            self.chat_input.config(fg='#666666')
+
+    def _on_send(self, event=None):
+        """Handle send button/enter key."""
+        text = self.chat_input.get().strip()
+        if text and text != "Talk to CORA...":
+            self.chat_input.delete(0, 'end')
+            self._process_user_input(text)
+
+    def _set_mode(self, mode: str, desc: str):
+        """Set the current tool mode."""
+        self.current_mode = mode
+
+        # Update button colors
+        for m, btn in self.mode_buttons.items():
+            if m == mode:
+                btn.config(bg=self.accent_color, fg='#000000')
+            else:
+                btn.config(bg='#222222', fg='#cccccc')
+
+        # Update mode indicator
+        if mode:
+            self.mode_label.config(text=f"Mode: {mode.upper()}")
+            self.log(f"Mode set to: {mode.upper()} - {desc}", 'info')
+        else:
+            self.mode_label.config(text="")
+            self.log("Mode: Normal chat", 'info')
+
+    def _process_user_input(self, text: str):
+        """Process user input - route to AI chat with mode context."""
+        self.log_user(text)
+
+        if self.on_user_input:
+            # Use callback to process input
+            self.on_user_input(text)
+        else:
+            # Default: try to use AI chat directly
+            self._default_process_input(text)
+
+    def _default_process_input(self, text: str):
+        """Default input processing using AI chat with mode-based tool use."""
+        import threading
+
+        mode = self.current_mode
+
+        def process():
+            try:
+                # MODE: Screenshot - take screenshot, analyze with AI
+                if mode == 'screenshot':
+                    self.log_action("Taking screenshot...")
+                    try:
+                        from tools.screenshots import desktop
+                        result = desktop()
+                        if result.success:
+                            self.log_result(f"Screenshot saved: {result.path}")
+                            # Analyze with vision AI
+                            from ai.ollama import generate_with_image
+                            prompt = text if text else "Describe what you see on this screen"
+                            vision_result = generate_with_image(prompt, result.path)
+                            if vision_result.content:
+                                self.log_result(vision_result.content)
+                                self._speak(vision_result.content)
+                            else:
+                                self._speak(f"Screenshot captured. {result.width} by {result.height} pixels.")
+                        else:
+                            self.log_fail(f"Screenshot failed: {result.error}")
+                    except Exception as e:
+                        self.log_fail(f"Screenshot error: {e}")
+                    return
+
+                # MODE: Vision - look through camera with AI
+                elif mode == 'vision':
+                    prompt = text if text else "Describe what you see"
+                    self.log_action("Looking through camera...")
+                    try:
+                        import cv2
+                        from pathlib import Path
+                        cap = cv2.VideoCapture(0)
+                        if cap.isOpened():
+                            ret, frame = cap.read()
+                            cap.release()
+                            if ret:
+                                import os
+                                proj_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent
+                                cam_path = proj_dir / 'data' / 'camera' / 'see_capture.jpg'
+                                cam_path.parent.mkdir(parents=True, exist_ok=True)
+                                cv2.imwrite(str(cam_path), frame)
+
+                                from ai.ollama import generate_with_image
+                                result = generate_with_image(prompt, str(cam_path))
+                                if result.content:
+                                    self.log_result(result.content)
+                                    self._speak(result.content)
+                                else:
+                                    self.log_warn("Vision analysis failed")
+                            else:
+                                self.log_fail("Camera capture failed")
+                        else:
+                            self.log_fail("No camera available")
+                    except Exception as e:
+                        self.log_fail(f"Vision error: {e}")
+                    return
+
+                # MODE: Imagine - generate image from text
+                elif mode == 'imagine':
+                    if text:
+                        self.log_action(f"Generating image: {text[:50]}...")
+                        self._speak(f"Creating {text[:30]}")
+                        try:
+                            from tools.image_gen import generate_image
+                            result = generate_image(text)
+                            if result.get('success'):
+                                self.log_result(f"Image saved: {result.get('path')}")
+                                self._speak("Image generated")
+                            else:
+                                self.log_fail(f"Generation failed: {result.get('error')}")
+                        except Exception as e:
+                            self.log_fail(f"Image gen error: {e}")
+                    else:
+                        self.log_warn("Please describe what image to create")
+                    return
+
+                # MODE: Tasks - task management with AI
+                elif mode == 'tasks':
+                    self.log_action("Loading tasks for context...")
+                    task_context = ""
+                    try:
+                        from tools.tasks import TaskManager
+                        tm = TaskManager()
+                        if tm.tasks:
+                            task_context = f"Current tasks: {[t.get('text', '') for t in tm.tasks[:10]]}"
+                    except:
+                        task_context = "No tasks loaded"
+
+                    # Send to AI with task context
+                    self.log_thinking("Thinking about your tasks...")
+                    try:
+                        from ai.ollama import chat
+                        response = chat(
+                            messages=[{'role': 'user', 'content': text}],
+                            system=f"You are CORA, a sarcastic goth AI assistant helping with task management. {task_context}. Help the user with their tasks. You can add, complete, or discuss tasks. Keep responses concise.",
+                            temperature=0.7,
+                            max_tokens=200
+                        )
+                        if response.content:
+                            self.log_result(response.content)
+                            self._speak(response.content)
+                        elif response.error:
+                            self.log_fail(f"AI error: {response.error}")
+                    except Exception as e:
+                        self.log_fail(f"Chat error: {e}")
+                    return
+
+                # DEFAULT MODE: Normal AI chat
+                self.log_thinking("Thinking...")
+                try:
+                    from ai.ollama import chat
+                    response = chat(
+                        messages=[{'role': 'user', 'content': text}],
+                        system="You are CORA, a sarcastic goth emo AI assistant. You're helpful but have attitude. Keep responses concise (1-3 sentences).",
+                        temperature=0.7,
+                        max_tokens=150
+                    )
+                    if response.content:
+                        self.log_result(response.content)
+                        self._speak(response.content)
+                    elif response.error:
+                        self.log_fail(f"AI error: {response.error}")
+                except Exception as e:
+                    self.log_fail(f"Chat error: {e}")
+
+            except Exception as e:
+                self.log_fail(f"Error: {e}")
+
+        # Run in thread so UI doesn't freeze
+        threading.Thread(target=process, daemon=True).start()
+
+    def _speak(self, text: str):
+        """Speak text via TTS."""
+        try:
+            self.start_speaking(text)
+            from voice.tts import KokoroTTS
+            tts = KokoroTTS(voice='af_bella', speed=1.0)
+            if tts.initialize():
+                tts.speak(text)
+            self.stop_speaking()
+        except Exception as e:
+            self.stop_speaking()
+            pass
+
+    def set_input_callback(self, callback):
+        """Set callback for user input processing."""
+        self.on_user_input = callback
+
+    def enable_chat_mode(self):
+        """Enable chat mode after boot completes."""
+        self.boot_complete = True
+        if self.chat_input:
+            self.chat_input.focus_set()
+        self._log_entry("─" * 50, 'info')
+        self._log_entry("Boot complete! Type below to chat with CORA.", 'ok')
+        self._log_entry("Or use the tool buttons for quick commands.", 'info')
 
     def _log_entry(self, text: str, tag: str = 'info'):
         """Add an entry to the scrolling log."""
