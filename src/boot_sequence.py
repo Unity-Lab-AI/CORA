@@ -24,6 +24,7 @@ sys.path.insert(0, str(PROJECT_DIR / 'ui'))
 
 # Visual boot display
 _boot_display = None
+_boot_complete = False  # Flag to stop display update thread
 
 # Boot status tracking
 BOOT_STATUS: Dict[str, Any] = {
@@ -102,67 +103,99 @@ def speak(text: str):
 
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
     """
-    Have CORA generate her own response to a system check result.
-    MUST include the critical data from result while being sarcastic.
-    Max 50 tokens - short but informative.
-
-    Args:
-        context: What system/tool was being checked
-        result: The actual result data (MUST be mentioned)
-        status: "ok", "warn", or "fail"
-
-    Returns:
-        CORA's response WITH the actual data included
+    CORA generates a unique response for each boot phase.
+    AI generates the personality/phrasing, but MUST include the exact data.
+    Falls back to templates if AI hallucinates wrong data.
     """
+    import random
+
+    # Fallback templates with exact data
+    templates_ok = [
+        f"{result}.",
+        f"{result}. Moving on.",
+        f"{result}. Next.",
+        f"Got it. {result}.",
+        f"{result}. Thrilling.",
+    ]
+    templates_warn = [
+        f"{result}. Not great but whatever.",
+        f"{result}. Could be worse.",
+        f"Hmm, {result}. We'll manage.",
+    ]
+    templates_fail = [
+        f"{result}. That's a problem.",
+        f"Damn. {result}.",
+        f"{result}. Not ideal.",
+    ]
+
+    # Extract key data points from result for validation
+    # Numbers, percentages, names that MUST appear in response
+    import re
+    key_data = []
+    # Find numbers/percentages
+    numbers = re.findall(r'\d+\.?\d*%?', result)
+    key_data.extend(numbers[:3])  # First 3 numbers
+    # Find key words (capitalized or model names)
+    words = re.findall(r'\b[A-Z][a-z]+\b|\b[a-z]{4,}\b', result)
+    key_data.extend([w.lower() for w in words[:2]])
+
     try:
         from ai.ollama import generate
 
-        # Prompt that REQUIRES including the data
-        prompt = f"""You are CORA, a sarcastic goth emo AI reporting boot status.
+        # Very strict prompt that emphasizes the exact data
+        system_prompt = (
+            "You are CORA, a sarcastic goth AI assistant. "
+            "Generate ONE sentence (max 20 words) about the status report. "
+            "You MUST include the EXACT numbers and data given - do NOT change any values. "
+            "Be snarky or add personality, but the data must be accurate. "
+            "Occasionally swear (damn, shit, hell) for variety."
+        )
 
-CHECK: {context}
-DATA: {result}
-STATUS: {status.upper()}
-
-RULES:
-1. You MUST mention the key info from DATA (numbers, names, values)
-2. Add sarcastic/goth attitude and maybe curse once
-3. ONE sentence, max 20 words
-4. Examples of good responses:
-   - "Voice loaded with af_bella. Finally, I can fucking talk."
-   - "RTX 4070 Ti at 3% usage. Bored as hell."
-   - "Camera's working, 1920x1080. I can see your ugly mug."
-   - "Weather's 45°F and cloudy. Matching my mood."
-
-Now respond about {context} - include the specific data: {result}"""
+        prompt = f"Status: {context}. Data: {result}. Say this with attitude but keep the exact data."
 
         response = generate(
             prompt=prompt,
-            system="CORA: goth AI. Include the DATA values. One sarcastic sentence. Can curse.",
+            system=system_prompt,
             temperature=0.7,
             max_tokens=50
         )
 
-        if response.content and len(response.content.strip()) > 3:
-            text = response.content.strip()
-            text = text.strip('"\'')
+        if response.content:
+            text = response.content.strip().strip('"\'')
+            # Remove CORA: prefix if present
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
-            # Truncate if too long
+            # Take first sentence
+            for end in ['. ', '! ', '? ', '\n']:
+                if end in text:
+                    text = text[:text.index(end)+1]
+                    break
+            # Length check
             if len(text) > 120:
                 text = text[:117] + "..."
-            return text
+
+            # VALIDATION: Check that key data appears in response
+            text_lower = text.lower()
+            data_found = 0
+            for kd in key_data:
+                if str(kd).lower() in text_lower:
+                    data_found += 1
+
+            # If most key data is present, use AI response
+            if len(key_data) == 0 or data_found >= len(key_data) * 0.5:
+                if len(text) > 10:
+                    return text
 
     except Exception:
         pass
 
-    # Fallbacks that INCLUDE the data
-    if status == "ok":
-        return f"{context}: {result}. We're good."
+    # Fallback to templates with exact data
+    if status == "fail":
+        return random.choice(templates_fail)
     elif status == "warn":
-        return f"{context}: {result}. Whatever, it works."
+        return random.choice(templates_warn)
     else:
-        return f"{context} is fucked. {result}."
+        return random.choice(templates_ok)
 
 
 def display_log(text: str, level: str = 'info'):
@@ -404,14 +437,16 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             _boot_display.log_system("Visual boot display initialized")
             _boot_display.log_system(f"Boot started at {time.strftime('%H:%M:%S')}")
 
-            # Run display updates in a separate thread
+            # Run display updates in a separate thread ONLY during boot
             def update_display():
-                while _boot_display and _boot_display.root:
+                global _boot_complete
+                while _boot_display and _boot_display.root and not _boot_complete:
                     try:
                         _boot_display.root.update()
                         time.sleep(0.05)
                     except:
                         break
+                print("[BOOT] Display update thread stopped - mainloop will take over")
 
             display_thread = threading.Thread(target=update_display, daemon=True)
             display_thread.start()
@@ -969,14 +1004,23 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
             BOOT_STATUS['headlines'] = headlines
 
-            # Announce top headline
+            # Announce top 3-4 headlines
             if headlines:
-                # Clean for TTS (remove source attribution for smoother speech)
-                top_headline = headlines[0].split(' - ')[0] if ' - ' in headlines[0] else headlines[0]
                 display_phase("News Headlines", "ok")
-                # CORA generates her own reaction to the news
-                response = cora_respond("News Headlines", f"Top story: {top_headline}", "ok")
-                speak(response)
+                speak("Here's what's happening in the news.")
+                time.sleep(0.2)
+
+                # Read up to 4 headlines
+                for i, hl in enumerate(headlines[:4], 1):
+                    # Clean for TTS (remove source attribution for smoother speech)
+                    clean_headline = hl.split(' - ')[0] if ' - ' in hl else hl
+                    # Keep it short for speech
+                    if len(clean_headline) > 100:
+                        clean_headline = clean_headline[:97] + "..."
+                    speak(f"Headline {i}: {clean_headline}")
+                    time.sleep(0.1)
+
+                speak("That's the news.")
             else:
                 display_phase("News Headlines", "warn")
                 response = cora_respond("News Headlines", "Feed returned empty", "warn")
@@ -1268,14 +1312,22 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 label.image = photo  # Keep reference
                 label.pack(fill='both', expand=True)
 
-                # Auto-close after 8 seconds or on click/escape
-                img_window.after(8000, img_window.destroy)
-                img_window.bind('<Button-1>', lambda e: img_window.destroy())
-                img_window.bind('<Escape>', lambda e: img_window.destroy())
-
-                # Update to show the image
+                # Show for 5 seconds, then auto-close (blocking wait during boot)
                 img_window.update()
                 display_result("Image displayed successfully")
+
+                # Wait 5 seconds while updating window, then destroy
+                for _ in range(50):  # 50 x 0.1s = 5 seconds
+                    try:
+                        img_window.update()
+                        time.sleep(0.1)
+                    except:
+                        break  # Window was closed manually
+
+                try:
+                    img_window.destroy()
+                except:
+                    pass  # Already closed
 
             except Exception as e:
                 print(f"  [INFO] Image display skipped: {e}")
@@ -1435,6 +1487,11 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     display_log("C.O.R.A IS READY", "ok")
 
+    # Stop the display update thread so mainloop can take over
+    global _boot_complete
+    _boot_complete = True
+    time.sleep(0.1)  # Brief pause to let thread exit
+
     # Enable chat mode - transform display into interactive chat
     if _boot_display:
         _boot_display.enable_chat_mode()
@@ -1478,8 +1535,53 @@ if __name__ == "__main__":
 
     print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
 
+    # Start STT listening for wake word "CORA"
+    stt_active = False
+    try:
+        from voice.stt import WakeWordDetector, SpeechRecognizer
+
+        def on_wake_word():
+            """Called when 'CORA' wake word detected."""
+            print("[STT] Wake word detected!")
+            if _boot_display:
+                _boot_display.log("Wake word detected - listening...", 'info')
+            # Listen for command
+            try:
+                recognizer = SpeechRecognizer()
+                if recognizer.initialize():
+                    text = recognizer.listen_once(timeout=5, phrase_limit=10)
+                    if text.strip():
+                        print(f"[STT] Heard: {text}")
+                        if _boot_display:
+                            _boot_display._process_user_input(text)
+            except Exception as e:
+                print(f"[STT] Listen error: {e}")
+
+        wake_detector = WakeWordDetector(wake_word="cora")
+        wake_detector.start(on_wake_word)
+        stt_active = True
+        print("[STT] Wake word detection active - say 'CORA' to speak")
+        if _boot_display:
+            _boot_display.log("Voice active - say 'CORA' to speak", 'ok')
+    except Exception as e:
+        print(f"[STT] Voice detection unavailable: {e}")
+        if _boot_display:
+            _boot_display.log(f"Voice detection unavailable: {e}", 'warn')
+
     # Keep the display running as interactive chat UI
     if _boot_display and _boot_display.root:
-        print("\n[CHAT MODE ACTIVE] Use the display window to chat with CORA")
-        print("Press X or Escape to close.\n")
-        _boot_display.run()  # This runs the tkinter mainloop
+        print("\n[CHAT MODE ACTIVE] Type or speak to CORA")
+        print("Close the window with the X button.\n")
+        try:
+            _boot_display.run()  # This runs the tkinter mainloop
+        except Exception as e:
+            print(f"[ERROR] Mainloop error: {e}")
+        finally:
+            # Stop STT when window closes
+            if stt_active:
+                try:
+                    wake_detector.stop()
+                except:
+                    pass
+    else:
+        print("\n[WARNING] Boot display not available for chat mode")

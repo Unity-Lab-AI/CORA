@@ -256,9 +256,10 @@ class BootDisplay:
         )
         progress.pack(pady=8)
 
-        # Phase indicators frame
-        phases_frame = tk.Frame(left_frame, bg=self.bg_color)
-        phases_frame.pack(fill='both', expand=True, pady=5)
+        # Phase indicators frame - fixed height, don't expand so stats stay visible
+        phases_frame = tk.Frame(left_frame, bg=self.bg_color, height=250)
+        phases_frame.pack(fill='x', pady=5)
+        phases_frame.pack_propagate(False)  # Keep fixed height
         self.phases_container = phases_frame
 
         # Status label
