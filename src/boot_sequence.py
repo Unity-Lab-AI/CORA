@@ -1599,10 +1599,6 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', help='Extra verbose output')
     args = parser.parse_args()
 
-    print("\n" + "=" * 60)
-    print("       C.O.R.A - Cognitive Operations & Reasoning Assistant")
-    print("=" * 60 + "\n")
-
     # Boot result storage
     boot_result = {'done': False, 'result': None}
 
