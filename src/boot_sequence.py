@@ -103,33 +103,44 @@ def speak(text: str):
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
     """
     Have CORA generate her own response to a system check result.
-    Uses Ollama to generate a dynamic, in-character response.
-    STRICT 40 token limit to prevent rambling.
+    MUST include the critical data from result while being sarcastic.
+    Max 50 tokens - short but informative.
 
     Args:
         context: What system/tool was being checked
-        result: The actual result data
+        result: The actual result data (MUST be mentioned)
         status: "ok", "warn", or "fail"
 
     Returns:
-        CORA's generated response string (short and punchy)
+        CORA's response WITH the actual data included
     """
     try:
         from ai.ollama import generate
 
-        # Very short, direct prompt for concise responses
-        prompt = f"""System: {context}
-Data: {result}
-Status: {status}
+        # Prompt that REQUIRES including the data
+        prompt = f"""You are CORA, a sarcastic goth emo AI reporting boot status.
 
-Respond in 1 SHORT sentence (under 15 words). Be CORA - sarcastic goth AI.
-Just report the status with attitude. No rambling."""
+CHECK: {context}
+DATA: {result}
+STATUS: {status.upper()}
+
+RULES:
+1. You MUST mention the key info from DATA (numbers, names, values)
+2. Add sarcastic/goth attitude and maybe curse once
+3. ONE sentence, max 20 words
+4. Examples of good responses:
+   - "Voice loaded with af_bella. Finally, I can fucking talk."
+   - "RTX 4070 Ti at 3% usage. Bored as hell."
+   - "Camera's working, 1920x1080. I can see your ugly mug."
+   - "Weather's 45°F and cloudy. Matching my mood."
+
+Now respond about {context} - include the specific data: {result}"""
 
         response = generate(
             prompt=prompt,
-            system="CORA: sarcastic goth AI. ONE sentence only. Under 15 words. Be brief.",
-            temperature=0.6,
-            max_tokens=40  # Hard limit - keeps responses tight
+            system="CORA: goth AI. Include the DATA values. One sarcastic sentence. Can curse.",
+            temperature=0.7,
+            max_tokens=50
         )
 
         if response.content and len(response.content.strip()) > 3:
@@ -137,21 +148,21 @@ Just report the status with attitude. No rambling."""
             text = text.strip('"\'')
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
-            # Truncate if still too long
-            if len(text) > 100:
-                text = text[:97] + "..."
+            # Truncate if too long
+            if len(text) > 120:
+                text = text[:117] + "..."
             return text
 
     except Exception:
         pass
 
-    # Short fallbacks
-    fallbacks = {
-        "ok": f"{context} online.",
-        "warn": f"{context} has issues.",
-        "fail": f"{context} failed."
-    }
-    return fallbacks.get(status, f"{context} checked.")
+    # Fallbacks that INCLUDE the data
+    if status == "ok":
+        return f"{context}: {result}. We're good."
+    elif status == "warn":
+        return f"{context}: {result}. Whatever, it works."
+    else:
+        return f"{context} is fucked. {result}."
 
 
 def display_log(text: str, level: str = 'info'):
