@@ -93,8 +93,13 @@ def init_tts():
         return False
 
 
-def speak(text: str):
-    """Speak text via Kokoro TTS and update visual display."""
+def speak(text: str, blocking: bool = True):
+    """Speak text via Kokoro TTS and update visual display.
+
+    Args:
+        text: Text to speak
+        blocking: If True, wait for speech to finish. If False, return immediately.
+    """
     global _boot_display
     print(f"[CORA] {text}")
 
@@ -116,25 +121,37 @@ def speak(text: str):
         except:
             pass
 
-    if _tts_engine:
-        try:
-            _tts_engine.speak(text, emotion='neutral')
-        except Exception as e:
-            print(f"[TTS ERROR] {e}")
+    def do_speak():
+        """Actual TTS call - runs in thread."""
+        if _tts_engine:
+            try:
+                _tts_engine.speak(text, emotion='neutral')
+            except Exception as e:
+                print(f"[TTS ERROR] {e}")
 
-    # Stop waveform animation after speaking
-    if _boot_display:
+        # Stop waveform animation after speaking
+        if _boot_display:
+            try:
+                _boot_display.stop_speaking()
+            except:
+                pass
+
+        # Clear echo filter now that we're done
         try:
-            _boot_display.stop_speaking()
+            from voice.echo_filter import get_echo_filter
+            get_echo_filter().stop_speaking()
         except:
             pass
 
-    # Clear echo filter now that we're done
-    try:
-        from voice.echo_filter import get_echo_filter
-        get_echo_filter().stop_speaking()
-    except:
-        pass
+    # Run TTS in background thread so UI stays responsive
+    import threading
+    tts_thread = threading.Thread(target=do_speak, daemon=True)
+    tts_thread.start()
+
+    # If blocking, wait for thread to finish
+    # Don't call root.update() - let tkinter mainloop handle it
+    if blocking:
+        tts_thread.join()
 
 
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
@@ -246,86 +263,85 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         return random.choice(templates_ok)
 
 
-def display_log(text: str, level: str = 'info'):
-    """Log to the visual display."""
+def _safe_ui_call(func, *args):
+    """Thread-safe UI call using root.after()."""
     global _boot_display
-    if _boot_display:
+    if _boot_display and _boot_display.root:
         try:
-            if level == 'ok':
-                _boot_display.log_ok(text)
-            elif level == 'warn':
-                _boot_display.log_warn(text)
-            elif level == 'fail':
-                _boot_display.log_fail(text)
-            elif level == 'system':
-                _boot_display.log_system(text)
-            elif level == 'phase':
-                _boot_display.log_phase(text)
-            else:
-                _boot_display.log(text, level)
+            _boot_display.root.after(0, lambda: func(*args))
         except:
             pass
+
+
+def display_log(text: str, level: str = 'info'):
+    """Log to the visual display (thread-safe)."""
+    global _boot_display
+    if _boot_display:
+        def do_log():
+            try:
+                if level == 'ok':
+                    _boot_display.log_ok(text)
+                elif level == 'warn':
+                    _boot_display.log_warn(text)
+                elif level == 'fail':
+                    _boot_display.log_fail(text)
+                elif level == 'system':
+                    _boot_display.log_system(text)
+                elif level == 'phase':
+                    _boot_display.log_phase(text)
+                else:
+                    _boot_display.log(text, level)
+            except:
+                pass
+        _safe_ui_call(do_log)
 
 
 def display_phase(phase_name: str, status: str):
-    """Update phase status on the visual display."""
+    """Update phase status on the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.update_phase(phase_name, status)
-            _boot_display.set_status(f"{phase_name}: {status.upper()}")
-        except:
-            pass
+        def do_phase():
+            try:
+                _boot_display.update_phase(phase_name, status)
+                _boot_display.set_status(f"{phase_name}: {status.upper()}")
+            except:
+                pass
+        _safe_ui_call(do_phase)
 
 
 def display_user_input(text: str):
-    """Log user input/command to the visual display."""
+    """Log user input/command to the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.log_user(text)
-        except:
-            pass
+        _safe_ui_call(lambda: _boot_display.log_user(text))
 
 
 def display_action(text: str):
-    """Log CORA action to the visual display."""
+    """Log CORA action to the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.log_action(text)
-        except:
-            pass
+        _safe_ui_call(lambda: _boot_display.log_action(text))
 
 
 def display_tool(tool_name: str, details: str = ""):
-    """Log tool execution to the visual display."""
+    """Log tool execution to the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.log_tool(tool_name, details)
-        except:
-            pass
+        _safe_ui_call(lambda: _boot_display.log_tool(tool_name, details))
 
 
 def display_result(text: str):
-    """Log action result to the visual display."""
+    """Log action result to the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.log_result(text)
-        except:
-            pass
+        _safe_ui_call(lambda: _boot_display.log_result(text))
 
 
 def display_thinking(text: str):
-    """Log CORA's reasoning/thinking to the visual display."""
+    """Log CORA's reasoning/thinking to the visual display (thread-safe)."""
     global _boot_display
     if _boot_display:
-        try:
-            _boot_display.log_thinking(text)
-        except:
-            pass
+        _safe_ui_call(lambda: _boot_display.log_thinking(text))
 
 
 def get_system_stats() -> Dict[str, Any]:
@@ -458,51 +474,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("  +=========================================================+")
     print("")
 
-    # Initialize visual boot display
-    if show_display:
-        try:
-            from boot_display import BootDisplay
-            import threading
-
-            _boot_display = BootDisplay()
-            _boot_display.create_window()
-
-            # Set up all boot phases
-            phase_names = [
-                "About CORA",
-                "Voice Synthesis",
-                "AI Engine",
-                "Hardware Check",
-                "Core Tools",
-                "Voice Systems",
-                "External Services",
-                "News Headlines",
-                "Vision Test",
-                "Image Generation",
-                "Final Check"
-            ]
-            _boot_display.set_phases(phase_names)
-            _boot_display.log_system("Visual boot display initialized")
-            _boot_display.log_system(f"Boot started at {time.strftime('%H:%M:%S')}")
-
-            # Run display updates in a separate thread ONLY during boot
-            def update_display():
-                global _boot_complete
-                while _boot_display and _boot_display.root and not _boot_complete:
-                    try:
-                        _boot_display.root.update()
-                        time.sleep(0.05)
-                    except:
-                        break
-                print("[BOOT] Display update thread stopped - mainloop will take over")
-
-            display_thread = threading.Thread(target=update_display, daemon=True)
-            display_thread.start()
-
-            print("[BOOT] Visual display initialized")
-        except Exception as e:
-            print(f"[BOOT] Visual display unavailable: {e}")
-            _boot_display = None
+    # Visual display should already be created by main thread before boot starts
+    # If not, we can't create it here (tkinter must run on main thread)
+    if show_display and _boot_display is None:
+        print("[BOOT] Visual display not pre-initialized - running without display")
+    elif _boot_display:
+        print("[BOOT] Using pre-initialized visual display")
 
     # ================================================================
     # PHASE 0.9: ABOUT CORA (Introduction)
@@ -1574,6 +1551,8 @@ def full_boot() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     import argparse
+    import threading
+
     parser = argparse.ArgumentParser(description='C.O.R.A Boot Sequence')
     parser.add_argument('--quick', '-q', action='store_true', help='Skip TTS (silent boot)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Extra verbose output')
@@ -1583,80 +1562,102 @@ if __name__ == "__main__":
     print("       C.O.R.A - Cognitive Operations & Reasoning Assistant")
     print("=" * 60 + "\n")
 
-    if args.quick:
-        result = quick_boot()
-    else:
-        result = full_boot()
+    # Boot result storage
+    boot_result = {'done': False, 'result': None}
 
-    # Final stats
-    ok = len([s for s in result['systems'] if s['status'] == 'OK'])
-    total = len(result['systems'])
-    tools = len([t for t in result.get('tools_tested', []) if t['status'] == 'OK'])
-    total_tools = len(result.get('tools_tested', []))
+    def run_boot_in_thread():
+        """Run boot sequence in background thread."""
+        global _boot_complete
+        try:
+            if args.quick:
+                boot_result['result'] = quick_boot()
+            else:
+                boot_result['result'] = full_boot()
+        except Exception as e:
+            print(f"[BOOT ERROR] {e}")
+            boot_result['result'] = {'systems': [], 'tools_tested': [], 'errors': [str(e)]}
+        finally:
+            boot_result['done'] = True
+            _boot_complete = True
 
-    print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
+            # Print final stats
+            result = boot_result['result']
+            if result:
+                ok = len([s for s in result.get('systems', []) if s.get('status') == 'OK'])
+                total = len(result.get('systems', []))
+                tools = len([t for t in result.get('tools_tested', []) if t.get('status') == 'OK'])
+                total_tools = len(result.get('tools_tested', []))
+                print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
 
-    # Start STT listening for wake word "CORA" with echo filtering
-    stt_active = False
-    echo_filter = None
-    try:
-        from voice.stt import WakeWordDetector, SpeechRecognizer
-        from voice.echo_filter import get_echo_filter
+            # Start STT after boot
+            start_stt()
 
-        # Get/create echo filter to prevent hearing ourselves
-        echo_filter = get_echo_filter(filter_duration=3.0)
+    def start_stt():
+        """Start speech-to-text after boot completes."""
+        global _boot_display
+        try:
+            from voice.stt import WakeWordDetector, SpeechRecognizer
+            from voice.echo_filter import get_echo_filter
 
-        def on_wake_word():
-            """Called when 'CORA' wake word detected."""
-            # Ignore if CORA is currently speaking (echo)
-            if echo_filter and echo_filter.is_speaking():
-                print("[STT] Ignoring wake word - CORA is speaking")
-                return
+            echo_filter = get_echo_filter(filter_duration=3.0)
 
-            print("[STT] Wake word detected!")
+            def on_wake_word():
+                if echo_filter and echo_filter.is_speaking():
+                    print("[STT] Ignoring wake word - CORA is speaking")
+                    return
+
+                print("[STT] Wake word detected!")
+                if _boot_display:
+                    _safe_ui_call(lambda: _boot_display.log("Wake word detected - listening...", 'info'))
+                try:
+                    recognizer = SpeechRecognizer()
+                    if recognizer.initialize():
+                        text = recognizer.listen_once(timeout=5, phrase_limit=10)
+                        if text.strip():
+                            if echo_filter and not echo_filter.should_process(text):
+                                print(f"[STT] Ignoring echo: {text}")
+                                return
+                            print(f"[STT] Heard: {text}")
+                            if _boot_display:
+                                _safe_ui_call(lambda: _boot_display._process_user_input(text))
+                except Exception as e:
+                    print(f"[STT] Listen error: {e}")
+
+            wake_detector = WakeWordDetector(wake_word="cora")
+            wake_detector.start(on_wake_word)
+            print("[STT] Wake word detection active - say 'CORA' to speak")
             if _boot_display:
-                _boot_display.log("Wake word detected - listening...", 'info')
-            # Listen for command
-            try:
-                recognizer = SpeechRecognizer()
-                if recognizer.initialize():
-                    text = recognizer.listen_once(timeout=5, phrase_limit=10)
-                    if text.strip():
-                        # Check if this is echo of what we just said
-                        if echo_filter and not echo_filter.should_process(text):
-                            print(f"[STT] Ignoring echo: {text}")
-                            return
-                        print(f"[STT] Heard: {text}")
-                        if _boot_display:
-                            _boot_display._process_user_input(text)
-            except Exception as e:
-                print(f"[STT] Listen error: {e}")
+                _safe_ui_call(lambda: _boot_display.log("Voice active - say 'CORA' to speak", 'ok'))
+        except Exception as e:
+            print(f"[STT] Voice detection unavailable: {e}")
+            if _boot_display:
+                _safe_ui_call(lambda: _boot_display.log(f"Voice detection unavailable: {e}", 'warn'))
 
-        wake_detector = WakeWordDetector(wake_word="cora")
-        wake_detector.start(on_wake_word)
-        stt_active = True
-        print("[STT] Wake word detection active - say 'CORA' to speak")
-        if _boot_display:
-            _boot_display.log("Voice active - say 'CORA' to speak", 'ok')
-    except Exception as e:
-        print(f"[STT] Voice detection unavailable: {e}")
-        if _boot_display:
-            _boot_display.log(f"Voice detection unavailable: {e}", 'warn')
+    # Create display first (must be on main thread for tkinter)
+    from boot_display import BootDisplay
+    _boot_display = BootDisplay()
+    _boot_display.create_window()
 
-    # Keep the display running as interactive chat UI
+    # Set up phases
+    phase_names = [
+        "About CORA", "Voice Synthesis", "AI Engine", "Hardware Check",
+        "Core Tools", "Voice Systems", "External Services", "News Headlines",
+        "Vision Test", "Image Generation", "Final Check"
+    ]
+    _boot_display.set_phases(phase_names)
+    _boot_display.log_system("Visual boot display initialized")
+    _boot_display.log_system(f"Boot started at {time.strftime('%H:%M:%S')}")
+
+    # Start boot in background thread
+    boot_thread = threading.Thread(target=run_boot_in_thread, daemon=True)
+    boot_thread.start()
+
+    # Run tkinter mainloop on main thread (keeps UI responsive)
+    print("[MAIN] Starting UI mainloop - boot running in background")
     if _boot_display and _boot_display.root:
-        print("\n[CHAT MODE ACTIVE] Type or speak to CORA")
-        print("Close the window with the X button.\n")
         try:
             _boot_display.run()  # This runs the tkinter mainloop
         except Exception as e:
             print(f"[ERROR] Mainloop error: {e}")
-        finally:
-            # Stop STT when window closes
-            if stt_active:
-                try:
-                    wake_detector.stop()
-                except:
-                    pass
     else:
-        print("\n[WARNING] Boot display not available for chat mode")
+        print("\n[WARNING] Boot display not available")
