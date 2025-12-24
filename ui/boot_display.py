@@ -71,15 +71,16 @@ def get_audio_buffer():
         import threading
         _audio_buffer_lock = threading.Lock()
     if _audio_buffer is None:
-        _audio_buffer = {'data': None, 'position': 0, 'active': False}
+        _audio_buffer = {'data': None, 'start_time': 0, 'active': False, 'sample_rate': 24000}
     return _audio_buffer
 
-def set_audio_data(audio_array):
+def set_audio_data(audio_array, sample_rate=24000):
     """Set audio data for waveform visualization (called by TTS)."""
     buf = get_audio_buffer()
     with _audio_buffer_lock:
         buf['data'] = audio_array
-        buf['position'] = 0
+        buf['start_time'] = time.time()
+        buf['sample_rate'] = sample_rate
         buf['active'] = True
 
 def clear_audio_data():
@@ -87,6 +88,7 @@ def clear_audio_data():
     buf = get_audio_buffer()
     with _audio_buffer_lock:
         buf['active'] = False
+        buf['data'] = None
 
 
 class AudioWaveform(tk.Canvas):
@@ -200,15 +202,21 @@ class AudioWaveform(tk.Canvas):
             try:
                 with _audio_buffer_lock:
                     audio = buf['data']
-                    pos = buf['position']
+                    start_time = buf['start_time']
+                    sample_rate = buf.get('sample_rate', 24000)
 
                     if audio is not None and len(audio) > 0:
-                        # Get next chunk of audio samples
-                        end_pos = min(pos + self.samples_per_frame, len(audio))
+                        # Calculate current position based on elapsed time (synced to playback)
+                        elapsed = time.time() - start_time
+                        current_sample = int(elapsed * sample_rate)
 
-                        if pos < len(audio):
-                            chunk = audio[pos:end_pos]
-                            buf['position'] = end_pos
+                        # Get samples around current playback position
+                        samples_per_frame = sample_rate // 30  # ~800 samples at 24kHz
+                        start_pos = max(0, current_sample - samples_per_frame // 2)
+                        end_pos = min(len(audio), current_sample + samples_per_frame // 2)
+
+                        if start_pos < len(audio) and end_pos > start_pos:
+                            chunk = audio[start_pos:end_pos]
 
                             if len(chunk) > 0:
                                 has_real_audio = True
@@ -216,17 +224,17 @@ class AudioWaveform(tk.Canvas):
                                 samples_per_bar = max(1, len(chunk) // self.num_bars)
 
                                 for i in range(self.num_bars):
-                                    start = i * samples_per_bar
-                                    end = min(start + samples_per_bar, len(chunk))
-                                    if start < len(chunk):
-                                        bar_chunk = chunk[start:end]
+                                    bar_start = i * samples_per_bar
+                                    bar_end = min(bar_start + samples_per_bar, len(chunk))
+                                    if bar_start < len(chunk):
+                                        bar_chunk = chunk[bar_start:bar_end]
                                         # RMS amplitude
                                         if HAS_NUMPY:
                                             rms = float(np.sqrt(np.mean(bar_chunk**2)))
                                         else:
-                                            rms = sum(abs(x) for x in bar_chunk) / len(bar_chunk)
+                                            rms = sum(abs(float(x)) for x in bar_chunk) / len(bar_chunk)
                                         # Scale to 0-1 (adjust multiplier for sensitivity)
-                                        self.target_heights[i] = min(1.0, rms * 8)
+                                        self.target_heights[i] = min(1.0, rms * 10)
                                     else:
                                         self.target_heights[i] = 0
             except Exception as e:

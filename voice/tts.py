@@ -108,10 +108,16 @@ class KokoroTTS(TTSEngine):
                 if result.audio is not None:
                     # Share audio data with waveform visualizer
                     try:
-                        from ui.boot_display import set_audio_data, clear_audio_data
-                        set_audio_data(result.audio)
-                    except:
-                        pass
+                        import sys
+                        from pathlib import Path
+                        # Ensure ui directory is in path
+                        ui_dir = Path(__file__).parent.parent / 'ui'
+                        if str(ui_dir) not in sys.path:
+                            sys.path.insert(0, str(ui_dir))
+                        from boot_display import set_audio_data, clear_audio_data
+                        set_audio_data(result.audio, sample_rate=24000)
+                    except Exception as e:
+                        print(f"[DEBUG] Waveform audio share failed: {e}")
 
                     # Play audio at 24kHz sample rate
                     self.sd.play(result.audio, samplerate=24000)
@@ -119,7 +125,7 @@ class KokoroTTS(TTSEngine):
 
                     # Clear audio data when done
                     try:
-                        from ui.boot_display import clear_audio_data
+                        from boot_display import clear_audio_data
                         clear_audio_data()
                     except:
                         pass
