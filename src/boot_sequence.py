@@ -1012,7 +1012,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Build weather report with location and 3-day forecast - natural speech
     weather_report = ""
     if location_str:
-        weather_report = f"Location: {location_str}. "
+        weather_report = f"We're currently in {location_str}. "
     if weather_data and weather_data.get('success'):
         temp = weather_data.get('temp', '?')
         cond = weather_data.get('conditions', '?')
