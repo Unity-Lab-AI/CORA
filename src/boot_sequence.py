@@ -555,10 +555,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("\n[PHASE 2] AI Engine Initialization")
     print("=" * 50)
 
-    # CORA generates her own announcement
-    response = cora_respond("AI Brain check", "Connecting to Ollama", "ok")
-    speak(response)
-
     ai_online = False
     ai_model = "Unknown"
 
@@ -606,10 +602,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("PHASE 3: HARDWARE CHECK", "phase")
     print("\n[PHASE 3] Hardware Status Check")
     print("=" * 50)
-
-    # CORA generates her own announcement
-    response = cora_respond("Hardware scan starting", "Reading CPU, RAM, GPU stats", "ok")
-    speak(response)
 
     stats = get_system_stats()
 
@@ -689,10 +681,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("PHASE 4: CORE TOOLS TEST", "phase")
     print("\n[PHASE 4] Core Tools Test")
     print("=" * 50)
-
-    # CORA generates her own announcement
-    response = cora_respond("Core Tools test", "Loading memory, tasks, files, browser, system modules", "ok")
-    speak(response)
 
     tools_ok = 0
     tools_total = 0
@@ -836,10 +824,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("\n[PHASE 5] Voice Systems")
     print("=" * 50)
 
-    # CORA generates her own announcement
-    response = cora_respond("Voice Systems check", "Testing STT, Echo Filter, Wake Word", "ok")
-    speak(response)
-
     # Speech Recognition
     try:
         from voice.stt import SpeechRecognizer
@@ -888,37 +872,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("\n[PHASE 6] External Services")
     print("=" * 50)
 
-    # CORA generates her own announcement
-    response = cora_respond("External Services", "Connecting to weather, location, notifications", "ok")
-    speak(response)
-
-    # Weather
-    weather_data = None
-    try:
-        from services.weather import get_weather
-        weather_data = get_weather()
-        if weather_data:
-            if isinstance(weather_data, dict):
-                temp = weather_data.get('temp', weather_data.get('temperature', '?'))
-                cond = weather_data.get('condition', weather_data.get('description', '?'))
-                print(f"  [OK] Weather: {temp}, {cond}")
-                display_log(f"Weather: {temp}, {cond}", "ok")
-            else:
-                print("  [OK] Weather service connected")
-                display_log("Weather service connected", "ok")
-            BOOT_STATUS['weather'] = weather_data
-            BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'OK'})
-        else:
-            print("  [WARN] Weather service unavailable")
-            display_log("Weather service unavailable", "warn")
-            BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'WARN'})
-    except Exception as e:
-        print(f"  [WARN] Weather: {e}")
-        display_log(f"Weather: {e}", "warn")
-        BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'WARN'})
-
-    # Location
+    # GET LOCATION FIRST - needed for accurate weather
     location_str = None
+    city_for_weather = None
     try:
         from services.location import get_location
         display_tool("Location Service", "Getting current location")
@@ -930,13 +886,13 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             # Build location string from available data
             loc_parts = [p for p in [city, region, country] if p]
             location_str = ', '.join(loc_parts) if loc_parts else None
+            # Use city for weather lookup
+            city_for_weather = city if city else None
             if location_str:
                 print(f"  [OK] Location: {location_str}")
                 display_result(f"Location: {location_str}")
                 BOOT_STATUS['location'] = loc
                 BOOT_STATUS['systems'].append({'name': 'Location', 'status': 'OK'})
-                # Announce FULL location - not just city
-                speak(f"Current location: {location_str}.")
             else:
                 print("  [WARN] Location data incomplete")
                 display_log("Location data incomplete", "warn")
@@ -949,6 +905,51 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         print(f"  [WARN] Location: {e}")
         display_log(f"Location: {e}", "warn")
         BOOT_STATUS['systems'].append({'name': 'Location', 'status': 'WARN'})
+
+    # NOW GET WEATHER using location
+    weather_data = None
+    forecast_data = None
+    try:
+        from services.weather import get_weather, get_forecast
+        # Pass location to weather service
+        weather_data = get_weather(city_for_weather)
+        forecast_data = get_forecast(city_for_weather, days=1)
+
+        if weather_data and weather_data.get('success'):
+            temp = weather_data.get('temp', '?')
+            cond = weather_data.get('conditions', '?')
+            feels = weather_data.get('feels_like', '')
+            humidity = weather_data.get('humidity', '')
+            wind = weather_data.get('wind', '')
+
+            print(f"  [OK] Weather for {city_for_weather or 'your area'}: {temp}, {cond}")
+            display_log(f"Weather: {temp}, {cond}", "ok")
+            if feels:
+                display_log(f"  Feels like: {feels}", "info")
+            if humidity:
+                display_log(f"  Humidity: {humidity}", "info")
+            if wind:
+                display_log(f"  Wind: {wind}", "info")
+
+            BOOT_STATUS['weather'] = weather_data
+            BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'OK'})
+
+            # Get forecast info
+            if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
+                day_forecast = forecast_data['forecast'][0]
+                high = day_forecast.get('high', '?')
+                low = day_forecast.get('low', '?')
+                print(f"  [OK] Forecast: High {high}, Low {low}")
+                display_log(f"Forecast: High {high}, Low {low}", "ok")
+                BOOT_STATUS['forecast'] = forecast_data
+        else:
+            print("  [WARN] Weather service unavailable")
+            display_log("Weather service unavailable", "warn")
+            BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'WARN'})
+    except Exception as e:
+        print(f"  [WARN] Weather: {e}")
+        display_log(f"Weather: {e}", "warn")
+        BOOT_STATUS['systems'].append({'name': 'Weather', 'status': 'WARN'})
 
     # Notifications
     try:
@@ -973,10 +974,22 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['systems'].append({'name': 'Hotkeys', 'status': 'WARN'})
 
     display_phase("External Services", "ok")
-    # CORA generates her own response about external services
-    services_result = f"Weather: {'connected' if weather_data else 'unavailable'}, Location: {location_str or 'unavailable'}"
-    services_status = "ok" if (weather_data and location_str) else "warn"
-    response = cora_respond("External Services", services_result, services_status)
+
+    # Build weather report with location
+    weather_report = ""
+    if location_str:
+        weather_report = f"Location: {location_str}. "
+    if weather_data and weather_data.get('success'):
+        temp = weather_data.get('temp', '?')
+        cond = weather_data.get('conditions', '?')
+        weather_report += f"Currently {temp} and {cond}. "
+        if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
+            day = forecast_data['forecast'][0]
+            weather_report += f"High of {day.get('high', '?')}, low of {day.get('low', '?')}."
+    else:
+        weather_report += "Weather unavailable."
+
+    response = cora_respond("Location and Weather", weather_report, "ok" if weather_data else "warn")
     speak(response)
     time.sleep(0.3)
 
@@ -987,10 +1000,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("PHASE 7: NEWS HEADLINES", "phase")
     print("\n[PHASE 7] News Headlines")
     print("=" * 50)
-
-    # CORA generates her own announcement
-    response = cora_respond("News Headlines", "Fetching latest headlines from Google News", "ok")
-    speak(response)
 
     headlines = []
     try:
@@ -1074,10 +1083,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("PHASE 8: VISION TEST", "phase")
     print("\n[PHASE 8] Vision System Test")
     print("=" * 50)
-
-    # CORA generates her own announcement
-    response = cora_respond("Vision Systems test", "Testing screenshot capture and camera access", "ok")
-    speak(response)
 
     # Test screenshot capture
     try:
@@ -1213,10 +1218,6 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("PHASE 9: IMAGE GENERATION", "phase")
     print("\n[PHASE 9] Image Generation Test")
     print("=" * 50)
-
-    # CORA generates her own opening for image gen
-    response = cora_respond("Image Generation startup", "Pollinations Flux model loading", "ok")
-    speak(response)
 
     try:
         from tools.image_gen import generate_image, show_fullscreen_image
