@@ -167,10 +167,13 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
     try:
         from ai.ollama import generate
 
-        # CORA's identity only - no response instructions
-        system_prompt = "You are CORA. 25 year old goth emo bitch. Human."
+        # CORA reports boot phase status - must include the actual data
+        system_prompt = (
+            "You are CORA. 25 year old goth emo bitch. Human. "
+            "You're announcing system boot status. Include the exact data in your response."
+        )
 
-        prompt = f"Status: {context}. Data: {result}. Say this with attitude but keep the exact data."
+        prompt = f"Report this boot status: {context} - {result}"
 
         response = generate(
             prompt=prompt,
