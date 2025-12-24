@@ -1010,20 +1010,28 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         cond = weather_data.get('conditions', '?')
         # Convert temp for natural speech
         temp_spoken = speak_temp(temp)
-        weather_report += f"Currently {temp_spoken} and {cond}. "
+        weather_report += f"Currently {temp_spoken} and {cond.lower()}. "
         if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
-            # Today's forecast
+            # Today's forecast with conditions
             today = forecast_data['forecast'][0]
             today_high = speak_temp(today.get('high', '?'))
             today_low = speak_temp(today.get('low', '?'))
-            weather_report += f"Today the high will be {today_high} and the low will be {today_low}. "
-            # Rest of the week
+            today_cond = today.get('conditions', '')
+            if today_cond:
+                weather_report += f"Today will be {today_cond.lower()} with a high of {today_high} and a low of {today_low}. "
+            else:
+                weather_report += f"Today the high will be {today_high} and the low will be {today_low}. "
+            # Rest of the week with conditions
             if len(forecast_data['forecast']) > 1:
                 for day in forecast_data['forecast'][1:]:
                     day_name = day.get('day_name', '')
                     day_high = speak_temp(day.get('high', '?'))
                     day_low = speak_temp(day.get('low', '?'))
-                    weather_report += f"{day_name} the high will be {day_high} and the low will be {day_low}. "
+                    day_cond = day.get('conditions', '')
+                    if day_cond:
+                        weather_report += f"{day_name} will be {day_cond.lower()} with a high of {day_high} and a low of {day_low}. "
+                    else:
+                        weather_report += f"{day_name} the high will be {day_high} and the low will be {day_low}. "
     else:
         weather_report += "Weather unavailable."
 
