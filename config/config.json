@@ -1,13 +1,13 @@
 {
   "app_name": "C.O.R.A",
-  "version": "0.5.1",
+  "version": "2.3.0",
   "tts": {
     "enabled": true,
-    "engine": "pyttsx3",
+    "engine": "kokoro",
     "rate": 150,
     "volume": 1.0,
     "kokoro": {
-      "enabled": false,
+      "enabled": true,
       "voice": "af_bella",
       "speed": 1.0,
       "model_path": null

@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 2.3.0
+  Version: 2.4.0
   Unity AI Lab
   Website: https://www.unityailab.com
   GitHub: https://github.com/Unity-Lab-AI
@@ -19,15 +19,32 @@
   ================================================================
 ```
 
-**Version 2.3.0** | **70+ Python Files** | **Unity AI Lab 2025**
+**Version 2.4.0** | **75+ Python Files** | **Unity AI Lab 2025**
 
-A Windows 11 AI-powered personal assistant with full autonomous capabilities: task management, knowledge base, voice input/output, vision analysis, GUI interface, boot diagnostics, and self-modification.
+A Windows 11 AI-powered personal assistant with full autonomous capabilities: visual boot display, dynamic AI responses, task management, knowledge base, voice input/output, vision analysis, image generation, and live system monitoring.
+
+---
+
+## What's New in v2.4.0
+
+- **Visual Boot Display** - Cyberpunk-themed boot screen with waveform visualization
+- **Dynamic AI Responses** - CORA generates unique responses via Ollama (no hardcoded phrases)
+- **Live System Stats** - Real-time CPU, RAM, GPU, VRAM, Disk monitoring during boot
+- **Kokoro TTS** - High-quality neural voice synthesis with af_bella voice
+- **Image Generation** - AI-generated art using Pollinations Flux model
+- **Full Location Announcement** - City, State, Country announced at boot
+- **Persistent Boot Display** - Window stays open with live stats after boot
 
 ---
 
 ## Quick Start
 
-### GUI Mode (Recommended)
+### Full Boot (Recommended)
+```bash
+python src/boot_sequence.py
+```
+
+### GUI Mode
 ```batch
 python gui_launcher.py
 ```
@@ -41,14 +58,42 @@ python ui/app.py
 python cora.py
 ```
 
-### Windows Batch
-```batch
-start.bat
+### Quick Boot (No TTS)
+```bash
+python src/boot_sequence.py --quick
 ```
 
 ---
 
+## Boot Sequence
+
+When CORA boots, she runs a 10-phase diagnostic with TTS announcements:
+
+| Phase | Check | What Happens |
+|-------|-------|--------------|
+| 1 | Voice Synthesis | Kokoro TTS initialization |
+| 2 | AI Engine | Ollama connection check |
+| 3 | Hardware Check | CPU, RAM, GPU, VRAM stats |
+| 4 | Core Tools | Memory, Tasks, Files, Browser |
+| 5 | Voice Systems | STT, Echo Filter, Wake Word |
+| 6 | External Services | Weather, Location, Notifications |
+| 7 | News Headlines | Top 3 headlines from Google News |
+| 8 | Vision Test | Screenshot & webcam capture |
+| 9 | Image Generation | AI art via Pollinations Flux |
+| 10 | Final Check | Summary & readiness status |
+
+**CORA generates her own unique responses for each phase using Ollama AI.**
+
+---
+
 ## Features
+
+### Visual Boot Display
+- Two-column layout: Status panel + Scrolling log
+- Audio waveform visualization during speech
+- Color-coded status indicators (green/yellow/red)
+- Live updating system stats panel
+- Cyberpunk/goth dark theme
 
 ### Task Management
 - Add, list, complete, delete tasks
@@ -65,38 +110,26 @@ start.bat
 
 ### AI Integration
 - Ollama-powered chat (llama3.2, llava)
-- Context-aware responses
-- Conversation memory
+- Dynamic boot responses via AI
+- Context-aware conversations
 - Vision/image analysis via llava
+- Image generation via Pollinations
 
 ### Voice Systems
-- **TTS Output:** pyttsx3 (default) or Kokoro neural TTS
+- **TTS Output:** Kokoro neural TTS (af_bella voice)
 - **Emotion-aware speech** with mood tracking
 - **STT Input:** Speech recognition with wake word detection
 - **Wake words:** "cora", "hey cora", "yo cora", "okay cora"
 - **TTS Mutex:** Prevents overlapping speech across processes
 
-### GUI Interface (CustomTkinter)
-- Dark/Light mode toggle
-- Chat panel with command processing
-- Tasks panel with status checkboxes
-- Knowledge panel with tag search
-- Settings panel with save/load
-- Status bar with camera presence detection
-
-### Boot Sequence
-- Fullscreen animated splash screen
-- Advanced System Diagnostics display
-- 13 boot checks: Time, Location, Weather, Calendar, Tasks, Ollama, TTS, System, GPU, Disk, Network, Microphone, Webcam
-- Context-aware TTS narration with varied responses
-
 ### System Tools
-- Screenshot capture
-- Webcam presence detection
+- Screenshot capture (3840x2160 support)
+- Webcam capture and vision analysis
 - Hotkey support
 - Image generation (Pollinations)
 - Browser control
 - Reminders and calendar integration
+- Live system monitoring (CPU, RAM, GPU, VRAM, Network)
 
 ---
 
@@ -107,95 +140,51 @@ start.bat
 |---------|-------------|
 | `add <text>` | Create new task |
 | `list` / `ls` | Show all tasks |
-| `list pri` | Show tasks sorted by priority |
-| `done <id>` | Mark task complete |
-| `delete <id>` / `del` / `rm` | Remove task |
-| `pri <id> <1-10>` | Set priority (1=highest) |
-| `due <id> <date>` | Set due date (YYYY-MM-DD or +3d) |
-| `note <id> <text>` | Add note to task |
-| `edit <id> <text>` | Edit task description |
-| `status <id> <state>` | Change status (pending/active/done) |
-| `show <id>` | View task details |
-| `search <query>` | Find tasks by text |
-| `today` | Show due/overdue tasks |
-| `stats` | Task statistics |
-| `undo` | Restore last deleted |
-
-### Knowledge Base
-| Command | Description |
-|---------|-------------|
-| `learn <text> [#tags]` | Add knowledge with tags |
-| `recall [#tag]` | View/filter knowledge |
+| `list pri` | Sort by priority |
+| `done <id>` | Mark complete |
+| `delete <id>` | Remove task |
+| `pri <id> <1-10>` | Set priority |
+| `due <id> <date>` | Set due date |
+| `note <id> <text>` | Add note |
+| `search <query>` | Find tasks |
+| `today` | Show due/overdue |
+| `undo` | Restore deleted |
 
 ### AI & Voice
 | Command | Description |
 |---------|-------------|
-| `chat <msg>` | Talk to CORA (context-aware) |
-| `chathistory [clear]` | View/clear chat history |
-| `speak <text>` | Text-to-speech output |
-| `see [question]` | Camera vision analysis |
-| `imagine <desc>` | Generate image from text |
+| `chat <msg>` | Talk to CORA |
+| `speak <text>` | TTS output |
+| `see [question]` | Camera vision |
+| `imagine <desc>` | Generate image |
 
-### System Tools
+### System
 | Command | Description |
 |---------|-------------|
-| `time` | Current time with greeting |
-| `weather` | Current weather conditions |
-| `remind <time> <msg>` | Set reminder |
-| `open <path>` | Open file or launch app |
+| `time` | Current time |
+| `weather` | Weather info |
 | `screenshot` | Capture screen |
-| `backup` | Save all data |
-
-### Runtime Tools
-| Command | Description |
-|---------|-------------|
-| `create_tool <name> <desc>` | Create custom tool |
-| `modify_tool <name> <action>` | Enable/disable/delete tool |
-| `list_tools` | Show all runtime tools |
-
-### Other
-| Command | Description |
-|---------|-------------|
-| `settings [key] [value]` | View/modify config |
-| `pull <model>` | Pull Ollama model |
-| `clear` | Clear terminal |
-| `help` | Show all commands |
+| `backup` | Save data |
 
 ---
 
 ## Requirements
 
-- Python 3.10+
-- Ollama (for AI features)
-- pyttsx3 (for TTS)
-- customtkinter (for GUI)
+- **Python 3.10+**
+- **Ollama** (for AI)
+- **NVIDIA GPU** (recommended)
 
-### Install Dependencies
+### Install
 ```bash
 pip install -r requirements.txt
 ```
 
-### Install Ollama
+### Ollama Setup
 ```bash
 winget install Ollama.Ollama
 ollama pull llama3.2
-ollama pull llava  # For vision
+ollama pull llava
 ```
-
----
-
-## Configuration
-
-### config/settings.json
-- TTS settings (rate, volume, engine)
-- Ollama model selection
-- STT settings (voice input)
-
-### config/voice_commands.json
-- Wake words
-- Command aliases
-- Enable/disable commands
-- Custom responses
 
 ---
 
@@ -203,148 +192,92 @@ ollama pull llava  # For vision
 
 ```
 C.O.R.A/
-├── cora.py                  # Main CLI application (2300+ lines)
-├── gui_launcher.py          # GUI entry point
-├── config.json              # Legacy settings
-├── personality.json         # AI personality config
-├── system_prompt.txt        # AI system prompt (282 lines)
-├── tasks.json               # Task storage
-├── knowledge.json           # Knowledge base
-├── chat_history.json        # Conversation memory
-├── requirements.txt         # Dependencies
-├── start.bat                # Windows launcher
-├── ARCHITECTURE.md          # System architecture spec
-├── TODO.md                  # Task hierarchy
-├── todoDriver.md            # Driver scan results
-├── todoSlave1.md            # Slave1 scan results
-├── todoSlave2.md            # Slave2 scan results
-│
-├── ui/                      # GUI Components
-│   ├── app.py               # Main GUI application (620+ lines)
-│   ├── splash.py            # Fullscreen animated splash
-│   ├── boot_console.py      # Boot diagnostics (800+ lines)
-│   ├── panels.py            # Task/Settings/Knowledge panels
-│   ├── query_panel.py       # Query interface
-│   ├── image_panel.py       # Image display
-│   ├── fullscreen_image.py  # Fullscreen image viewer
-│   └── system_tray.py       # System tray integration
-│
-├── voice/                   # Voice Systems
-│   ├── tts.py               # Text-to-speech (Kokoro/pyttsx3)
-│   ├── stt.py               # Speech-to-text (Vosk)
-│   ├── emotion.py           # Emotional state machine
-│   ├── wake_word.py         # Wake word detection
-│   ├── commands.py          # Voice command processing
-│   ├── converse.py          # Conversation handler + echo filter
-│   └── tts_mutex.py         # Speech overlap prevention
-│
-├── ai/                      # AI Integration
-│   ├── ollama.py            # Ollama HTTP API client
-│   ├── router.py            # Model routing
-│   ├── context.py           # Context management
-│   └── prompts.py           # Prompt templates
-│
-├── tools/                   # System Tools
-│   ├── system.py            # System info/control + calculator + shell
-│   ├── web.py               # Web search + instant answers
-│   ├── browser.py           # Playwright browser control
-│   ├── email_tool.py        # SMTP email sending
-│   ├── media.py             # Emby media server control
-│   ├── screenshots.py       # Screen capture
-│   ├── calendar.py          # Calendar integration
-│   ├── memory.py            # Working memory
-│   ├── reminders.py         # Reminder system
-│   ├── image_gen.py         # Image generation (Pollinations)
-│   ├── files.py             # File operations
-│   ├── tasks.py             # Task management module
-│   ├── self_modify.py       # Runtime tool creation
-│   ├── ai_tools.py          # AI tool integrations
-│   └── tts_handler.py       # TTS utility handler
-│
-├── services/                # Background Services
-│   ├── presence.py          # Webcam presence detection
-│   ├── audio.py             # Audio device management
-│   ├── weather.py           # Weather API (wttr.in)
+├── src/
+│   ├── boot_sequence.py     # Main boot with TTS (1350+ lines)
+│   └── cora.py              # CLI application
+├── ui/
+│   ├── boot_display.py      # Visual boot display with waveform
+│   ├── app.py               # Main GUI application
+│   └── panels.py            # Task/Settings/Knowledge panels
+├── voice/
+│   ├── tts.py               # Kokoro TTS engine
+│   ├── stt.py               # Speech recognition
+│   └── wake_word.py         # Wake word detection
+├── ai/
+│   ├── ollama.py            # Ollama API client
+│   └── context.py           # Context management
+├── tools/
+│   ├── image_gen.py         # Pollinations AI image gen
+│   ├── screenshots.py       # Screen/window capture
+│   ├── tasks.py             # Task management
+│   └── memory.py            # Working memory
+├── services/
+│   ├── weather.py           # Weather API
 │   ├── location.py          # IP geolocation
-│   ├── hotkeys.py           # Hotkey handling
 │   └── notifications.py     # System notifications
-│
-├── config/                  # Configuration
-│   ├── settings.json        # GUI settings
-│   └── voice_commands.json  # Voice command config
-│
-├── READMEs/                 # Documentation
-│   ├── UserGuide.md         # User documentation
-│   └── NerdReadme.md        # Developer documentation
-│
-└── backups/                 # Data backups
+├── config/
+│   └── settings.json        # Configuration
+├── data/
+│   ├── images/              # Generated images
+│   └── camera/              # Camera captures
+└── READMEs/
+    ├── UserGuide.md         # User documentation
+    └── NerdReadme.md        # Developer documentation
 ```
 
 ---
 
-## Command Line Arguments
+## Hardware Detection
 
-```bash
-# GUI with splash screen (default)
-python ui/app.py
+| Component | Method |
+|-----------|--------|
+| CPU | psutil.cpu_percent() |
+| RAM | psutil.virtual_memory() |
+| Disk | psutil.disk_usage() |
+| GPU | nvidia-smi subprocess |
+| VRAM | nvidia-smi memory query |
+| Network | psutil.net_if_stats() |
+| Camera | OpenCV VideoCapture |
 
-# GUI without splash (quick boot)
-python ui/app.py --no-splash
-python ui/app.py --quick
+---
 
-# CLI mode
-python cora.py
-```
+## Recent Updates (v2.4.0)
+
+- Visual Boot Display with cyberpunk theme
+- Dynamic AI responses via Ollama for all boot phases
+- Live system stats panel with 1-second refresh
+- Kokoro TTS with af_bella neural voice
+- Image generation test creates AI art during boot
+- Full location announcement (City, State, Country)
+- Waveform visualization during TTS playback
+- GPU detection via nvidia-smi (RTX 4070 Ti SUPER tested)
+- 75+ Python files across all modules
+
+---
+
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| [README.md](README.md) | Overview & quick start |
+| [SETUP.md](SETUP.md) | Installation guide |
+| [HOW_TO_USE.md](HOW_TO_USE.md) | Simple user guide |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture |
+| [READMEs/UserGuide.md](READMEs/UserGuide.md) | Full user docs |
+| [READMEs/NerdReadme.md](READMEs/NerdReadme.md) | Developer docs |
 
 ---
 
 ## Roadmap
 
-- [x] Phase 0: CLI Task Manager (cora.py - 84KB)
-- [x] Phase 1: Kokoro TTS + Emotion (voice/ - 98KB)
-- [x] Phase 2: CustomTkinter GUI (ui/ - 145KB)
-- [x] Phase 3: Voice Input (STT + Wake Word)
-- [x] Phase 4: Boot Diagnostics + Splash Screen
-- [x] Phase 5: Vision/Camera Integration (llava)
-- [x] Phase 6: Voice Commands (voice_commands.json)
-- [x] Phase 7: System tray integration
-- [x] Phase 8: Advanced Tools (browser, email, media, calculator)
-- [~] Phase 9: Self-modification system (in progress)
-- [ ] Phase 10: Auto-updater + Installer
-
----
-
-## Recent Updates (v2.3.0)
-
-- **70+ Python files** - Full production codebase
-- Advanced System Diagnostics boot sequence with 13+ checks
-- Voice command processing via voice_commands.json
-- Camera presence detection in GUI status bar
-- TTS mutex for preventing speech overlap
-- Emotional state tracking with mood-aware responses
-- Runtime tool creation system (self-modification)
-- Image generation via Pollinations API
-- Browser automation (Playwright)
-- Email sending (SMTP)
-- Media server control (Emby)
-- Web search with DuckDuckGo instant answers
-- Math calculator with safe expression evaluation
-- Shell command execution with safety checks
-- Conversation mode with echo filtering
-- Working memory system (remember/recall)
-- Query panels with hotbar support
-- Natural language command parsing
-
-### Module Breakdown
-
-| Module | Files | Purpose |
-|--------|-------|---------|
-| **cora.py** | 1 | Main CLI application |
-| **ui/** | 10 | GUI components |
-| **voice/** | 9 | TTS/STT/Wake word |
-| **tools/** | 18 | System tools (browser, email, media, web, etc.) |
-| **ai/** | 5 | Ollama integration |
-| **services/** | 8 | Background services |
+- [x] Phase 1: CLI Task Manager
+- [x] Phase 2: Kokoro TTS + Emotion
+- [x] Phase 3: CustomTkinter GUI
+- [x] Phase 4: Voice Input (STT)
+- [x] Phase 5: Boot Diagnostics
+- [x] Phase 6: Vision/Camera
+- [x] Phase 7: Visual Boot Display + Dynamic AI
+- [ ] Phase 8: Auto-updater + Installer
 
 ---
 
@@ -354,6 +287,6 @@ Unity AI Lab - 2025
 
 ---
 
-*C.O.R.A v2.3.0 - Cognitive Operations & Reasoning Assistant*
+*C.O.R.A v2.4.0 - Cognitive Operations & Reasoning Assistant*
 *Last Updated: 2025-12-23*
-*Built by Unity AI Lab with ClaudeColab team coordination*
+*Built by Unity AI Lab*

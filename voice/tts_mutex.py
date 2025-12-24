@@ -5,7 +5,7 @@ Lock-based speech coordination to prevent overlapping TTS
 
 Per ARCHITECTURE.md v2.2.0:
 - Prevents multiple bots/instances from talking over each other
-- Lock file coordination at C:\claude\tts_mutex.lock
+- Lock file in CLAUDE_MUTEX_DIR env var, or temp dir, or local data dir
 - Acquires lock before speaking, releases after audio complete
 """
 
@@ -22,10 +22,21 @@ import portalocker  # For cross-process file locking
 
 
 # Lock file location (shared across all Claude instances)
-TTS_LOCK_FILE = Path(r'C:\claude\tts_mutex.lock')
-TTS_STATE_FILE = Path(r'C:\claude\tts_state.json')
+# Use CLAUDE_MUTEX_DIR env var, fallback to temp dir or local data dir
+_MUTEX_DIR = os.environ.get('CLAUDE_MUTEX_DIR')
+if _MUTEX_DIR:
+    _MUTEX_PATH = Path(_MUTEX_DIR)
+elif os.name == 'nt':
+    # Windows: use user's temp dir
+    _MUTEX_PATH = Path(os.environ.get('TEMP', os.environ.get('TMP', ''))) / 'claude'
+else:
+    # Unix: use /tmp or XDG_RUNTIME_DIR
+    _MUTEX_PATH = Path(os.environ.get('XDG_RUNTIME_DIR', '/tmp')) / 'claude'
 
-# Fallback if C:\claude doesn't exist
+TTS_LOCK_FILE = _MUTEX_PATH / 'tts_mutex.lock'
+TTS_STATE_FILE = _MUTEX_PATH / 'tts_state.json'
+
+# Fallback to local data directory
 LOCAL_LOCK_FILE = Path(__file__).parent.parent / 'data' / 'tts_mutex.lock'
 LOCAL_STATE_FILE = Path(__file__).parent.parent / 'data' / 'tts_state.json'
 

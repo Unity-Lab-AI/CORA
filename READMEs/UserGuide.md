@@ -2,7 +2,7 @@
 
 ## Cognitive Operations & Reasoning Assistant
 
-Version 2.2.0
+Version 2.4.0
 
 ---
 
@@ -10,14 +10,24 @@ Version 2.2.0
 
 ### Starting CORA
 
-**GUI Mode (Recommended):**
+**Visual Boot (Recommended):**
+```bash
+python src/boot_sequence.py
+```
+Full cyberpunk visual boot display with dynamic AI responses.
+
+**GUI Mode:**
+```bash
+python gui_launcher.py
+```
+or
 ```bash
 python ui/app.py
 ```
 
-**GUI Quick Boot (No Splash):**
+**Quick Boot (No TTS):**
 ```bash
-python ui/app.py --quick
+python src/boot_sequence.py --quick
 ```
 
 **CLI Mode:**
@@ -30,26 +40,61 @@ python cora.py
 python cora.py <command> [args]
 ```
 
-**Windows Launcher:**
-```batch
-start.bat
-```
-
 ---
 
 ## Boot Sequence
 
-When CORA starts in GUI mode, you'll see:
+When CORA starts with visual boot, you'll see:
 
-1. **Splash Screen** - Animated logo with progress bar (press ESC/SPACE to skip)
-2. **Boot Diagnostics** - System checks with status indicators:
-   - Time, Location, Weather
-   - Calendar, Tasks
-   - AI (Ollama), Voice (TTS)
-   - System resources (CPU, RAM, GPU, Disk)
-   - Network, Microphone, Webcam
+1. **Visual Boot Display** - Cyberpunk-themed window with two panels
+2. **10-Phase Diagnostic** - Each phase with dynamic AI responses:
 
-CORA will speak a summary of each check as it boots.
+| Phase | Check | What Happens |
+|-------|-------|--------------|
+| 1 | Voice Synthesis | Kokoro TTS initialization |
+| 2 | AI Engine | Ollama connection check |
+| 3 | Hardware Check | CPU, RAM, GPU, VRAM stats |
+| 4 | Core Tools | Memory, Tasks, Files, Browser |
+| 5 | Voice Systems | STT, Echo Filter, Wake Word |
+| 6 | External Services | Weather, Location, Notifications |
+| 7 | News Headlines | Top 3 headlines from Google News |
+| 8 | Vision Test | Screenshot & webcam capture |
+| 9 | Image Generation | AI art via Pollinations Flux |
+| 10 | Final Check | Summary & readiness status |
+
+3. **Live System Stats** - Real-time CPU, RAM, GPU, VRAM, Disk monitoring
+4. **Waveform Visualization** - Audio waveform during TTS playback
+
+**CORA generates unique responses for each phase using Ollama AI.**
+
+---
+
+## Visual Boot Display
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  C.O.R.A v2.4.0 - Visual Boot Display                          │
+├──────────────────────────┬─────────────────────────────────────┤
+│  STATUS PANEL            │  BOOT LOG                           │
+│                          │                                     │
+│  CPU: 15%                │  [10:30:45] Voice synthesis ready   │
+│  RAM: 45%                │  [10:30:46] AI engine connected     │
+│  GPU: RTX 4070 Ti        │  [10:30:47] Hardware check passed   │
+│  VRAM: 2.1/16 GB         │  [10:30:48] All systems online      │
+│  Disk: 450/1000 GB       │                                     │
+│                          │  ~~~ Waveform Visualization ~~~     │
+│  Phase: 10/10            │                                     │
+├──────────────────────────┴─────────────────────────────────────┤
+│  CORA: "All systems operational. Ready to assist!"             │
+└────────────────────────────────────────────────────────────────┘
+```
+
+Features:
+- Two-column layout: Status panel + Scrolling log
+- Audio waveform visualization during speech
+- Color-coded status indicators (green/yellow/red)
+- Live updating system stats panel
+- Cyberpunk/goth dark theme
 
 ---
 
@@ -176,7 +221,7 @@ cora> chat What should I focus on today?
 ### Voice Output
 
 ```
-speak <text>          Speak text aloud
+speak <text>          Speak text aloud (Kokoro TTS)
 ```
 
 ### Vision / Camera
@@ -186,7 +231,20 @@ see                   Capture webcam and describe what CORA sees
 see <prompt>          Analyze camera image with specific question
 ```
 
-Uses Ollama's llava model for vision.
+Uses Ollama's llava model for vision analysis.
+
+### Image Generation
+
+```
+imagine <description>  Generate AI image via Pollinations Flux
+```
+
+Example:
+```
+cora> imagine a cyberpunk city at night with neon lights
+```
+
+Images saved to `data/images/` folder.
 
 ### AI Model Management
 
@@ -208,7 +266,7 @@ weather               Show current weather conditions
 ### Screenshots
 
 ```
-screenshot            Capture and save screenshot
+screenshot            Capture and save screenshot (supports 3840x2160)
 ```
 
 ### Camera
@@ -219,9 +277,9 @@ see                   Vision analysis via webcam
 
 The status bar shows camera status:
 - **Check** button - Manual presence detection
-- **📷 ✓** - User detected
-- **📷 ✗** - No user
-- **📷 --** - Not checked
+- **Check mark** - User detected
+- **X** - No user
+- **--** - Not checked
 
 ---
 
@@ -325,10 +383,11 @@ backup                Save all data to backups/
 | tasks.json | Task storage |
 | knowledge.json | Knowledge base |
 | chat_history.json | Conversation memory |
-| config.json | Legacy settings |
 | config/settings.json | GUI settings |
 | config/voice_commands.json | Voice config |
 | personality.json | AI personality |
+| data/images/ | Generated images |
+| data/camera/ | Camera captures |
 | backups/ | Backup directory |
 
 ---
@@ -349,13 +408,12 @@ backup                Save all data to backups/
 | Enter | Send message |
 | Ctrl+C | Exit |
 
-### Splash Screen
+### Boot Display
 
 | Key | Action |
 |-----|--------|
-| ESC | Skip splash |
-| SPACE | Skip splash |
-| Enter | Skip splash |
+| ESC | Close display |
+| Any key | Skip boot (during phases) |
 
 ---
 
@@ -366,11 +424,13 @@ backup                Save all data to backups/
 3. **Quick Lists:** `list pri` shows by priority
 4. **Task Context:** Chat knows your tasks - ask for help!
 5. **Tags:** Use #tags in knowledge entries for easy filtering
-6. **Quick Boot:** Use `--quick` flag to skip splash screen
+6. **Quick Boot:** Use `--quick` flag to skip TTS announcements
 7. **Voice Activation:** Say "hey cora" hands-free
 8. **Camera Check:** Use the Check button to verify presence
 9. **Dark Mode:** Toggle in sidebar for eye comfort
-10. **Settings Persist:** GUI settings save to config/settings.json
+10. **Image Generation:** Use `imagine` to create AI art
+11. **System Stats:** Boot display shows live CPU/RAM/GPU stats
+12. **Dynamic AI:** CORA generates unique responses every boot
 
 ---
 
@@ -378,13 +438,15 @@ backup                Save all data to backups/
 
 | Issue | Solution |
 |-------|----------|
-| No voice | Check TTS settings, install pyttsx3 |
-| No AI | Start Ollama service, check model |
-| No camera | Install opencv-python, check webcam |
+| No voice | Check TTS settings, ensure Kokoro installed |
+| No AI | Start Ollama service (`ollama serve`), check model |
+| No camera | Install opencv-python, check webcam connection |
 | Slow boot | Use `--quick` flag |
 | Voice not heard | Check microphone in settings |
+| No GPU stats | Install NVIDIA drivers, check nvidia-smi |
+| No images | Check internet connection (Pollinations needs internet) |
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.2.0*
+*Unity AI Lab - C.O.R.A v2.4.0*
 *Last Updated: 2025-12-23*

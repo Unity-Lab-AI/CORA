@@ -450,6 +450,107 @@ def create_model(
         return False
 
 
+# ============ VISION (Image Analysis) ============
+# Per ARCHITECTURE.md v2.4.0 - Vision analysis using llava
+
+VISION_MODEL = "llava"  # Multimodal vision model
+
+
+def generate_with_image(
+    prompt: str,
+    image_path: str,
+    model: str = VISION_MODEL,
+    temperature: float = 0.7,
+    max_tokens: int = 150,
+    timeout: int = 60
+) -> OllamaResponse:
+    """Generate response based on an image using vision model (llava).
+
+    Args:
+        prompt: Question about the image
+        image_path: Path to the image file
+        model: Vision model to use (default: llava)
+        temperature: Sampling temperature
+        max_tokens: Max response tokens
+        timeout: Request timeout
+
+    Returns:
+        OllamaResponse with description of the image
+    """
+    import base64
+    from pathlib import Path
+
+    try:
+        # Read and encode the image
+        img_path = Path(image_path)
+        if not img_path.exists():
+            return OllamaResponse(
+                content='',
+                model=model,
+                done=True,
+                error=f"Image not found: {image_path}"
+            )
+
+        with open(img_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+
+        # Build payload with image
+        payload = {
+            'model': model,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': prompt,
+                    'images': [image_data]
+                }
+            ],
+            'stream': False,
+            'options': {
+                'temperature': temperature,
+                'num_predict': max_tokens
+            }
+        }
+
+        resp = requests.post(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            json=payload,
+            timeout=timeout
+        )
+
+        if resp.status_code == 200:
+            data = resp.json()
+            message = data.get('message', {})
+            return OllamaResponse(
+                content=message.get('content', ''),
+                model=data.get('model', model),
+                done=data.get('done', True),
+                total_duration=data.get('total_duration'),
+                eval_count=data.get('eval_count')
+            )
+        else:
+            return OllamaResponse(
+                content='',
+                model=model,
+                done=True,
+                error=f"HTTP {resp.status_code}: {resp.text}"
+            )
+
+    except requests.ConnectionError:
+        return OllamaResponse(
+            content='',
+            model=model,
+            done=True,
+            error='Ollama not running'
+        )
+    except Exception as e:
+        return OllamaResponse(
+            content='',
+            model=model,
+            done=True,
+            error=str(e)
+        )
+
+
 # Convenience functions for CORA integration
 
 def quick_ask(question: str, model: str = DEFAULT_MODEL) -> str:

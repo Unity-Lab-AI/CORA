@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rm -f \"C:\\Users\\gfour\\Desktop\\C.O.R.A Cognitive Operations & Reasoning Assistant\\NUL\")"
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

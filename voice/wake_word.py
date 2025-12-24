@@ -8,6 +8,13 @@ Per ARCHITECTURE.md v2.2.0:
 - Detect wake words using Vosk
 - On detection, activate full STT for command
 - Play subtle audio cue when detected
+
+VOSK MODEL SETUP:
+1. Download model from: https://alphacephei.com/vosk/models
+2. Recommended: vosk-model-small-en-us-0.15 (~40MB, fast)
+3. Alternative: vosk-model-en-us-0.22 (~1GB, more accurate)
+4. Extract to: models/vosk-model-small-en-us-0.15/
+5. Model path configured at line 40 (MODEL_PATH)
 """
 
 import os

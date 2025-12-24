@@ -7,6 +7,7 @@
 
 # Core
 requests~=2.31.0
+aiohttp~=3.9.0
 
 # Text-to-Speech
 pyttsx3~=2.90
@@ -18,6 +19,7 @@ numpy~=1.26.0
 
 # Voice Recognition (optional)
 vosk~=0.3.45
+SpeechRecognition~=3.10.0
 soundfile~=0.12.1
 
 # GUI
@@ -25,12 +27,8 @@ customtkinter~=5.2.1
 pystray~=0.19.5
 Pillow~=10.2.0
 
-# Ollama AI integration
-ollama~=0.3.3
-
 # Utilities
 python-dateutil~=2.8.2
-colorama~=0.4.6
 
 # Screenshot/Window tools
 pygetwindow~=0.0.9
@@ -41,3 +39,10 @@ psutil~=5.9.8
 
 # OpenCV for presence detection (optional)
 opencv-python~=4.9.0.80
+
+# Testing
+pytest~=8.0.0
+pytest-cov~=4.1.0
+
+# File locking for safe concurrent access
+portalocker~=2.8.0

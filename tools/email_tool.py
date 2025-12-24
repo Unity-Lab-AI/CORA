@@ -106,8 +106,8 @@ def send_email(
         else:
             msg.attach(MIMEText(body, "plain"))
 
-        # Send via SMTP SSL
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+        # Send via SMTP SSL (with 30 second timeout)
+        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as server:
             server.login(sender, password)
             server.sendmail(sender, to, msg.as_string())
 

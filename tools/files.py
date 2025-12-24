@@ -9,6 +9,61 @@ import os
 import shutil
 import json
 import datetime
+from pathlib import Path
+
+
+def _validate_path(file_path: str, base_dir: str = None) -> bool:
+    """Validate a path to prevent directory traversal attacks.
+
+    Args:
+        file_path: Path to validate
+        base_dir: Optional base directory to restrict access to
+
+    Returns:
+        bool: True if path is safe, False if potentially malicious
+    """
+    if not file_path:
+        return False
+
+    # Normalize the path to resolve any .. or . components
+    try:
+        # Resolve to absolute path
+        resolved = Path(file_path).resolve()
+
+        # Check for null bytes (common injection technique)
+        if '\x00' in file_path:
+            return False
+
+        # If base_dir specified, ensure path is within it
+        if base_dir:
+            base_resolved = Path(base_dir).resolve()
+            try:
+                resolved.relative_to(base_resolved)
+            except ValueError:
+                # Path is not relative to base_dir (traversal attempt)
+                return False
+
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _safe_path(file_path: str, base_dir: str = None) -> str:
+    """Get a safe, resolved path or raise ValueError if invalid.
+
+    Args:
+        file_path: Path to validate and resolve
+        base_dir: Optional base directory to restrict access to
+
+    Returns:
+        str: Resolved absolute path
+
+    Raises:
+        ValueError: If path is invalid or attempts traversal
+    """
+    if not _validate_path(file_path, base_dir):
+        raise ValueError(f"Invalid or unsafe path: {file_path}")
+    return str(Path(file_path).resolve())
 
 
 def create_file(file_path, content='', overwrite=False):
@@ -23,6 +78,11 @@ def create_file(file_path, content='', overwrite=False):
         bool: True if created successfully
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return False
+
         if os.path.exists(file_path) and not overwrite:
             print(f"[!] File already exists: {file_path}")
             return False
@@ -52,6 +112,11 @@ def read_file(file_path, encoding='utf-8'):
         str: File contents or None if error
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return None
+
         if not os.path.exists(file_path):
             print(f"[!] File not found: {file_path}")
             return None
@@ -75,6 +140,11 @@ def append_file(file_path, content, create_if_missing=True):
         bool: True if appended successfully
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return False
+
         if not os.path.exists(file_path) and not create_if_missing:
             print(f"[!] File not found: {file_path}")
             return False
@@ -99,6 +169,11 @@ def delete_file(file_path, confirm=True):
         bool: True if deleted successfully
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return False
+
         if not os.path.exists(file_path):
             print(f"[!] File not found: {file_path}")
             return False
@@ -122,6 +197,14 @@ def move_file(source, destination, overwrite=False):
         bool: True if moved successfully
     """
     try:
+        # Validate both paths to prevent traversal attacks
+        if not _validate_path(source):
+            print(f"[!] Invalid source path: {source}")
+            return False
+        if not _validate_path(destination):
+            print(f"[!] Invalid destination path: {destination}")
+            return False
+
         if not os.path.exists(source):
             print(f"[!] Source not found: {source}")
             return False
@@ -154,6 +237,14 @@ def copy_file(source, destination, overwrite=False):
         bool: True if copied successfully
     """
     try:
+        # Validate both paths to prevent traversal attacks
+        if not _validate_path(source):
+            print(f"[!] Invalid source path: {source}")
+            return False
+        if not _validate_path(destination):
+            print(f"[!] Invalid destination path: {destination}")
+            return False
+
         if not os.path.exists(source):
             print(f"[!] Source not found: {source}")
             return False
@@ -185,12 +276,27 @@ def rename_file(file_path, new_name):
         bool: True if renamed successfully
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return False
+
+        # Validate new_name doesn't contain path separators (traversal attempt)
+        if os.sep in new_name or '/' in new_name or '\\' in new_name:
+            print(f"[!] Invalid filename (contains path separators): {new_name}")
+            return False
+
         if not os.path.exists(file_path):
             print(f"[!] File not found: {file_path}")
             return False
 
         directory = os.path.dirname(file_path)
         new_path = os.path.join(directory, new_name)
+
+        # Validate the resulting path as well
+        if not _validate_path(new_path):
+            print(f"[!] Invalid resulting path: {new_path}")
+            return False
 
         os.rename(file_path, new_path)
         return True
@@ -275,6 +381,11 @@ def create_directory(dir_path):
         bool: True if created successfully
     """
     try:
+        # Validate path to prevent traversal attacks
+        if not _validate_path(dir_path):
+            print(f"[!] Invalid path: {dir_path}")
+            return False
+
         if os.path.exists(dir_path):
             return True  # Already exists
 

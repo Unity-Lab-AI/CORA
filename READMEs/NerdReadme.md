@@ -2,7 +2,7 @@
 
 ## Developer/Nerd Guide
 
-Version 2.2.0
+Version 2.4.0
 
 ---
 
@@ -17,41 +17,183 @@ Version 2.2.0
 | Strategy | TTS engine selection (Kokoro/pyttsx3) |
 | Observer | Chat history, emotional event tracking |
 | State Machine | EmotionalState with mood decay |
-| Factory | Panel creation in GUI |
+| Factory | Panel creation in GUI, cora_respond() |
 | Mutex | TTS mutex for process-safe speech |
+| Callback | Waveform visualization during TTS |
 
 ### System Layers
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    GUI Layer (ui/)                           │
-│   app.py → splash.py → boot_console.py → panels.py          │
+│                 Visual Boot Layer (ui/)                     │
+│   boot_display.py → Cyberpunk UI + Waveform + Live Stats    │
 ├─────────────────────────────────────────────────────────────┤
-│                    CLI Layer (cora.py)                       │
-│   Command dispatch → Response generation → TTS output        │
+│                    Boot Layer (src/)                        │
+│   boot_sequence.py → 10-phase diagnostic + cora_respond()   │
 ├─────────────────────────────────────────────────────────────┤
-│                    Voice Layer (voice/)                      │
-│   STT (stt.py) ←→ Wake Word ←→ Commands ←→ TTS (tts.py)     │
-│                         ↓                                    │
-│                  Emotion State Machine                       │
+│                    GUI Layer (ui/)                          │
+│   app.py → splash.py → boot_console.py → panels.py         │
 ├─────────────────────────────────────────────────────────────┤
-│                    AI Layer (ai/)                            │
-│   Ollama client → Router → Context manager                   │
+│                    CLI Layer (cora.py)                      │
+│   Command dispatch → Response generation → TTS output       │
 ├─────────────────────────────────────────────────────────────┤
-│                 Services Layer (services/)                   │
-│   Presence → Weather → Location → Audio → Hotkeys           │
+│                    Voice Layer (voice/)                     │
+│   STT (stt.py) ←→ Wake Word ←→ Commands ←→ TTS (tts.py)    │
+│                         ↓                                   │
+│                  Emotion State Machine                      │
 ├─────────────────────────────────────────────────────────────┤
-│                   Tools Layer (tools/)                       │
-│   System → Screenshots → Calendar → Memory → Reminders      │
+│                    AI Layer (ai/)                           │
+│   Ollama client → Router → Context manager → cora_respond() │
 ├─────────────────────────────────────────────────────────────┤
-│                  Data Layer (JSON files)                     │
-│   tasks.json → knowledge.json → config/ → personality.json  │
+│                 Services Layer (services/)                  │
+│   Presence → Weather → Location → Audio → Notifications    │
+├─────────────────────────────────────────────────────────────┤
+│                   Tools Layer (tools/)                      │
+│   System → Screenshots → Calendar → Memory → Image Gen     │
+├─────────────────────────────────────────────────────────────┤
+│                  Data Layer (JSON files)                    │
+│   tasks.json → knowledge.json → config/ → data/images/     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
+## New in v2.4.0
+
+### Visual Boot Display (ui/boot_display.py)
+
+**Class:** `BootDisplay(tk.Tk)`
+
+**Key Features:**
+- Two-column layout: Status panel + Scrolling log
+- Audio waveform visualization during TTS playback
+- Live system stats (1-second refresh rate)
+- Color-coded status indicators (green/yellow/red)
+- Cyberpunk/goth dark theme
+
+**Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `update_status()` | Update left panel status indicators |
+| `add_log()` | Add entry to scrolling log |
+| `show_waveform()` | Display audio waveform during speech |
+| `update_system_stats()` | Refresh CPU/RAM/GPU/VRAM/Disk |
+
+### Dynamic AI Responses (src/boot_sequence.py)
+
+**Function:** `cora_respond(phase, data, style)`
+
+Generates unique AI responses for each boot phase using Ollama.
+
+```python
+def cora_respond(phase: str, data: dict, style: str = "cora") -> str:
+    """
+    Generate dynamic CORA response via Ollama.
+
+    Args:
+        phase: Boot phase name (e.g., "voice_synthesis")
+        data: Phase-specific data dict
+        style: Response style ("cora", "technical", "playful")
+
+    Returns:
+        AI-generated response string
+    """
+```
+
+**Phase Data Examples:**
+
+| Phase | Data Keys |
+|-------|-----------|
+| hardware | cpu_percent, ram_percent, gpu_name, vram_used, vram_total |
+| voice_synthesis | engine, voice, status |
+| external_services | weather, location, temperature |
+| news | headlines (list of dicts) |
+| image_generation | path, prompt, success |
+
+### Image Generation (tools/image_gen.py)
+
+**API:** Pollinations Flux model
+
+```python
+def generate_image(prompt: str, save_path: str = None) -> str:
+    """
+    Generate AI image via Pollinations API.
+
+    Args:
+        prompt: Image description
+        save_path: Optional save location (default: data/images/)
+
+    Returns:
+        Path to saved image
+    """
+```
+
+---
+
 ## Module Reference
+
+### src/boot_sequence.py (Main Boot)
+
+**Entry Point:** `main(quick=False)`
+
+**Boot Phases (10 total):**
+
+| Phase | Function | Data Returned |
+|-------|----------|---------------|
+| 1 | `phase_voice_synthesis()` | engine, voice, status |
+| 2 | `phase_ai_engine()` | connected, model, model_count |
+| 3 | `phase_hardware()` | cpu, ram, gpu, vram, disk |
+| 4 | `phase_core_tools()` | memory, tasks, files, browser |
+| 5 | `phase_voice_systems()` | stt, echo_filter, wake_word |
+| 6 | `phase_external_services()` | weather, location, notifications |
+| 7 | `phase_news()` | headlines list |
+| 8 | `phase_vision()` | screenshot, webcam, paths |
+| 9 | `phase_image_gen()` | path, prompt, success |
+| 10 | `phase_final()` | systems_ok, tools_ok, ready |
+
+**Command Line:**
+
+```bash
+python src/boot_sequence.py           # Full boot with visual display
+python src/boot_sequence.py --quick   # Skip TTS announcements
+```
+
+### ui/boot_display.py (Visual Display)
+
+**Class:** `BootDisplay(tk.Tk)`
+
+**Layout:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  C.O.R.A v2.4.0 - Visual Boot Display                [X]   │
+├──────────────────────────┬──────────────────────────────────┤
+│  STATUS PANEL            │  BOOT LOG                        │
+│  ────────────────────    │  ────────────────────────────    │
+│  CPU: [████████░░] 80%   │  [HH:MM:SS] Phase 1 started     │
+│  RAM: [██████░░░░] 60%   │  [HH:MM:SS] Voice ready         │
+│  GPU: RTX 4070 Ti SUPER  │  [HH:MM:SS] Phase 2 started     │
+│  VRAM: 2.1/16 GB         │  ...                             │
+│  Disk: 450/1000 GB       │                                  │
+│                          │  ┌───────────────────────────┐   │
+│  Phase: 5/10             │  │  ~~~~ Waveform ~~~~       │   │
+│  Status: Running         │  └───────────────────────────┘   │
+├──────────────────────────┴──────────────────────────────────┤
+│  CORA: "Initializing voice synthesis systems..."            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Color Scheme:**
+
+| Element | Color |
+|---------|-------|
+| Background | #0a0a0a (near black) |
+| Text | #00ff00 (matrix green) |
+| Accent | #ff00ff (magenta) |
+| Success | #00ff00 (green) |
+| Warning | #ffff00 (yellow) |
+| Error | #ff0000 (red) |
 
 ### ui/app.py (Main GUI)
 
@@ -70,101 +212,6 @@ Version 2.2.0
 | `_voice_input()` | STT recording and processing |
 | `_show_*()` | Panel switching methods |
 
-**Entry Points:**
-
-```python
-main(skip_splash=False)  # Full boot with optional splash
-main_quick()              # No splash, quick boot
-```
-
-**Command Line:**
-
-```bash
-python ui/app.py --no-splash  # Skip splash screen
-python ui/app.py --quick      # Quick boot alias
-```
-
----
-
-### ui/splash.py (Splash Screen)
-
-**Classes:**
-
-| Class | Description |
-|-------|-------------|
-| `SplashScreen` | Fullscreen animated splash with progress |
-| `MinimalSplash` | Quick 1-second logo flash |
-
-**Key Features:**
-- ASCII art logo with Matrix green color
-- Animated progress bar
-- Boot status messages
-- Fade-out effect on completion
-- Skip with ESC/SPACE/ENTER
-
-```python
-show_splash(master, fullscreen=True, duration=3.0, on_complete=callback)
-```
-
----
-
-### ui/boot_console.py (Boot Diagnostics)
-
-**Classes:**
-
-| Class | Description |
-|-------|-------------|
-| `BootCheck` | Single boot check with TTS summary |
-| `BootConsole` | Full boot sequence runner |
-
-**Boot Checks (13 total):**
-
-| Check | Data Returned | TTS Style |
-|-------|---------------|-----------|
-| System Time | hour, day, time | Time-of-day aware |
-| Location | city, region, country | Geolocation phrases |
-| Weather | conditions string | Atmospheric terminology |
-| Calendar | event count, summaries | Schedule-aware |
-| Tasks | pending, overdue counts | Priority-aware |
-| Ollama | connected, model count | Neural/cognitive phrases |
-| TTS | available, engine name | Engine-specific |
-| System | CPU%, RAM%, used | Load-aware thresholds |
-| GPU | name, VRAM | NVIDIA nvidia-smi |
-| Disk | free_gb, total_gb | Storage phrases |
-| Network | connected, latency_ms | Connection status |
-| Microphone | count, device names | Input device status |
-| Webcam | available, resolution | Visual input status |
-
-**TTS Variations:**
-All TTS functions use `random.choice()` for varied responses. Each function has 3-5 variations per status (success/failure/edge cases).
-
----
-
-### ui/panels.py (GUI Panels)
-
-**Classes:**
-
-| Class | Purpose |
-|-------|---------|
-| `BasePanel` | Base class with grid config |
-| `ChatPanel` | Chat display + input (unused in current app.py) |
-| `TasksPanel` | Scrollable task list with checkboxes |
-| `SettingsPanel` | TTS/Ollama/STT settings with save/load |
-| `KnowledgePanel` | Knowledge entries with tag search |
-
-**SettingsPanel Persistence:**
-
-```python
-# Saves to: config/settings.json
-{
-  "tts": {"enabled": bool, "rate": int, "volume": float},
-  "ollama": {"enabled": bool, "model": str},
-  "stt": {"enabled": bool, "sensitivity": float}
-}
-```
-
----
-
 ### voice/tts.py (Text-to-Speech)
 
 **Classes:**
@@ -172,7 +219,7 @@ All TTS functions use `random.choice()` for varied responses. Each function has 
 | Class | Engine | Features |
 |-------|--------|----------|
 | `TTSEngine` | Base | Abstract interface |
-| `KokoroTTS` | Kokoro | Emotion instructions, high-quality |
+| `KokoroTTS` | Kokoro | af_bella voice, emotion instructions |
 | `Pyttsx3TTS` | pyttsx3 | Rate modifiers, offline |
 | `TTSQueue` | Any | Non-blocking, priority queue, mutex |
 
@@ -182,104 +229,17 @@ All TTS functions use `random.choice()` for varied responses. Each function has 
 - `speak_now()` for interrupts
 - Callbacks: `on_speak_start`, `on_speak_end`
 - TTS mutex integration (prevents overlap)
+- Audio data callback for waveform visualization
 
 **Global Functions:**
 
 ```python
-get_tts_engine(config)    # Factory for engine selection
-speak(text, emotion)       # Quick synchronous speak
-queue_speak(text, emotion, priority)  # Async queued speak
-speak_interrupt(text)      # Clear queue and speak immediately
+get_tts_engine(config)              # Factory for engine selection
+speak(text, emotion)                # Quick synchronous speak
+queue_speak(text, emotion, priority) # Async queued speak
+speak_interrupt(text)               # Clear queue and speak immediately
+speak_with_callback(text, on_audio) # Speak with audio data callback
 ```
-
----
-
-### voice/emotion.py (Emotional State)
-
-**Class:** `EmotionalState`
-
-**Emotions:**
-- excited, concerned, satisfied, annoyed, sarcastic
-- caring, playful, urgent, neutral
-
-**State Machine:**
-
-```python
-# Singleton access
-state = get_emotional_state()
-state.apply_event('task_completed')  # +0.2 satisfaction
-state.apply_event('error')           # +0.3 frustration
-state.decay(0.1)                     # Natural decay toward neutral
-
-mood = state.get_mood()              # Returns dominant emotion
-intensity = state.get_intensity()    # 0.0 - 1.0
-```
-
-**Mood Decay:**
-- Automatic decay toward neutral over time
-- Events push mood in specific directions
-- Intensity threshold for mood expression
-
----
-
-### voice/commands.py (Voice Commands)
-
-**Configuration:** `config/voice_commands.json`
-
-```json
-{
-  "enabled": true,
-  "wake_words": ["cora", "hey cora", "yo cora"],
-  "confidence_threshold": 0.7,
-  "commands": {
-    "time": {"enabled": true, "aliases": ["clock"]},
-    "weather": {"enabled": true, "aliases": ["forecast"]}
-  }
-}
-```
-
-**Functions:**
-
-```python
-load_voice_config()           # Load JSON config
-is_command_enabled(name)      # Check if command active
-get_wake_words()              # List wake words
-parse_voice_input(text)       # Extract command from speech
-execute_command(cmd, args)    # Run command handler
-```
-
----
-
-### voice/tts_mutex.py (Speech Overlap Prevention)
-
-**Purpose:** Prevents multiple processes from speaking simultaneously.
-
-```python
-mutex = get_mutex("CORA")
-with mutex.locked(timeout=10) as acquired:
-    if acquired:
-        engine.speak(text)
-```
-
-Uses file-based locking on Windows for cross-process synchronization.
-
----
-
-### services/presence.py (Webcam Detection)
-
-**Functions:**
-
-```python
-check_human_present() -> PresenceResult
-# Returns: PresenceResult(present, confidence, error)
-
-capture_webcam() -> bytes | None
-# Returns: JPEG image bytes or None
-```
-
-Uses OpenCV for face detection with Haar cascades.
-
----
 
 ### ai/ollama.py (AI Integration)
 
@@ -287,15 +247,40 @@ Uses OpenCV for face detection with Haar cascades.
 
 ```python
 # HTTP API to localhost:11434
-POST /api/chat
-POST /api/generate
-GET /api/tags  # List models
+POST /api/chat      # Conversational chat
+POST /api/generate  # Single-shot generation
+GET /api/tags       # List models
 ```
 
 **Context Management (ai/context.py):**
 - Builds context from tasks, knowledge, time of day
 - Injects personality from personality.json
 - Manages conversation history
+
+**cora_respond() Integration:**
+- Uses /api/generate for boot phase responses
+- System prompt enforces CORA personality
+- Response limited to 1-2 sentences
+- Focused on specific phase data
+
+### tools/image_gen.py (Image Generation)
+
+**API:** Pollinations Flux
+
+```python
+# URL format
+https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&model=flux
+
+# Example usage
+from tools.image_gen import generate_image
+path = generate_image("a cyberpunk city at night")
+```
+
+**Features:**
+- Automatic prompt encoding
+- Configurable dimensions
+- Auto-save to data/images/
+- Timestamp-based filenames
 
 ---
 
@@ -337,25 +322,13 @@ GET /api/tags  # List models
 }
 ```
 
-### config/settings.json (GUI Settings)
+### config/settings.json
 
 ```json
 {
   "tts": {"enabled": true, "rate": 150, "volume": 1.0},
   "ollama": {"enabled": true, "model": "llama3.2"},
   "stt": {"enabled": true, "sensitivity": 0.7}
-}
-```
-
-### config/voice_commands.json
-
-```json
-{
-  "enabled": true,
-  "wake_words": ["cora", "hey cora"],
-  "confidence_threshold": 0.7,
-  "commands": {...},
-  "custom_responses": {...}
 }
 ```
 
@@ -394,7 +367,8 @@ COMMANDS = {
     'time': cmd_time,
     'weather': cmd_weather,
     'screenshot': cmd_screenshot,
-    'see': cmd_see,  # Vision via llava
+    'see': cmd_see,           # Vision via llava
+    'imagine': cmd_imagine,   # Image generation (NEW)
 
     # Runtime tools
     'create_tool': cmd_create_tool,
@@ -411,18 +385,34 @@ COMMANDS = {
 
 ---
 
+## Hardware Detection
+
+| Component | Method | Module |
+|-----------|--------|--------|
+| CPU | `psutil.cpu_percent()` | psutil |
+| RAM | `psutil.virtual_memory()` | psutil |
+| Disk | `psutil.disk_usage()` | psutil |
+| GPU | `nvidia-smi` subprocess | subprocess |
+| VRAM | `nvidia-smi --query-gpu=memory.used,memory.total` | subprocess |
+| Network | `psutil.net_if_stats()` | psutil |
+| Camera | `cv2.VideoCapture(0)` | opencv-python |
+
+---
+
 ## Extension Points
+
+### Adding Boot Phases
+
+1. Create `phase_*()` function in boot_sequence.py
+2. Return dict with phase data
+3. Add to `run_boot_sequence()` phase list
+4. Create corresponding `cora_respond()` prompt template
 
 ### Adding New Commands
 
 1. Create `cmd_newcommand(args, tasks)` in cora.py
 2. Add to `COMMANDS` dict
 3. Add to `cmd_help()` output
-
-### Adding Boot Checks
-
-1. In `boot_console.py`, create `check_*()` and `tts_*()` functions
-2. Add tuple to `create_default_boot_checks()` return list
 
 ### Adding TTS Engines
 
@@ -445,10 +435,12 @@ COMMANDS = {
 | Task load | O(n) | File I/O |
 | Task search | O(n) | String matching |
 | Chat | Network | Ollama API latency |
-| TTS (pyttsx3) | CPU | Speech synthesis |
-| TTS (Kokoro) | GPU | Neural inference |
+| TTS (Kokoro) | GPU | Neural inference (~1-2s) |
+| cora_respond() | Network | Ollama generate (~2-5s) |
+| Image generation | Network | Pollinations API (~5-15s) |
 | Presence | CPU/Camera | Frame capture + detection |
 | Boot sequence | Network | Weather/location API calls |
+| System stats | CPU | nvidia-smi subprocess (~100ms) |
 
 ---
 
@@ -461,12 +453,20 @@ COMMANDS = {
 | Camera unavailable | Returns `PresenceResult(error=...)` |
 | Missing JSON file | Creates default empty structure |
 | Import failure | Module-specific `*_AVAILABLE` flags |
+| nvidia-smi missing | GPU stats show "N/A" |
+| Image gen failure | Returns None, logs error |
 
 ---
 
 ## Testing
 
 ```bash
+# Test full visual boot
+python src/boot_sequence.py
+
+# Test quick boot (no TTS)
+python src/boot_sequence.py --quick
+
 # Test GUI
 python ui/app.py --quick
 
@@ -475,18 +475,70 @@ python cora.py add "Test task"
 python cora.py list
 python cora.py chat "Hello"
 python cora.py speak "Testing"
+python cora.py imagine "a robot"
 
-# Test boot sequence
-python ui/boot_console.py
+# Test image generation
+python -c "from tools.image_gen import generate_image; print(generate_image('test'))"
 
-# Test splash
-python ui/splash.py
-
-# Test TTS
+# Test TTS with waveform
 python voice/tts.py
 ```
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.2.0 Technical Documentation*
+## Project Structure
+
+```
+C.O.R.A/
+├── src/
+│   ├── boot_sequence.py     # Main boot with TTS (1350+ lines)
+│   └── cora.py              # CLI application
+├── ui/
+│   ├── boot_display.py      # Visual boot display with waveform
+│   ├── app.py               # Main GUI application
+│   ├── splash.py            # Splash screen
+│   ├── boot_console.py      # Boot diagnostics
+│   └── panels.py            # Task/Settings/Knowledge panels
+├── voice/
+│   ├── tts.py               # Kokoro TTS engine
+│   ├── stt.py               # Speech recognition
+│   ├── wake_word.py         # Wake word detection
+│   ├── emotion.py           # Emotional state machine
+│   ├── commands.py          # Voice command parsing
+│   └── tts_mutex.py         # Cross-process TTS lock
+├── ai/
+│   ├── ollama.py            # Ollama API client
+│   ├── context.py           # Context management
+│   └── router.py            # Model routing
+├── tools/
+│   ├── image_gen.py         # Pollinations AI image gen
+│   ├── screenshots.py       # Screen/window capture
+│   ├── tasks.py             # Task management
+│   ├── memory.py            # Working memory
+│   ├── calendar.py          # Calendar integration
+│   ├── reminders.py         # Reminder system
+│   └── ...                  # 17+ tool modules
+├── services/
+│   ├── weather.py           # Weather API
+│   ├── location.py          # IP geolocation
+│   ├── presence.py          # Webcam detection
+│   └── notifications.py     # System notifications
+├── config/
+│   ├── settings.json        # GUI settings
+│   └── voice_commands.json  # Voice configuration
+├── data/
+│   ├── images/              # Generated images
+│   └── camera/              # Camera captures
+├── READMEs/
+│   ├── UserGuide.md         # User documentation
+│   └── NerdReadme.md        # This file
+├── tasks.json               # Task storage
+├── knowledge.json           # Knowledge base
+├── personality.json         # AI personality
+└── requirements.txt         # Python dependencies
+```
+
+---
+
+*Unity AI Lab - C.O.R.A v2.4.0 Technical Documentation*
 *Last Updated: 2025-12-23*

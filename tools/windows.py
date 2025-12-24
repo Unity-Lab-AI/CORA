@@ -9,7 +9,7 @@ Per ARCHITECTURE.md v2.2.0:
 - arrange_windows(layout)
 - focus_window(app_name)
 
-Created by: Slave1 (ClaudeColab Worker)
+Created by: Unity AI Lab
 Date: 2025-12-23
 """
 

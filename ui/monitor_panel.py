@@ -8,7 +8,7 @@ Per ARCHITECTURE.md v2.2.0:
 - Live updating metrics display
 - Integration with main UI
 
-Created by: Slave1 (ClaudeColab Worker)
+Created by: Unity AI Lab
 Date: 2025-12-23
 """
 

@@ -275,6 +275,26 @@ def set_volume(level):
         return False
 
 
+def _escape_powershell_string(s: str) -> str:
+    """Escape a string for safe use in PowerShell commands.
+
+    Args:
+        s: String to escape
+
+    Returns:
+        Escaped string safe for PowerShell
+    """
+    if not s:
+        return ''
+    # Escape backticks, double quotes, and dollar signs
+    s = s.replace('`', '``')
+    s = s.replace('"', '`"')
+    s = s.replace('$', '`$')
+    # Remove any null bytes or control characters
+    s = ''.join(c for c in s if ord(c) >= 32 or c in '\t\n\r')
+    return s
+
+
 def notify(title, message, duration=5):
     """Show Windows toast notification.
 
@@ -295,9 +315,11 @@ def notify(title, message, duration=5):
         toaster.show_toast(title, message, duration=duration, threaded=True)
         return True
     except ImportError:
-        # Fallback to PowerShell BurntToast
+        # Fallback to PowerShell BurntToast - escape inputs to prevent injection
         try:
-            ps_cmd = f'New-BurntToastNotification -Text "{title}", "{message}"'
+            safe_title = _escape_powershell_string(str(title))
+            safe_message = _escape_powershell_string(str(message))
+            ps_cmd = f'New-BurntToastNotification -Text "{safe_title}", "{safe_message}"'
             subprocess.run(['powershell', '-Command', ps_cmd], timeout=10)
             return True
         except Exception:
@@ -343,7 +365,8 @@ def clipboard_copy(text):
     """
     try:
         if platform.system() == 'Windows':
-            subprocess.run(['powershell', '-Command', f'Set-Clipboard -Value "{text}"'],
+            safe_text = _escape_powershell_string(str(text))
+            subprocess.run(['powershell', '-Command', f'Set-Clipboard -Value "{safe_text}"'],
                          timeout=5)
         elif platform.system() == 'Darwin':
             subprocess.run(['pbcopy'], input=text.encode(), timeout=5)
@@ -544,6 +567,8 @@ def run_shell(command: str, timeout: int = 30) -> dict:
     Returns:
         dict: {'success': bool, 'output': str, 'error': str}
     """
+    import shlex
+
     if not command or not command.strip():
         return {'success': False, 'error': 'Empty command'}
 
@@ -562,9 +587,18 @@ def run_shell(command: str, timeout: int = 30) -> dict:
             return {'success': False, 'error': f'Blocked: "{d}" is dangerous'}
 
     try:
+        # Parse command safely without shell=True
+        # On Windows, use cmd /c for shell features; on Unix use sh -c
+        if platform.system() == 'Windows':
+            # Use cmd.exe to handle Windows shell features safely
+            cmd_args = ['cmd', '/c', command]
+        else:
+            # Use sh -c for Unix shell features
+            cmd_args = ['sh', '-c', command]
+
         result = subprocess.run(
-            command,
-            shell=True,
+            cmd_args,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,

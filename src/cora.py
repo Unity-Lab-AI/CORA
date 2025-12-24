@@ -163,7 +163,7 @@ CHAT_HISTORY_FILE = DATA_DIR / 'chat_history.json'
 
 # Chat history for conversation memory
 CHAT_HISTORY = []
-MAX_CHAT_HISTORY = 10  # Keep last 10 exchanges for context
+MAX_CHAT_HISTORY = 50  # Keep last 50 exchanges for context
 
 # Counters for ID generation
 task_counter = 0
@@ -1063,6 +1063,52 @@ def cmd_recall(args, tasks):
 
     print("-" * 60)
     print(f"Total entries: {len(entries)}")
+    return tasks
+
+
+def cmd_remember(args, tasks):
+    """Remember/recall working memory. Usage: remember [key] [value] or remember (show all)"""
+    try:
+        from tools.memory import get_memory, remember, recall, forget
+    except ImportError:
+        print("Error: Memory module not available")
+        return tasks
+
+    mem = get_memory()
+
+    if not args:
+        # Show all memory
+        all_mem = recall()
+        if not all_mem:
+            print("Working memory is empty.")
+            print("Usage: remember <key> <value> - store something")
+            print("       remember <key>         - recall a specific key")
+            print("       remember               - show all memory")
+            return tasks
+
+        print("\n=== WORKING MEMORY ===")
+        print("-" * 40)
+        for key, value in all_mem.items():
+            print(f"  {key}: {value}")
+        print("-" * 40)
+        print(f"Total: {mem.count()} entries")
+        return tasks
+
+    key = args[0]
+
+    if len(args) == 1:
+        # Recall specific key
+        value = recall(key)
+        if value is not None:
+            print(f"{key}: {value}")
+        else:
+            print(f"No memory for '{key}'")
+        return tasks
+
+    # Remember key=value
+    value = ' '.join(args[1:])
+    remember(key, value)
+    print(f"Remembered: {key} = {value}")
     return tasks
 
 
@@ -2558,6 +2604,8 @@ def main():
         'recall': cmd_recall,
         'knowledge': cmd_recall,
         'kb': cmd_recall,
+        'remember': cmd_remember,
+        'mem': cmd_remember,
         'stats': cmd_stats,
         'count': cmd_stats,
         'pull': cmd_pull_model,
@@ -2663,6 +2711,8 @@ if __name__ == "__main__":
             'search': cmd_search,
             'learn': cmd_learn,
             'recall': cmd_recall,
+            'remember': cmd_remember,
+            'mem': cmd_remember,
             'stats': cmd_stats,
             'pull': cmd_pull_model,
             'chat': cmd_chat,

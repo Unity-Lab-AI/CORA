@@ -40,20 +40,30 @@ try:
 except ImportError:
     HOTKEYS_AVAILABLE = False
 
+# Import boot sequence
+try:
+    from boot_sequence import run_boot_sequence, quick_boot, full_boot, BOOT_STATUS
+    BOOT_SEQUENCE_AVAILABLE = True
+except ImportError:
+    BOOT_SEQUENCE_AVAILABLE = False
+
 
 class CoraGUIApp(CoraApp):
     """Extended GUI that integrates with cora.py commands."""
 
-    def __init__(self):
+    def __init__(self, boot_summary=None):
         super().__init__()
 
         # Load tasks from cora.py
         cora.load_config()
         self.tasks = cora.load_tasks()
 
-        # Load personality for greeting
-        personality = cora.load_personality()
-        greeting = cora.generate_greeting(personality)
+        # Use boot summary if provided, otherwise generate greeting
+        if boot_summary:
+            greeting = boot_summary
+        else:
+            personality = cora.load_personality()
+            greeting = cora.generate_greeting(personality)
         self._clear_and_greet(greeting)
 
         # Setup global hotkeys (P2-FEATURE: Hotkey system)
@@ -215,6 +225,8 @@ def main():
                         help='Quick launch - skip slow initialization for faster startup')
     parser.add_argument('--test', action='store_true',
                         help='Test mode - validate imports only, do not run mainloop')
+    parser.add_argument('--no-boot', action='store_true',
+                        help='Skip F-100 boot sequence')
     args = parser.parse_args()
 
     # Test mode - just validate imports and exit
@@ -224,18 +236,30 @@ def main():
         print("[OK] cora module loaded")
         print("[OK] CoraApp class available")
         print("[OK] CoraGUIApp class defined")
+        print(f"[OK] Boot sequence available: {BOOT_SEQUENCE_AVAILABLE}")
         print("[TEST PASS] gui_launcher.py syntax and imports validated")
         return 0
 
-    # Quick mode - skip first run setup (for faster dev iteration)
-    if not args.quick:
-        cora.first_run_setup()
+    # Run F-100 style boot sequence (unless --no-boot or not available)
+    boot_summary = None
+    if BOOT_SEQUENCE_AVAILABLE and not args.no_boot:
+        if args.quick:
+            # Quick boot - no TTS announcements
+            boot_result = quick_boot()
+        else:
+            # Full boot - with TTS announcements for each system
+            boot_result = full_boot()
+        boot_summary = boot_result.get('summary')
     else:
-        print("[QUICK] Skipping first_run_setup for faster startup")
-        cora.load_config()  # Still need config
+        # Fallback to old init
+        if not args.quick:
+            cora.first_run_setup()
+        else:
+            print("[QUICK] Skipping first_run_setup for faster startup")
+            cora.load_config()
 
-    # Create and run GUI
-    app = CoraGUIApp()
+    # Create and run GUI with boot summary
+    app = CoraGUIApp(boot_summary=boot_summary)
     try:
         app.mainloop()
     finally:

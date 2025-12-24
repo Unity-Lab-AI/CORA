@@ -23,7 +23,9 @@ IMAGES_DIR = PROJECT_DIR / 'data' / 'images'
 
 # Pollinations.AI API settings
 IMAGE_API = "https://gen.pollinations.ai/image"
-API_KEY = "pk_YBwckBxhiFxxCMbk"
+# API key - uses Unity AI Lab public key by default
+# Can override with POLLINATIONS_API_KEY environment variable
+API_KEY = os.environ.get("POLLINATIONS_API_KEY", "pk_YBwckBxhiFxxCMbk")
 
 
 def encode_prompt(prompt: str) -> str:

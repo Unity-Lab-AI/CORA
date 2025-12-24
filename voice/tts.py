@@ -49,19 +49,19 @@ class TTSEngine:
 
 
 class KokoroTTS(TTSEngine):
-    """Kokoro TTS engine (high-quality, emotion-aware)."""
+    """Kokoro TTS engine (high-quality neural voice - af_bella)."""
 
     def __init__(self, voice='af_bella', speed=1.0):
         """Initialize Kokoro TTS.
 
         Args:
-            voice: Voice ID (af_bella, af_sarah, etc.)
+            voice: Voice ID (af_bella, af_heart, etc.)
             speed: Speech speed multiplier
         """
         super().__init__()
         self.voice = voice
         self.speed = speed
-        self.kokoro = None
+        self.pipeline = None
 
     def initialize(self):
         """Initialize Kokoro engine.
@@ -70,12 +70,16 @@ class KokoroTTS(TTSEngine):
             bool: True if initialized successfully
         """
         try:
-            from kokoro_onnx import Kokoro
-            self.kokoro = Kokoro(self.voice, speed=self.speed)
+            from kokoro import KPipeline
+            import sounddevice as sd
+            # Initialize pipeline for English with American voice
+            self.pipeline = KPipeline(lang_code='a')
+            self.sd = sd
             self.is_initialized = True
             return True
-        except ImportError:
-            print("[!] Kokoro not installed. Run: pip install kokoro-onnx")
+        except ImportError as e:
+            print(f"[!] Kokoro dependencies missing: {e}")
+            print("[!] Run: pip install kokoro sounddevice")
             return False
         except Exception as e:
             print(f"[!] Failed to initialize Kokoro: {e}")
@@ -96,60 +100,70 @@ class KokoroTTS(TTSEngine):
                 return False
 
         try:
-            # Build instruction based on emotion
-            instruction = self._get_emotion_instruction(emotion)
-            full_text = f"{instruction} {text}" if instruction else text
+            # Get speed modifier based on emotion
+            speed = self._get_emotion_speed(emotion)
 
-            # Generate and play audio
-            self.kokoro.speak(full_text)
+            # Generate audio using Kokoro pipeline
+            for result in self.pipeline(text, voice=self.voice, speed=speed):
+                if result.audio is not None:
+                    # Play audio at 24kHz sample rate
+                    self.sd.play(result.audio, samplerate=24000)
+                    self.sd.wait()
             return True
         except Exception as e:
-            print(f"[!] TTS error: {e}")
+            print(f"[!] Kokoro TTS error: {e}")
             return False
 
     def get_audio(self, text, emotion='neutral'):
-        """Get audio data as bytes.
+        """Get audio data as numpy array.
 
         Args:
             text: Text to convert
             emotion: Emotion type
 
         Returns:
-            bytes: Audio data or None
+            numpy array: Audio data or None
         """
         if not self.is_initialized:
             if not self.initialize():
                 return None
 
         try:
-            instruction = self._get_emotion_instruction(emotion)
-            full_text = f"{instruction} {text}" if instruction else text
-            return self.kokoro.generate(full_text)
+            import numpy as np
+            speed = self._get_emotion_speed(emotion)
+            audio_chunks = []
+
+            for result in self.pipeline(text, voice=self.voice, speed=speed):
+                if result.audio is not None:
+                    audio_chunks.append(result.audio)
+
+            if audio_chunks:
+                return np.concatenate(audio_chunks)
+            return None
         except Exception as e:
             print(f"[!] Audio generation error: {e}")
             return None
 
-    def _get_emotion_instruction(self, emotion):
-        """Get TTS instruction for emotion.
+    def _get_emotion_speed(self, emotion):
+        """Get speed modifier for emotion.
 
         Args:
             emotion: Emotion type
 
         Returns:
-            str: Instruction text for TTS
+            float: Speed modifier
         """
-        instructions = {
-            'excited': '[speak with excitement and energy]',
-            'concerned': '[speak with worry and care]',
-            'annoyed': '[speak with slight irritation]',
-            'sarcastic': '[speak with dry sarcasm]',
-            'caring': '[speak warmly and gently]',
-            'playful': '[speak playfully and teasingly]',
-            'urgent': '[speak urgently and quickly]',
-            'satisfied': '[speak with contentment]',
-            'neutral': '',
+        speeds = {
+            'excited': 1.15,
+            'urgent': 1.2,
+            'annoyed': 1.05,
+            'concerned': 0.95,
+            'caring': 0.9,
+            'playful': 1.1,
+            'sarcastic': 0.95,
+            'neutral': 1.0,
         }
-        return instructions.get(emotion, '')
+        return speeds.get(emotion, self.speed)
 
 
 class Pyttsx3TTS(TTSEngine):
@@ -280,6 +294,8 @@ class Pyttsx3TTS(TTSEngine):
 def get_tts_engine(config=None):
     """Get appropriate TTS engine based on config.
 
+    CORA always uses Kokoro (af_bella voice) by default.
+
     Args:
         config: Configuration dict with TTS settings
 
@@ -290,26 +306,24 @@ def get_tts_engine(config=None):
         config = {}
 
     tts_config = config.get('tts', {})
-    engine_name = tts_config.get('engine', 'pyttsx3')
+    # Default to Kokoro (sexy af_bella voice) - CORA's signature voice
+    engine_name = tts_config.get('engine', 'kokoro')
 
     if engine_name == 'kokoro':
         voice = tts_config.get('kokoro', {}).get('voice', 'af_bella')
         speed = tts_config.get('kokoro', {}).get('speed', 1.0)
         engine = KokoroTTS(voice=voice, speed=speed)
-    else:
-        rate = tts_config.get('rate', 150)
-        volume = tts_config.get('volume', 1.0)
-        engine = Pyttsx3TTS(rate=rate, volume=volume)
+        if engine.initialize():
+            return engine
+        # Fallback to pyttsx3 if Kokoro fails
+        print("[!] Kokoro failed, falling back to pyttsx3")
 
-    if engine.initialize():
-        return engine
-
-    # Fallback to pyttsx3 if Kokoro fails
-    if engine_name == 'kokoro':
-        print("[!] Falling back to pyttsx3")
-        fallback = Pyttsx3TTS()
-        if fallback.initialize():
-            return fallback
+    # pyttsx3 fallback
+    rate = tts_config.get('rate', 150)
+    volume = tts_config.get('volume', 1.0)
+    fallback = Pyttsx3TTS(rate=rate, volume=volume)
+    if fallback.initialize():
+        return fallback
 
     return None
 

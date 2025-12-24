@@ -1,6 +1,6 @@
 """
 C.O.R.A Web Tools Module
-Version: 2.2.0
+Version: 2.3.0
 Unity AI Lab
 
 Web search, URL fetching, and content summarization.
@@ -8,9 +8,32 @@ Web search, URL fetching, and content summarization.
 
 import requests
 import re
+import time
 from typing import Optional, Dict, List, Any
 from urllib.parse import quote_plus, urlparse
 from html.parser import HTMLParser
+
+
+# Simple rate limiting to prevent API abuse
+class RateLimiter:
+    """Simple token bucket rate limiter for web requests."""
+
+    def __init__(self, requests_per_second: float = 2.0):
+        self.requests_per_second = requests_per_second
+        self.min_interval = 1.0 / requests_per_second
+        self._last_request_time = 0.0
+
+    def wait(self):
+        """Wait if necessary to respect rate limit."""
+        now = time.time()
+        elapsed = now - self._last_request_time
+        if elapsed < self.min_interval:
+            time.sleep(self.min_interval - elapsed)
+        self._last_request_time = time.time()
+
+
+# Global rate limiter (2 requests per second default)
+_rate_limiter = RateLimiter(requests_per_second=2.0)
 
 
 class HTMLTextExtractor(HTMLParser):
@@ -70,6 +93,9 @@ def instant_answer(query: str) -> Dict[str, Any]:
         return {'success': False, 'error': 'Empty query'}
 
     try:
+        # Apply rate limiting
+        _rate_limiter.wait()
+
         url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_html=1"
         headers = {'User-Agent': 'CORA/2.3.0'}
 
@@ -137,6 +163,9 @@ def web_search(query: str, num_results: int = 5) -> Dict[str, Any]:
         }
 
     try:
+        # Apply rate limiting
+        _rate_limiter.wait()
+
         # DuckDuckGo HTML search
         url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
         headers = {
@@ -232,6 +261,9 @@ def fetch_url(url: str, timeout: int = 15) -> Dict[str, Any]:
         }
 
     try:
+        # Apply rate limiting
+        _rate_limiter.wait()
+
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
