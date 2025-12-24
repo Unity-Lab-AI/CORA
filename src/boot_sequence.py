@@ -181,7 +181,7 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=50
+            max_tokens=150
         )
 
         if response.content:
@@ -189,14 +189,10 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             # Remove CORA: prefix if present
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
-            # Take first sentence
-            for end in ['. ', '! ', '? ', '\n']:
-                if end in text:
-                    text = text[:text.index(end)+1]
-                    break
-            # Length check
-            if len(text) > 120:
-                text = text[:117] + "..."
+            # Remove any trailing incomplete sentences (end at last punctuation)
+            last_punct = max(text.rfind('.'), text.rfind('!'), text.rfind('?'))
+            if last_punct > 10:
+                text = text[:last_punct+1]
 
             # VALIDATION: Check that key data appears in response
             text_lower = text.lower()

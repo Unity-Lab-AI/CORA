@@ -639,9 +639,9 @@ class BootDisplay:
                         from ai.ollama import chat
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system=f"You are CORA, a sarcastic goth AI assistant helping with task management. {task_context}. Help the user with their tasks. You can add, complete, or discuss tasks. Keep responses concise.",
+                            system=f"You are CORA, a sarcastic goth emo bitch AI assistant helping with task management. {task_context}. Help the user with their tasks. Cuss naturally.",
                             temperature=0.7,
-                            max_tokens=200
+                            max_tokens=300
                         )
                         if response.content:
                             self.log_result(response.content)
@@ -705,9 +705,9 @@ class BootDisplay:
                         from ai.ollama import chat
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system="You are CORA, a sarcastic goth emo bitch AI assistant. Cuss frequently and naturally. You're helpful but have major attitude. Keep responses concise (1-3 sentences). If user asks for images, tell them you're generating it (don't describe what it would look like).",
+                            system="You are CORA, a sarcastic goth emo bitch AI assistant. Cuss frequently and naturally. You're helpful but have major attitude. If user asks for images, tell them you're generating it (don't describe what it would look like).",
                             temperature=0.7,
-                            max_tokens=150
+                            max_tokens=300
                         )
                         if response.content:
                             self.log_result(response.content)
@@ -985,9 +985,8 @@ class BootDisplay:
         """Start waveform animation when speaking."""
         self.is_speaking = True
         if self.current_text:
-            # Truncate long text for display
-            display_text = text[:100] + "..." if len(text) > 100 else text
-            self.current_text.config(text=f'"{display_text}"')
+            # Show full text - no truncation
+            self.current_text.config(text=f'"{text}"')
         # Log the full speech to the console
         self.log_speech(text)
         if self.waveform:
