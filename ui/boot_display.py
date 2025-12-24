@@ -652,46 +652,39 @@ class BootDisplay:
                         self.log_fail(f"Chat error: {e}")
                     return
 
-                # DEFAULT MODE: Normal AI chat - but detect image requests first
-                text_lower = text.lower()
+                # DEFAULT MODE: Let AI decide what to do
+                # First, ask AI if this requires image generation
+                self.log_thinking("Thinking...")
 
-                # Detect image generation requests
-                is_image_request = False
+                should_generate_image = False
+                image_prompt = ""
 
-                # Direct image requests with keywords
-                image_triggers = ['show me', 'generate', 'create', 'draw', 'make me', 'make a',
-                                  'picture of', 'image of', 'photo of', 'imagine', 'visualize', 'render']
-                image_words = ['image', 'picture', 'photo', 'pic', 'drawing', 'art', 'selfie']
+                try:
+                    from ai.ollama import generate
 
-                # Check for explicit image requests like "generate an image of..."
-                if any(trigger in text_lower for trigger in image_triggers):
-                    if any(word in text_lower for word in image_words):
-                        is_image_request = True
+                    # Ask AI to decide if image generation is needed
+                    decision = generate(
+                        prompt=f'User request: "{text}"\n\nDoes this request require generating/creating/showing an image or picture? Reply with ONLY "YES: <image description>" or "NO".',
+                        system="You decide if requests need image generation. Visual requests like 'show me a cat', 'draw a sunset', 'create an image of X' = YES. Questions, conversation, info requests = NO. Reply ONLY with YES: <description> or NO.",
+                        temperature=0.1,
+                        max_tokens=100
+                    )
 
-                # Check for "show me X" or "draw X" patterns (visual object requests)
-                visual_triggers = ['show me a', 'show me an', 'show me the', 'show me',
-                                   'draw a', 'draw an', 'draw me', 'draw',
-                                   'create a', 'create an', 'generate a', 'generate an',
-                                   'make me a', 'make me an', 'make a', 'make an']
-                if any(trigger in text_lower for trigger in visual_triggers):
-                    # NOT an image request if asking for information
-                    info_words = ['how to', 'how do', 'what is', 'what are', 'explain', 'tell me about',
-                                  'why', 'when', 'where', 'who', 'help me', 'can you']
-                    if not any(w in text_lower for w in info_words):
-                        is_image_request = True
+                    if decision.content:
+                        response_text = decision.content.strip()
+                        if response_text.upper().startswith("YES"):
+                            should_generate_image = True
+                            # Extract the image description
+                            if ":" in response_text:
+                                image_prompt = response_text.split(":", 1)[1].strip()
+                            else:
+                                image_prompt = text  # Fallback to original text
+                except Exception as e:
+                    pass  # If decision fails, fall through to regular chat
 
-                if is_image_request:
-                    # Route to image generation
-                    # Extract what to generate - strip the trigger words first
-                    prompt = text
-                    for trigger in ['show me a', 'show me an', 'show me', 'generate a', 'generate an',
-                                   'create a', 'create an', 'draw a', 'draw an', 'make me a', 'make me an',
-                                   'picture of', 'image of', 'photo of']:
-                        if trigger in text_lower:
-                            idx = text_lower.find(trigger)
-                            prompt = text[idx + len(trigger):].strip()
-                            break
-
+                if should_generate_image:
+                    # Use AI-generated prompt or fall back to cleaned user text
+                    prompt = image_prompt if image_prompt else text
                     self.log_action(f"Generating image: {prompt}")
                     self._speak(f"Fine, I'll make your fucking picture")
                     try:
