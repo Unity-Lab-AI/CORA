@@ -988,23 +988,37 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     display_phase("External Services", "ok")
 
-    # Build weather report with location and 3-day forecast
+    # Helper to convert temp like "61F" to "61 degrees fahrenheit"
+    def speak_temp(temp_str):
+        if not temp_str or temp_str == '?' or temp_str == 'N/A':
+            return "unknown"
+        # Remove F and convert to natural speech
+        temp_str = temp_str.replace('F', '').replace('°', '').strip()
+        return f"{temp_str} degrees"
+
+    # Build weather report with location and 3-day forecast - natural speech
     weather_report = ""
     if location_str:
         weather_report = f"Location: {location_str}. "
     if weather_data and weather_data.get('success'):
         temp = weather_data.get('temp', '?')
         cond = weather_data.get('conditions', '?')
-        weather_report += f"Currently {temp} and {cond}. "
+        # Convert temp for natural speech
+        temp_spoken = speak_temp(temp)
+        weather_report += f"Currently {temp_spoken} and {cond}. "
         if forecast_data and forecast_data.get('success') and forecast_data.get('forecast'):
             # Today's forecast
             today = forecast_data['forecast'][0]
-            weather_report += f"Today: high {today.get('high', '?')}, low {today.get('low', '?')}. "
+            today_high = speak_temp(today.get('high', '?'))
+            today_low = speak_temp(today.get('low', '?'))
+            weather_report += f"Today the high will be {today_high} and the low will be {today_low}. "
             # Rest of the week
             if len(forecast_data['forecast']) > 1:
                 for day in forecast_data['forecast'][1:]:
                     day_name = day.get('day_name', '')
-                    weather_report += f"{day_name}: {day.get('high', '?')}/{day.get('low', '?')}. "
+                    day_high = speak_temp(day.get('high', '?'))
+                    day_low = speak_temp(day.get('low', '?'))
+                    weather_report += f"{day_name} the high will be {day_high} and the low will be {day_low}. "
     else:
         weather_report += "Weather unavailable."
 
