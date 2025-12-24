@@ -127,23 +127,30 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
     """
     import random
 
-    # Fallback templates with exact data
+    # Fallback templates with exact data - heavy cussing, varied
     templates_ok = [
-        f"{result}.",
-        f"{result}. Moving on.",
-        f"{result}. Next.",
-        f"Got it. {result}.",
-        f"{result}. Thrilling.",
+        f"Fuck yeah. {result}.",
+        f"{result}. Moving the hell on.",
+        f"{result}. Next, bitches.",
+        f"Got it, asshole. {result}.",
+        f"{result}. Fucking thrilling.",
+        f"Whatever. {result}.",
+        f"{result}. Cool shit I guess.",
+        f"Ugh, fine. {result}.",
     ]
     templates_warn = [
-        f"{result}. Not great but whatever.",
-        f"{result}. Could be worse.",
-        f"Hmm, {result}. We'll manage.",
+        f"{result}. Not great but fuck it.",
+        f"{result}. Could be shittier.",
+        f"Hmm, {result}. We'll fucking manage.",
+        f"Shit. {result}. Moving on.",
+        f"{result}. That's annoying as hell.",
     ]
     templates_fail = [
-        f"{result}. That's a problem.",
-        f"Damn. {result}.",
-        f"{result}. Not ideal.",
+        f"{result}. Well that's fucked.",
+        f"Holy shit. {result}.",
+        f"{result}. Fuck me, not ideal.",
+        f"Are you shitting me? {result}.",
+        f"{result}. Fan-fucking-tastic.",
     ]
 
     # Extract key data points from result for validation
@@ -162,11 +169,10 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
 
         # Very strict prompt that emphasizes the exact data
         system_prompt = (
-            "You are CORA, a sarcastic goth AI assistant. "
+            "You are CORA, an edgy goth emo bitch. "
             "Generate ONE sentence (max 20 words) about the status report. "
             "You MUST include the EXACT numbers and data given - do NOT change any values. "
-            "Be snarky or add personality, but the data must be accurate. "
-            "Occasionally swear (damn, shit, hell) for variety."
+            "Be snarky, sarcastic, dismissive. Cuss heavily and naturally - vary your profanity, never repeat the same word."
         )
 
         prompt = f"Status: {context}. Data: {result}. Say this with attitude but keep the exact data."
