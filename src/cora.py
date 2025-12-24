@@ -130,6 +130,27 @@ except ImportError:
 # Global system tray instance
 _system_tray = None
 
+# Project directory for loading system prompt
+_PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent
+
+# Cache for system prompt
+_cora_system_prompt_cache = None
+
+
+def get_system_prompt() -> str:
+    """Load CORA's full system prompt from config/system_prompt.txt."""
+    global _cora_system_prompt_cache
+    if _cora_system_prompt_cache is not None:
+        return _cora_system_prompt_cache
+
+    system_prompt_path = _PROJECT_DIR / 'config' / 'system_prompt.txt'
+    if system_prompt_path.exists():
+        with open(system_prompt_path, 'r', encoding='utf-8') as f:
+            _cora_system_prompt_cache = f.read()
+    else:
+        _cora_system_prompt_cache = ""
+    return _cora_system_prompt_cache
+
 # Data directories and files - cora.py is in src/, so go up one level
 ROOT_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent
 DATA_DIR = ROOT_DIR / 'data'
@@ -1624,13 +1645,10 @@ def cmd_chat(args, tasks):
     task_context = get_task_context(tasks)
     chat_history = get_chat_history_context()
 
-    system_prompt = f"""You are CORA, a helpful task management assistant. You help users manage their tasks and stay productive.
-
-Current Task Context:
-{task_context}
-
-When the user asks about tasks, refer to this context. You can suggest task priorities, remind about overdue items, or help plan work.
-Respond conversationally and helpfully. Keep responses concise."""
+    # Load CORA's full system prompt and add task context
+    system_prompt = get_system_prompt()
+    if task_context:
+        system_prompt += f"\n\nCurrent Task Context:\n{task_context}"
 
     # Include conversation history if available (for subprocess fallback)
     if chat_history:

@@ -18,8 +18,31 @@ import threading
 import time
 import math
 import random
+import os
+from pathlib import Path
 from typing import Optional, Callable, List
 from dataclasses import dataclass
+
+# Project directory for loading system prompt
+_PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent
+
+# Cache for system prompt
+_system_prompt_cache = None
+
+
+def get_system_prompt() -> str:
+    """Load CORA's full system prompt from config/system_prompt.txt."""
+    global _system_prompt_cache
+    if _system_prompt_cache is not None:
+        return _system_prompt_cache
+
+    system_prompt_path = _PROJECT_DIR / 'config' / 'system_prompt.txt'
+    if system_prompt_path.exists():
+        with open(system_prompt_path, 'r', encoding='utf-8') as f:
+            _system_prompt_cache = f.read()
+    else:
+        _system_prompt_cache = ""
+    return _system_prompt_cache
 
 # Try to import audio visualization dependencies
 try:
@@ -761,9 +784,12 @@ class BootDisplay:
                     self.log_thinking("Thinking about your tasks...")
                     try:
                         from ai.ollama import chat
+                        system_prompt = get_system_prompt()
+                        if task_context:
+                            system_prompt += f"\n\n{task_context}"
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system=f"You are CORA. 25 year old goth emo bitch. Human. {task_context}",
+                            system=system_prompt,
                             temperature=0.7,
                             max_tokens=300
                         )
@@ -836,7 +862,7 @@ class BootDisplay:
                         from ai.ollama import chat
                         response = chat(
                             messages=[{'role': 'user', 'content': text}],
-                            system="You are CORA. 25 year old goth emo bitch. Human.",
+                            system=get_system_prompt(),
                             temperature=0.7,
                             max_tokens=300
                         )

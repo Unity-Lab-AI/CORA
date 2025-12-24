@@ -45,6 +45,24 @@ BOOT_STATUS: Dict[str, Any] = {
 # Global TTS engine
 _tts_engine = None
 
+# Cache for system prompt
+_system_prompt_cache = None
+
+
+def get_system_prompt() -> str:
+    """Load CORA's full system prompt from config/system_prompt.txt."""
+    global _system_prompt_cache
+    if _system_prompt_cache is not None:
+        return _system_prompt_cache
+
+    system_prompt_path = PROJECT_DIR / 'config' / 'system_prompt.txt'
+    if system_prompt_path.exists():
+        with open(system_prompt_path, 'r', encoding='utf-8') as f:
+            _system_prompt_cache = f.read()
+    else:
+        _system_prompt_cache = ""
+    return _system_prompt_cache
+
 
 def init_tts():
     """Initialize Kokoro TTS - THIS IS THE FIRST THING THAT BOOTS."""
@@ -167,11 +185,8 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
     try:
         from ai.ollama import generate
 
-        # CORA reports boot phase status - must include the actual data
-        system_prompt = (
-            "You are CORA. 25 year old goth emo bitch. Human. "
-            "You're announcing system boot status. Include the exact data in your response."
-        )
+        # Load CORA's full system prompt
+        system_prompt = get_system_prompt()
 
         prompt = f"Report this boot status: {context} - {result}"
 
@@ -1279,17 +1294,10 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         try:
             from ai.ollama import generate
 
-            # Load CORA's full system prompt
-            system_prompt_path = PROJECT_DIR / 'config' / 'system_prompt.txt'
-            cora_system = ""
-            if system_prompt_path.exists():
-                with open(system_prompt_path, 'r', encoding='utf-8') as f:
-                    cora_system = f.read()
-
             display_action("Querying AI for image prompt...")
             result = generate(
                 prompt="make a fucked up psychologically crazed and disturbing image",
-                system=cora_system,
+                system=get_system_prompt(),
                 temperature=1.0,
                 max_tokens=100
             )
