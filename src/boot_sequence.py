@@ -1561,7 +1561,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         _boot_display.enable_chat_mode()
         # Keep display running as interactive chat UI
 
-    BOOT_STATUS['summary'] = full_summary
+    BOOT_STATUS['summary'] = summary_data
     return BOOT_STATUS
 
 
