@@ -652,23 +652,70 @@ class BootDisplay:
                         self.log_fail(f"Chat error: {e}")
                     return
 
-                # DEFAULT MODE: Normal AI chat
-                self.log_thinking("Thinking...")
-                try:
-                    from ai.ollama import chat
-                    response = chat(
-                        messages=[{'role': 'user', 'content': text}],
-                        system="You are CORA, a sarcastic goth emo AI assistant. You're helpful but have attitude. Keep responses concise (1-3 sentences).",
-                        temperature=0.7,
-                        max_tokens=150
-                    )
-                    if response.content:
-                        self.log_result(response.content)
-                        self._speak(response.content)
-                    elif response.error:
-                        self.log_fail(f"AI error: {response.error}")
-                except Exception as e:
-                    self.log_fail(f"Chat error: {e}")
+                # DEFAULT MODE: Normal AI chat - but detect image requests first
+                text_lower = text.lower()
+                image_triggers = ['show me', 'generate', 'create', 'draw', 'make me', 'picture of',
+                                  'image of', 'photo of', 'imagine', 'visualize', 'render']
+                is_image_request = any(trigger in text_lower for trigger in image_triggers) and \
+                                   any(word in text_lower for word in ['image', 'picture', 'photo', 'pic', 'drawing', 'art', 'selfie'])
+
+                # Also check for simple object requests like "show me an apple"
+                if any(trigger in text_lower for trigger in ['show me', 'draw', 'create', 'generate', 'make']):
+                    # Check if it's asking for a visual thing (not info)
+                    info_words = ['how', 'what is', 'explain', 'tell me', 'why', 'when', 'where', 'who']
+                    if not any(w in text_lower for w in info_words):
+                        is_image_request = True
+
+                if is_image_request:
+                    # Route to image generation
+                    self.log_action(f"Generating image: {text[:50]}...")
+                    self._speak(f"Fine, I'll make your fucking picture")
+                    try:
+                        from tools.image_gen import generate_image
+                        # Extract what to generate - strip the trigger words
+                        prompt = text
+                        for trigger in ['show me a', 'show me an', 'show me', 'generate a', 'generate an',
+                                       'create a', 'create an', 'draw a', 'draw an', 'make me a', 'make me an',
+                                       'picture of', 'image of', 'photo of']:
+                            if trigger in text_lower:
+                                idx = text_lower.find(trigger)
+                                prompt = text[idx + len(trigger):].strip()
+                                break
+
+                        result = generate_image(prompt if prompt else text)
+                        if result.get('success'):
+                            self.log_result(f"Image saved: {result.get('path')}")
+                            self._speak("There. Your shitty image is done.")
+                            # Show the image
+                            try:
+                                from tools.image_gen import show_fullscreen_image
+                                show_fullscreen_image(result.get('path'), duration=5)
+                            except:
+                                pass
+                        else:
+                            self.log_fail(f"Generation failed: {result.get('error')}")
+                            self._speak("Image generation fucked up. Try again.")
+                    except Exception as e:
+                        self.log_fail(f"Image gen error: {e}")
+                        self._speak(f"Shit broke: {e}")
+                else:
+                    # Regular chat
+                    self.log_thinking("Thinking...")
+                    try:
+                        from ai.ollama import chat
+                        response = chat(
+                            messages=[{'role': 'user', 'content': text}],
+                            system="You are CORA, a sarcastic goth emo bitch AI assistant. Cuss frequently and naturally. You're helpful but have major attitude. Keep responses concise (1-3 sentences). If user asks for images, tell them you're generating it (don't describe what it would look like).",
+                            temperature=0.7,
+                            max_tokens=150
+                        )
+                        if response.content:
+                            self.log_result(response.content)
+                            self._speak(response.content)
+                        elif response.error:
+                            self.log_fail(f"AI error: {response.error}")
+                    except Exception as e:
+                        self.log_fail(f"Chat error: {e}")
 
             except Exception as e:
                 self.log_fail(f"Error: {e}")
