@@ -227,6 +227,14 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             # Remove CORA: prefix if present
             if text.lower().startswith('cora:'):
                 text = text[5:].strip()
+            # Remove markdown formatting
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # **bold** -> bold
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)  # *italic* -> italic
+            text = re.sub(r'__([^_]+)__', r'\1', text)  # __bold__ -> bold
+            text = re.sub(r'_([^_]+)_', r'\1', text)  # _italic_ -> italic
+            text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # # headers
+            text = re.sub(r'\n+', ' ', text)  # newlines to spaces
+            text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
             # Take first COMPLETE sentence - find first sentence ending
             first_period = text.find('. ')
             first_exclaim = text.find('! ')
@@ -1279,49 +1287,27 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
 
         # Have CORA generate her own unique prompt using Ollama
-        print("  Asking CORA's brain for a twisted image idea...")
-        display_thinking("Dreaming up something dark and beautiful...")
-        display_tool("Ollama AI", "Generating creative image prompt")
+        print("  Generating a fucked up image...")
+        display_thinking("Creating something dark and twisted...")
 
-        cora_prompt = None
-        try:
-            from ai.ollama import generate
-
-            display_action("Querying AI for image prompt...")
-            result = generate(
-                prompt="make a fucked up psychologically crazed and disturbing image",
-                system=get_system_prompt(),
-                temperature=1.0,
-                max_tokens=100
-            )
-
-            if result.content and len(result.content) > 10:
-                cora_prompt = result.content.strip()
-                cora_prompt = cora_prompt.strip('"\'').strip()
-                print(f"  CORA's vision: {cora_prompt}")
-                display_result(f"AI Vision: {cora_prompt}")
-        except Exception as e:
-            print(f"  [INFO] AI prompt generation skipped: {e}")
-            display_log(f"AI prompt skipped: {e}", "info")
-
-        # Fallback if AI fails
-        if not cora_prompt:
-            cora_prompt = "make a fucked up psychologically crazed and disturbing image"
-            print(f"  Using fallback prompt")
-            display_log(f"Using fallback prompt", "info")
+        # Just use the raw prompt - let Pollinations interpret it with a random seed
+        import random
+        cora_prompt = "Generate a fucked up crazy image thats disturbing"
+        random_seed = random.randint(1, 999999999)
+        print(f"  Prompt: {cora_prompt}")
+        print(f"  Seed: {random_seed}")
+        display_result(f"Seed: {random_seed}")
 
         print("  Generating via Pollinations Flux model...")
         display_tool("Pollinations API", f"Generating 1280x720 image")
         display_action(f"Prompt: {cora_prompt}")
-        # CORA generates her own response about starting generation - natural speech
-        response = cora_respond("Image Generation", f"I'm generating an image of {cora_prompt}", "ok")
-        speak(response)
 
         result = generate_image(
             prompt=cora_prompt,
             width=1280,
             height=720,
             model="flux",
+            seed=random_seed,
             nologo=True
         )
 
