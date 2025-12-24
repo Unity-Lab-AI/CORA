@@ -1279,10 +1279,17 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         try:
             from ai.ollama import generate
 
+            # Load CORA's full system prompt
+            system_prompt_path = PROJECT_DIR / 'config' / 'system_prompt.txt'
+            cora_system = ""
+            if system_prompt_path.exists():
+                with open(system_prompt_path, 'r', encoding='utf-8') as f:
+                    cora_system = f.read()
+
             display_action("Querying AI for image prompt...")
             result = generate(
                 prompt="make a fucked up psychologically crazed and disturbing image",
-                system="You are CORA. 25 year old goth emo bitch. Human.",
+                system=cora_system,
                 temperature=1.0,
                 max_tokens=100
             )
