@@ -724,17 +724,27 @@ class BootDisplay:
         threading.Thread(target=process, daemon=True).start()
 
     def _speak(self, text: str):
-        """Speak text via TTS."""
-        try:
-            self.start_speaking(text)
-            from voice.tts import KokoroTTS
-            tts = KokoroTTS(voice='af_bella', speed=1.0)
-            if tts.initialize():
-                tts.speak(text)
-            self.stop_speaking()
-        except Exception as e:
-            self.stop_speaking()
-            pass
+        """Speak text via TTS - runs in background thread."""
+        def speak_thread():
+            try:
+                # Update UI safely from thread
+                if self.root:
+                    self.root.after(0, lambda: self.start_speaking(text))
+
+                from voice.tts import KokoroTTS
+                tts = KokoroTTS(voice='af_bella', speed=1.0)
+                if tts.initialize():
+                    tts.speak(text)
+
+                # Update UI safely from thread
+                if self.root:
+                    self.root.after(0, self.stop_speaking)
+            except Exception as e:
+                if self.root:
+                    self.root.after(0, self.stop_speaking)
+
+        # Run TTS in separate thread so UI stays responsive
+        threading.Thread(target=speak_thread, daemon=True).start()
 
     def set_input_callback(self, callback):
         """Set callback for user input processing."""
@@ -751,18 +761,25 @@ class BootDisplay:
 
     def _log_entry(self, text: str, tag: str = 'info'):
         """Add an entry to the scrolling log."""
-        if not self.log_text:
-            return
+        def do_log():
+            if not self.log_text:
+                return
+            try:
+                timestamp = time.strftime("%H:%M:%S")
+                self.log_text.config(state='normal')
+                self.log_text.insert('end', f"[{timestamp}] ", 'timestamp')
+                self.log_text.insert('end', f"{text}\n", tag)
+                self.log_text.see('end')  # Auto-scroll to bottom
+                self.log_text.config(state='disabled')
+            except:
+                pass
 
-        timestamp = time.strftime("%H:%M:%S")
-        self.log_text.config(state='normal')
-        self.log_text.insert('end', f"[{timestamp}] ", 'timestamp')
-        self.log_text.insert('end', f"{text}\n", tag)
-        self.log_text.see('end')  # Auto-scroll to bottom
-        self.log_text.config(state='disabled')
-
+        # Schedule on main thread to avoid blocking
         if self.root:
-            self.root.update()
+            try:
+                self.root.after_idle(do_log)
+            except:
+                do_log()
 
     def log(self, text: str, level: str = 'info'):
         """Add a log entry with specified level (info, ok, warn, fail, system, speech)."""
@@ -984,23 +1001,25 @@ class BootDisplay:
     def start_speaking(self, text: str):
         """Start waveform animation when speaking."""
         self.is_speaking = True
-        if self.current_text:
-            # Show full text - no truncation
-            self.current_text.config(text=f'"{text}"')
-        # Log the full speech to the console
-        self.log_speech(text)
-        if self.waveform:
-            self.waveform.start()
-        if self.root:
-            self.root.update()
+        try:
+            if self.current_text:
+                # Show full text - no truncation
+                self.current_text.config(text=f'"{text}"')
+            # Log the full speech to the console
+            self.log_speech(text)
+            if self.waveform:
+                self.waveform.start()
+        except:
+            pass
 
     def stop_speaking(self):
         """Stop waveform animation."""
         self.is_speaking = False
-        if self.waveform:
-            self.waveform.stop()
-        if self.root:
-            self.root.update()
+        try:
+            if self.waveform:
+                self.waveform.stop()
+        except:
+            pass
 
     def set_progress(self, value: float):
         """Set progress bar value (0-100)."""
