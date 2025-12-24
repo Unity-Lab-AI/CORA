@@ -1320,7 +1320,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
         # Fallback if AI fails
         if not cora_prompt:
-            cora_prompt = "disturbing surreal nightmare dark horror psychological terror"
+            cora_prompt = "Generate a fucked up crazy image thats disturbing"
             print(f"  Using fallback prompt")
 
         print(f"  Seed: {random_seed}")
