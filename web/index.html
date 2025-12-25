@@ -1028,155 +1028,122 @@ WHEN RESPONDING:
         }
 
         async function initSetupTerminal(forceRefresh = false) {
-            console.log('[SETUP] initSetupTerminal called, forceRefresh:', forceRefresh);
-            // Always run fresh checks when user opens setup terminal
+            // If already initialized and not forcing refresh, just scroll to bottom
             if (setupTerminalInitialized && !forceRefresh) {
-                console.log('[SETUP] Already initialized, skipping');
+                const container = document.getElementById('setupLog');
+                if (container) container.scrollTop = container.scrollHeight;
                 return;
             }
-            setupTerminalInitialized = true;
 
             const container = document.getElementById('setupLog');
             if (!container) {
                 console.error('[SETUP] setupLog container not found!');
                 return;
             }
-            console.log('[SETUP] Container found, clearing and populating...');
-            container.innerHTML = '';  // Clear any old content
 
-            // Immediate feedback - show something right away
-            console.log('[SETUP] Adding ASCII header...');
-            console.log('[SETUP] CORA_ASCII_HEADER defined:', typeof CORA_ASCII_HEADER !== 'undefined');
+            // Only run initial checks ONCE on first call
+            // Boot logs accumulate via the log() function piping to setupLog()
+            if (!setupTerminalInitialized) {
+                setupTerminalInitialized = true;
 
-            const headerDiv = document.createElement('pre');
-            headerDiv.style.cssText = 'color: #ff00ff; margin: 0; font-family: Consolas, monospace; white-space: pre;';
-            headerDiv.textContent = CORA_ASCII_HEADER || 'CORA BACKEND TERMINAL';
-            container.appendChild(headerDiv);
-            console.log('[SETUP] Header added to container');
+                // Add header at the top
+                const headerDiv = document.createElement('pre');
+                headerDiv.style.cssText = 'color: #ff00ff; margin: 0; font-family: Consolas, monospace; white-space: pre;';
+                headerDiv.textContent = CORA_ASCII_HEADER || 'CORA BACKEND TERMINAL';
+                container.appendChild(headerDiv);
 
-            const isFirstRun = !localStorage.getItem('cora_setup_complete');
-            console.log('[SETUP] isFirstRun:', isFirstRun);
+                const isFirstRun = !localStorage.getItem('cora_setup_complete');
 
-            // Show loading message while checks run
-            setupLog('', '#ffffff');
-            setupLog('Initializing backend checks...', '#00ffff');
-            console.log('[SETUP] Initial messages added');
-            setupLog('', '#ffffff');
-
-            if (isFirstRun) {
-                setupLog('============================================================', '#ffaa00');
-                setupLog('  FIRST TIME SETUP - This may take a while!', '#ffaa00');
-                setupLog('  Subsequent runs will be much faster (preloaded).', '#ffaa00');
-                setupLog('============================================================', '#ffaa00');
                 setupLog('', '#ffffff');
-            }
-
-            // Check Ollama
-            setupLog('[CHECK] Ollama AI Backend...', '#ffff00');
-            ollamaStatus = await checkOllamaRunning();
-
-            if (!ollamaStatus.running) {
-                setupLog('[ERROR] Ollama is NOT running!', '#ff4444');
+                setupLog('Initializing backend checks...', '#00ffff');
                 setupLog('', '#ffffff');
-                setupLog('Ollama is required for CORA to function.', '#ffffff');
-                setupLog('', '#ffffff');
-                setupLogHTML('<span style="color: #00ffff;">Download Ollama:</span> <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff; text-decoration: underline;">https://ollama.com/download</a>');
-                setupLog('', '#ffffff');
-                setupLog('After installing, run these commands in terminal:', '#ffffff');
-                setupLog('', '#ffffff');
-                setupLog('  ollama serve', '#00ff00');
-                setupLog('', '#ffffff');
-                setupLog('Then refresh this page.', '#ffff00');
-                setupLog('', '#ffffff');
-                setupLog('============================================================', '#ff4444');
-                setupLog('[BLOCKED] Cannot proceed without Ollama', '#ff4444');
-                setupLog('============================================================', '#ff4444');
-                return;
-            }
 
-            setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
-            setupLog('', '#ffffff');
+                if (isFirstRun) {
+                    setupLog('============================================================', '#ffaa00');
+                    setupLog('  FIRST TIME SETUP - This may take a while!', '#ffaa00');
+                    setupLog('  Subsequent runs will be much faster (preloaded).', '#ffaa00');
+                    setupLog('============================================================', '#ffaa00');
+                    setupLog('', '#ffffff');
+                }
 
-            // Check required models
-            setupLog('[CHECK] Required AI Models...', '#ffff00');
-            setupLog('', '#ffffff');
+                // Check Ollama
+                setupLog('[CHECK] Ollama AI Backend...', '#ffff00');
+                ollamaStatus = await checkOllamaRunning();
 
-            const requiredModels = [
-                { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', size: '~4.1 GB', desc: 'Main chat model (CORA brain)' },
-                { name: 'llava', display: 'llava', size: '~4.7 GB', desc: 'Vision model (image analysis)' },
-                { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', size: '~4.4 GB', desc: 'Coding model' }
-            ];
+                if (!ollamaStatus.running) {
+                    setupLog('[ERROR] Ollama is NOT running!', '#ff4444');
+                    setupLog('', '#ffffff');
+                    setupLog('Ollama is required for CORA to function.', '#ffffff');
+                    setupLog('', '#ffffff');
+                    setupLogHTML('<span style="color: #00ffff;">Download Ollama:</span> <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff; text-decoration: underline;">https://ollama.com/download</a>');
+                    setupLog('', '#ffffff');
+                    setupLog('After installing, run: ollama serve', '#00ff00');
+                    setupLog('Then refresh this page.', '#ffff00');
+                    setupLog('============================================================', '#ff4444');
+                    setupLog('[BLOCKED] Cannot proceed without Ollama', '#ff4444');
+                    return;
+                }
 
-            let missingModels = [];
+                setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                setupLog('', '#ffffff');
 
-            for (const model of requiredModels) {
-                if (hasModel(ollamaStatus.models, model.name)) {
-                    setupLog(`  [OK] ${model.display} - ${model.desc}`, '#00ff00');
+                // Check required models
+                setupLog('[CHECK] Required AI Models...', '#ffff00');
+
+                const requiredModels = [
+                    { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', desc: 'Main chat model (CORA brain)' },
+                    { name: 'llava', display: 'llava', desc: 'Vision model (image analysis)' },
+                    { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', desc: 'Coding model' }
+                ];
+
+                let missingModels = [];
+                for (const model of requiredModels) {
+                    if (hasModel(ollamaStatus.models, model.name)) {
+                        setupLog(`  [OK] ${model.display} - ${model.desc}`, '#00ff00');
+                    } else {
+                        setupLog(`  [MISSING] ${model.display} - ${model.desc}`, '#ff4444');
+                        missingModels.push(model);
+                    }
+                }
+
+                if (missingModels.length > 0) {
+                    setupLog('', '#ffffff');
+                    setupLog('Run: ollama pull <model> for missing models', '#ffaa00');
                 } else {
-                    setupLog(`  [MISSING] ${model.display} - ${model.desc}`, '#ff4444');
-                    missingModels.push(model);
-                }
-            }
-
-            setupLog('', '#ffffff');
-
-            if (missingModels.length > 0) {
-                setupLog('============================================================', '#ffaa00');
-                setupLog('  MODELS NEED TO BE DOWNLOADED', '#ffaa00');
-                setupLog('  Run these commands in your terminal:', '#ffaa00');
-                setupLog('============================================================', '#ffaa00');
-                setupLog('', '#ffffff');
-
-                for (const model of missingModels) {
-                    setupLog(`  ollama pull ${model.display}    # ${model.size}`, '#00ffff');
+                    setupLog('[OK] All required models installed!', '#00ff00');
                 }
 
                 setupLog('', '#ffffff');
-                setupLog('After downloading, refresh this page.', '#ffff00');
-                setupLog('', '#ffffff');
-                setupLog('[WARN] Some features may not work without all models', '#ffaa00');
-            } else {
-                setupLog('[OK] All required models installed!', '#00ff00');
-            }
 
-            setupLog('', '#ffffff');
+                // API Checks
+                setupLog('[CHECK] API Connections...', '#ffff00');
 
-            // API Checks
-            setupLog('[CHECK] API Connections...', '#ffff00');
-
-            // Kokoro TTS check
-            try {
-                const kokoroResp = await fetch('http://localhost:8880/v1/audio/speech', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: 'kokoro', input: 'test', voice: 'af_bella' }),
-                    signal: AbortSignal.timeout(2000)
-                });
-                if (kokoroResp.ok) {
-                    setupLog('  [OK] Kokoro TTS - localhost:8880', '#00ff00');
-                } else {
-                    setupLog('  [WARN] Kokoro TTS - not responding (voice disabled)', '#ffaa00');
+                try {
+                    const kokoroResp = await fetch('http://localhost:8880/v1/audio/speech', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: 'kokoro', input: 'test', voice: 'af_bella' }),
+                        signal: AbortSignal.timeout(2000)
+                    });
+                    setupLog(kokoroResp.ok ? '  [OK] Kokoro TTS - localhost:8880' : '  [WARN] Kokoro TTS - not responding', kokoroResp.ok ? '#00ff00' : '#ffaa00');
+                } catch (e) {
+                    setupLog('  [WARN] Kokoro TTS - not running (voice disabled)', '#ffaa00');
                 }
-            } catch (e) {
-                setupLog('  [WARN] Kokoro TTS - not running (voice disabled)', '#ffaa00');
+
+                const weatherKey = localStorage.getItem('cora_weather_key');
+                setupLog(weatherKey ? '  [OK] Weather API - configured' : '  [INFO] Weather API - using free tier', weatherKey ? '#00ff00' : '#888888');
+
+                setupLog('', '#ffffff');
+                setupLog('============================================================', '#00ffff');
+                setupLog('[READY] Backend checks complete - Boot logs below', '#00ff00');
+                setupLog('============================================================', '#00ffff');
+                setupLog('', '#ffffff');
+
+                localStorage.setItem('cora_setup_complete', 'true');
             }
 
-            // Weather API (just show status based on localStorage)
-            const weatherKey = localStorage.getItem('cora_weather_key');
-            if (weatherKey) {
-                setupLog('  [OK] Weather API - configured', '#00ff00');
-            } else {
-                setupLog('  [INFO] Weather API - using free tier', '#888888');
-            }
-
-            setupLog('', '#ffffff');
-            setupLog('============================================================', '#00ffff');
-            setupLog('[READY] Backend checks complete', '#00ff00');
-            setupLog('[START] Boot sequence will begin...', '#ff00ff');
-            setupLog('============================================================', '#00ffff');
-
-            // Mark setup complete for faster subsequent loads
-            localStorage.setItem('cora_setup_complete', 'true');
+            // Scroll to bottom to show latest logs
+            container.scrollTop = container.scrollHeight;
         }
 
         // Initialize setup terminal when view is toggled to setup mode
@@ -4571,14 +4538,10 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 viewMode = 'setup';
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
-                btn.textContent = '[ BACKEND TERMINAL ]';
-                // Initialize the setup terminal with real checks
-                try {
-                    await initSetupTerminal(true);
-                } catch (e) {
-                    console.error('[SETUP] Error:', e);
-                    setupLog('ERROR: ' + e.message, '#ff0000');
-                }
+                btn.textContent = '[ BACK TO MAIN ]';
+                // Just scroll to bottom - logs already accumulated during boot
+                const setupLog = document.getElementById('setupLog');
+                if (setupLog) setupLog.scrollTop = setupLog.scrollHeight;
             } else {
                 // Back to main split view
                 backToMain();
