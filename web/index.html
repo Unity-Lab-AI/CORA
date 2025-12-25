@@ -557,10 +557,7 @@
     </div>
 
     <!-- Toggle Button -->
-    <div style="position: fixed; top: 10px; right: 10px; z-index: 100; display: flex; gap: 8px;">
-        <button class="toggle-btn" onclick="window.open('console.html', '_blank')">[ OPEN CONSOLE ]</button>
-        <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
-    </div>
+    <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
 
     <!-- Main Container -->
     <div class="container" id="mainContainer">
@@ -1941,6 +1938,9 @@ You ARE Cora. That's just who you are.`;
         // ============================================================
 
         async function init() {
+            // Auto-open console in new tab
+            window.open('console.html', '_blank');
+
             renderPhases();
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
