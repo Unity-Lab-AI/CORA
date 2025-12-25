@@ -2175,98 +2175,117 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Screenshot error: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Screenshot Capture', 'status': 'WARN'})
 
-    # Test camera if available
+    # Test camera if available - try multiple camera indices
     try:
         import cv2
         print("  Testing camera...")
         display_tool("OpenCV", "Accessing camera device")
-        display_action("Opening camera VideoCapture(0)...")
 
-        cap = cv2.VideoCapture(0)
-        if cap.isOpened():
-            display_action("Camera opened, capturing frame...")
-            ret, frame = cap.read()
-            if ret:
-                print(f"  [OK] Camera working: {frame.shape[1]}x{frame.shape[0]}")
-                display_result(f"Camera frame: {frame.shape[1]}x{frame.shape[0]}")
-                BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'OK'})
-                BOOT_STATUS['camera_available'] = True
+        # Try camera indices 0, 1, 2 (some systems have multiple cameras)
+        cap = None
+        frame = None
+        working_index = -1
 
-                # Save test frame
-                cam_dir = PROJECT_DIR / 'data' / 'camera'
-                cam_dir.mkdir(parents=True, exist_ok=True)
-                cam_path = cam_dir / 'boot_test.jpg'
-                display_action(f"Saving camera frame to {cam_path}")
-                cv2.imwrite(str(cam_path), frame)
-                print(f"       Test frame saved: {cam_path}")
-                display_result("Camera frame saved successfully")
-                BOOT_STATUS['camera_path'] = str(cam_path)
-
-                # Show camera popup (like screenshot and image gen)
-                cam_window = None
-                try:
-                    import tkinter as tk
-                    from PIL import Image, ImageTk
-
-                    # Use window manager for proper z-layering
-                    parent = _boot_display.root if _boot_display else None
-                    cam_window = create_image_window(
-                        title="CORA - Camera View",
-                        width=1280, height=720,
-                        parent=parent
-                    )
-
-                    # Load and display camera image
-                    img = Image.open(cam_path)
-                    img = img.resize((1280, 720), Image.Resampling.LANCZOS)
-                    photo = ImageTk.PhotoImage(img, master=cam_window)
-
-                    label = tk.Label(cam_window, image=photo, bg='black')
-                    label.image = photo
-                    label.pack(fill='both', expand=True)
-                    cam_window.update()
-                    display_action("Showing camera view for 5 seconds...")
-                except Exception as e:
-                    print(f"  [INFO] Camera popup failed: {e}")
-                    cam_window = None
-
-                # Use AI vision to describe what CORA sees through camera
-                camera_description = None
-                try:
-                    from ai.ollama import generate_with_image
-                    display_action("Analyzing camera with AI vision...")
-                    vision_result = generate_with_image(
-                        prompt="What do you see through this camera? Describe the person, their appearance, the room, objects, or anything interesting. Be detailed and specific.",
-                        image_path=str(cam_path),
-                        system=get_system_prompt(),
-                        model="llava"
-                    )
-                    if vision_result and vision_result.content:
-                        camera_description = vision_result.content.strip()
-                        # Clean markdown
-                        camera_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', camera_description)
-                        camera_description = re.sub(r'\*([^*]+)\*', r'\1', camera_description)
-                        camera_description = re.sub(r'\n+', ' ', camera_description)
-                        camera_description = re.sub(r'\s+', ' ', camera_description).strip()
-                        print(f"  CORA sees: {camera_description}")
-                        display_result(f"Vision: {camera_description[:80]}...")
-                        BOOT_STATUS['camera_description'] = camera_description
-                except Exception as e:
-                    print(f"  [INFO] Camera vision analysis skipped: {e}")
-
-                # CORA speaks what she sees - the actual description
-                if camera_description:
-                    speak(camera_description)
+        for cam_index in [0, 1, 2]:
+            display_action(f"Trying camera index {cam_index}...")
+            test_cap = cv2.VideoCapture(cam_index)
+            if test_cap.isOpened():
+                # Try to read a frame - some cameras open but don't capture
+                ret, test_frame = test_cap.read()
+                if ret and test_frame is not None:
+                    cap = test_cap
+                    frame = test_frame
+                    working_index = cam_index
+                    display_result(f"Camera {cam_index} working!")
+                    break
                 else:
-                    response = cora_respond("Camera system", "Camera working. Vision failed.", "warn")
-                    speak(response)
+                    display_action(f"Camera {cam_index} opened but no frame")
+                    test_cap.release()
+            else:
+                test_cap.release()
 
-                # Close camera popup after speaking
-                if cam_window:
-                    try:
-                        cam_window.destroy()
-                    except:
-                        pass
+        if cap is not None and frame is not None:
+            print(f"  [OK] Camera {working_index} working: {frame.shape[1]}x{frame.shape[0]}")
+            display_result(f"Camera {working_index}: {frame.shape[1]}x{frame.shape[0]}")
+            BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'OK'})
+            BOOT_STATUS['camera_available'] = True
+            BOOT_STATUS['camera_index'] = working_index
+
+            # Save test frame
+            cam_dir = PROJECT_DIR / 'data' / 'camera'
+            cam_dir.mkdir(parents=True, exist_ok=True)
+            cam_path = cam_dir / 'boot_test.jpg'
+            display_action(f"Saving camera frame to {cam_path}")
+            cv2.imwrite(str(cam_path), frame)
+            print(f"       Test frame saved: {cam_path}")
+            display_result("Camera frame saved successfully")
+            BOOT_STATUS['camera_path'] = str(cam_path)
+
+            # Show camera popup (like screenshot and image gen)
+            cam_window = None
+            try:
+                import tkinter as tk
+                from PIL import Image, ImageTk
+
+                # Use window manager for proper z-layering
+                parent = _boot_display.root if _boot_display else None
+                cam_window = create_image_window(
+                    title="CORA - Camera View",
+                    width=1280, height=720,
+                    parent=parent
+                )
+
+                # Load and display camera image
+                img = Image.open(cam_path)
+                img = img.resize((1280, 720), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img, master=cam_window)
+
+                label = tk.Label(cam_window, image=photo, bg='black')
+                label.image = photo
+                label.pack(fill='both', expand=True)
+                cam_window.update()
+                display_action("Showing camera view for 5 seconds...")
+            except Exception as e:
+                print(f"  [INFO] Camera popup failed: {e}")
+                cam_window = None
+
+            # Use AI vision to describe what CORA sees through camera
+            camera_description = None
+            try:
+                from ai.ollama import generate_with_image
+                display_action("Analyzing camera with AI vision...")
+                vision_result = generate_with_image(
+                    prompt="What do you see through this camera? Describe the person, their appearance, the room, objects, or anything interesting. Be detailed and specific.",
+                    image_path=str(cam_path),
+                    system=get_system_prompt(),
+                    model="llava"
+                )
+                if vision_result and vision_result.content:
+                    camera_description = vision_result.content.strip()
+                    # Clean markdown
+                    camera_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', camera_description)
+                    camera_description = re.sub(r'\*([^*]+)\*', r'\1', camera_description)
+                    camera_description = re.sub(r'\n+', ' ', camera_description)
+                    camera_description = re.sub(r'\s+', ' ', camera_description).strip()
+                    print(f"  CORA sees: {camera_description}")
+                    display_result(f"Vision: {camera_description[:80]}...")
+                    BOOT_STATUS['camera_description'] = camera_description
+            except Exception as e:
+                print(f"  [INFO] Camera vision analysis skipped: {e}")
+
+            # CORA speaks what she sees - the actual description
+            if camera_description:
+                speak(camera_description)
+            else:
+                response = cora_respond("Camera system", "Camera working. Vision failed.", "warn")
+                speak(response)
+
+            # Close camera popup after speaking
+            if cam_window:
+                try:
+                    cam_window.destroy()
+                except:
+                    pass
             else:
                 print("  [WARN] Camera opened but no frame")
                 display_log("Camera opened but no frame captured", "warn")
@@ -2755,6 +2774,10 @@ if __name__ == "__main__":
         info_text.insert('end', "  2. Extract to: CORA/tools/\n", 'cmd')
         info_text.insert('end', "  3. Click 'Check & Continue' below\n\n", 'feature')
 
+        info_text.insert('end', "⚠ WARNING: Site has DECEPTIVE ADS!\n", 'warning')
+        info_text.insert('end', "Click DIRECTLY on the filename you want.\n", 'dim')
+        info_text.insert('end', "Ignore all 'Download' buttons - they're ads!\n\n", 'dim')
+
         info_text.insert('end', "Folder structure doesn't matter - CORA will\n", 'dim')
         info_text.insert('end', "find mpv.exe anywhere inside the tools folder.\n", 'dim')
 
@@ -3016,32 +3039,53 @@ if __name__ == "__main__":
                     user_activity = context.get('user_activity', '')
                     user_mood = context.get('user_mood', '')
 
-                    # Build a prompt for CORA to generate her interjection
+                    # Build context for natural AI response - DON'T include instructions in the speech
+                    # The key is to give context but let AI respond naturally
                     if reason == InterjectReason.HELPFUL_INFO:
-                        prompt = f"You overheard: '{recent_speech}'. You think you can help. Offer brief, useful input naturally - like a friend who happened to hear something. Keep it short."
+                        context_info = f"Overheard: {recent_speech[:100]}"
                     elif reason == InterjectReason.JOKE:
-                        prompt = f"The moment feels right for some humor. Based on: '{hint}'. Crack a quick joke or witty comment. Keep it natural and brief."
+                        context_info = f"Good moment for humor about: {hint[:50]}"
                     elif reason == InterjectReason.CHECK_IN:
-                        prompt = f"You noticed: '{hint}'. Check in with your user like a friend would. Keep it casual and brief - don't be overbearing."
+                        context_info = f"User seems: {hint[:50]}"
                     elif reason == InterjectReason.VIBE:
-                        prompt = f"You're just vibing with your user. You noticed: '{hint}'. Say something chill and friendly. Keep it short."
+                        context_info = f"Vibing, noticed: {hint[:50]}"
                     elif reason == InterjectReason.COMMENT:
-                        prompt = f"You overheard something interesting: '{recent_speech}'. Make a natural comment like a friend would. Brief and casual."
+                        context_info = f"Overheard interesting: {recent_speech[:80]}"
                     elif reason == InterjectReason.ALERT:
-                        prompt = f"You noticed something important: '{hint}'. Alert your user briefly."
+                        context_info = f"Important: {hint[:50]}"
                     else:
-                        prompt = f"You want to say something based on: '{hint}'. Keep it brief and natural."
+                        context_info = hint[:50]
 
                     # Log that CORA is interjecting
                     if _boot_display:
                         _safe_ui_call(lambda: _boot_display.log(f"[Ambient] {reason.value}: {hint[:50]}...", 'info'))
 
-                    # Generate CORA's response using AI
-                    response = cora_respond("Ambient Interjection", prompt, "info")
+                    # Generate CORA's response using direct AI call (not cora_respond which adds boot context)
+                    try:
+                        from ai.ollama import generate
 
-                    # Speak the interjection
-                    if response:
-                        speak(response)
+                        # Simple direct prompt - let CORA be natural
+                        system = """You are CORA. Respond naturally in 1 short sentence. Be casual like a friend.
+Don't repeat the context - just respond to it naturally. No quotes around your response."""
+
+                        if reason == InterjectReason.HELPFUL_INFO:
+                            prompt = f"You overheard '{recent_speech}'. Say something helpful briefly."
+                        elif reason == InterjectReason.CHECK_IN:
+                            prompt = f"User seems {hint}. Check in casually."
+                        elif reason == InterjectReason.COMMENT:
+                            prompt = f"You heard mention of '{recent_speech}'. Make a quick comment."
+                        elif reason == InterjectReason.VIBE:
+                            prompt = f"You're chilling with user. Say something friendly."
+                        else:
+                            prompt = f"Respond naturally to: {context_info}"
+
+                        response = generate(prompt=prompt, system=system, max_tokens=60)
+
+                        # Speak the interjection
+                        if response:
+                            speak(response)
+                    except Exception as ai_err:
+                        print(f"[AMBIENT] AI generation error: {ai_err}")
 
                 except Exception as e:
                     print(f"[AMBIENT] Interjection error: {e}")

@@ -18,11 +18,7 @@ Full cyberpunk visual boot display with dynamic AI responses.
 
 **GUI Mode:**
 ```bash
-python gui_launcher.py
-```
-or
-```bash
-python ui/app.py
+python src/gui_launcher.py
 ```
 
 **Quick Boot (No TTS):**
@@ -449,4 +445,4 @@ backup                Save all data to backups/
 ---
 
 *Unity AI Lab - C.O.R.A v2.4.0*
-*Last Updated: 2025-12-23*
+*Last Updated: 2025-12-25*
