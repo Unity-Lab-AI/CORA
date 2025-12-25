@@ -596,7 +596,7 @@
 
         const CONFIG = {
             ollamaUrl: 'http://localhost:11434',
-            pollinationsUrl: 'https://api.pollinations.ai',
+            pollinationsImageUrl: 'https://image.pollinations.ai/prompt',
             githubApiUrl: 'https://api.github.com',
             version: '2.4.0'
         };
@@ -646,7 +646,7 @@
         // ============================================================
 
         async function validatePollinationsKey(key) {
-            if (!key || key.length < 10) return false;
+            if (!key || key.length < 5) return false;
 
             const statusEl = document.getElementById('pollinationsStatus');
             const inputEl = document.getElementById('pollinationsKey');
@@ -654,29 +654,62 @@
             statusEl.className = 'api-status checking';
 
             try {
-                // Pollinations API validation - try to hit their endpoint
-                const response = await fetch(`${CONFIG.pollinationsUrl}/models`, {
+                // Pollinations validation - generate a tiny 64x64 test image
+                // This is how CORA tests it - actual image generation
+                const testPrompt = encodeURIComponent('test');
+                const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}`;
+
+                log('Testing Pollinations key with 64x64 image generation...', 'info');
+
+                const response = await fetch(testUrl, {
                     method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${key}`
-                    }
+                    // No CORS mode - we just need to see if it returns an image
                 });
 
-                // Even a 401 means the endpoint exists - we check if key format is right
-                // For Pollinations, we'll accept keys that look valid
-                if (response.ok || key.startsWith('poll_') || key.length > 20) {
+                // Check if we got an image back (content-type contains image)
+                const contentType = response.headers.get('content-type') || '';
+
+                if (response.ok && contentType.includes('image')) {
+                    statusEl.textContent = '✓';
+                    statusEl.className = 'api-status valid';
+                    inputEl.className = 'valid';
+                    log('Pollinations test image generated successfully', 'ok');
+                    return true;
+                }
+
+                // If response is ok but not image, might still work
+                if (response.ok) {
                     statusEl.textContent = '✓';
                     statusEl.className = 'api-status valid';
                     inputEl.className = 'valid';
                     return true;
                 }
             } catch (e) {
-                // Network error or CORS - accept key if it looks valid
-                if (key.length > 20) {
-                    statusEl.textContent = '✓';
-                    statusEl.className = 'api-status valid';
-                    inputEl.className = 'valid';
-                    return true;
+                // CORS will block us from reading the response, but if the request went through
+                // and we can load the image via img tag, it works
+                // Try loading as an image element instead
+                try {
+                    const testPrompt = encodeURIComponent('test');
+                    const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}`;
+
+                    const imgTest = await new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = () => resolve(true);
+                        img.onerror = () => reject(false);
+                        // Add timeout
+                        setTimeout(() => reject(false), 30000);
+                        img.src = testUrl;
+                    });
+
+                    if (imgTest) {
+                        statusEl.textContent = '✓';
+                        statusEl.className = 'api-status valid';
+                        inputEl.className = 'valid';
+                        log('Pollinations test image loaded successfully', 'ok');
+                        return true;
+                    }
+                } catch (imgErr) {
+                    console.error('Image load test failed:', imgErr);
                 }
             }
 
