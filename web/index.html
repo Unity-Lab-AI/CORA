@@ -1378,7 +1378,7 @@ WHEN RESPONDING:
             }
         }
 
-        function handleAudioReady(id, data) {
+        async function handleAudioReady(id, data) {
             if (!pendingCallbacks[id]) return;
 
             const { resolve, startTime, text, timeoutId } = pendingCallbacks[id];
@@ -1394,6 +1394,12 @@ WHEN RESPONDING:
             }
 
             try {
+                // Resume audio context if suspended (browser requires user interaction)
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    console.log('[TTS] AudioContext resumed');
+                }
+
                 // Convert ArrayBuffer back to Float32Array
                 const float32Audio = new Float32Array(data.audio);
                 const sampleRate = data.sampleRate || 24000;
@@ -3605,7 +3611,16 @@ WHEN RESPONDING:
                 setPhase('voice', 'ok');
                 ttsEnabled = true;
                 updateProgress(15, 'Neural voice online');
-                // Don't speak yet - wait until AI is ready so CORA can be CORA
+
+                // TTS TEST - speak immediately after Kokoro loads (matches desktop behavior)
+                // Resume audio context first (browser requires this)
+                if (audioContext && audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    log('AudioContext resumed', 'info');
+                }
+                log('Testing TTS...', 'info');
+                await speakAndWait('Voice synthesis online. Kokoro TTS loaded and ready.');
+                log('TTS test passed', 'ok');
             } else {
                 log('Kokoro failed - using browser TTS', 'warn');
                 document.getElementById('ttsNotice').textContent = 'Browser TTS (fallback mode)';
@@ -3614,7 +3629,11 @@ WHEN RESPONDING:
                 ttsEnabled = true;
                 setPhase('voice', 'warn');
                 updateProgress(15, 'Fallback voice');
-                // Don't speak yet - wait until AI is ready
+
+                // Test browser TTS fallback
+                log('Testing browser TTS fallback...', 'info');
+                await speakAndWait('Voice synthesis online. Using browser speech.');
+                log('Browser TTS test passed', 'ok');
             }
 
             // ================================================================
