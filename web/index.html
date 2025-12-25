@@ -539,17 +539,26 @@
             <p style="color: #ff00ff;">Real-time GPU/CPU/RAM monitoring</p>
 
             <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
-                <p style="color: #ffaa00; margin-bottom: 10px;">This feature requires the full CORA download:</p>
-                <p style="color: #ccc; font-size: 12px; margin-bottom: 15px;">Live hardware stats need the stats server running locally on your machine.</p>
-                <a href="https://github.com/Unity-Lab-AI/CORA" target="_blank" style="display: inline-block; background: #ff00ff; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Download CORA from GitHub</a>
+                <p style="color: #00ff88; margin-bottom: 15px; font-weight: bold;">Step 1: Download the stats server</p>
+                <a href="https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/services/stats_server.py" download="stats_server.py" style="display: inline-block; background: #ff00ff; color: #000; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">Download stats_server.py</a>
+                <p style="color: #666; font-size: 10px; margin-top: 8px;">Save it anywhere you want (Downloads folder is fine)</p>
             </div>
 
-            <p style="color: var(--text-dim); font-size: 11px; margin: 15px 0;">Already have CORA? Run <code style="background: #222; padding: 2px 6px; border-radius: 3px; color: #ff00ff;">START_STATS_SERVER.bat</code> then click Retry</p>
+            <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #00ff88; margin-bottom: 10px; font-weight: bold;">Step 2: Run it</p>
+                <p style="color: #ccc; font-size: 12px; margin-bottom: 10px;">Open a terminal in the folder where you saved it, then run:</p>
+                <code style="display: block; background: #222; padding: 10px; border-radius: 4px; color: #ff00ff; font-size: 13px;">python stats_server.py</code>
+                <p style="color: #666; font-size: 10px; margin-top: 8px;">Keep that terminal open!</p>
+            </div>
 
-            <button onclick="retryStatsServer()" style="margin-top: 10px;">I Started It - Retry</button>
-            <button onclick="skipStatsServer()" style="margin-top: 10px; background: #444; font-size: 14px; padding: 12px 25px;">Continue Without Live Stats</button>
+            <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #00ff88; margin-bottom: 10px; font-weight: bold;">Step 3: Click Retry</p>
+            </div>
 
-            <p style="color: #666; font-size: 10px; margin-top: 15px;">Stats will show "N/A" - everything else works fine</p>
+            <button onclick="retryStatsServer()" style="margin-top: 10px; font-size: 14px; padding: 12px 30px;">Retry Connection</button>
+            <button onclick="skipStatsServer()" style="margin-top: 10px; background: #333;">Skip - Continue Without Live Stats</button>
+
+            <p style="color: #666; font-size: 10px; margin-top: 15px;">Without stats: GPU/CPU/RAM will show "N/A" but everything else works</p>
         </div>
     </div>
 
