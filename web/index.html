@@ -3836,16 +3836,43 @@ WHEN RESPONDING:
             log('PHASE 4.2: YOUTUBE VIDEO TEST', 'phase');
             updateProgress(50, 'Finding a video...');
 
-            // Random fun video IDs (short, interesting clips)
-            const videoIds = [
-                { id: 'dQw4w9WgXcQ', title: 'Classic Rick Roll' },
-                { id: 'jNQXAC9IVRw', title: 'First YouTube Video Ever' },
-                { id: 'kJQP7kiw5Fk', title: 'Despacito' },
-                { id: '9bZkp7q19f0', title: 'Gangnam Style' },
-                { id: 'hY7m5jjJ9mM', title: 'Chocolate Rain' }
+            // Random YouTube search - different crazy search each time
+            const randomSearchTerms = [
+                'synthwave mix', 'vaporwave aesthetic', 'lofi beats', 'retro gaming music',
+                'cyberpunk ambience', 'space ambient', 'dark synthwave', 'outrun music',
+                'chillwave', 'retrowave driving', 'neon lights aesthetic', 'rain sounds',
+                'city night ambience', 'coding music', 'hacker music', 'matrix soundtrack',
+                'blade runner vibes', 'stranger things music', 'synth pop', 'new retro wave',
+                'midnight drive music', 'aesthetic visuals', 'vapor aesthetic', '80s nostalgia',
+                'electronic chill', 'ambient electronic', 'future funk', 'french house',
+                'deep house mix', 'techno ambient', 'industrial music', 'darkwave',
+                'goth music mix', 'post punk', 'shoegaze', 'dream pop', 'indie electronic'
             ];
-            const video = videoIds[Math.floor(Math.random() * videoIds.length)];
-            log(`Selected: ${video.title}`, 'ok');
+            const searchTerm = randomSearchTerms[Math.floor(Math.random() * randomSearchTerms.length)];
+            log(`Searching YouTube: "${searchTerm}"`, 'info');
+
+            let video = { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop (fallback)' }; // Fallback
+            try {
+                // Use Invidious API (no API key needed) for random YouTube search
+                const instances = ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yt.artemislena.eu'];
+                const instance = instances[Math.floor(Math.random() * instances.length)];
+                const searchUrl = `${instance}/api/v1/search?q=${encodeURIComponent(searchTerm)}&type=video`;
+
+                const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+                if (searchRes.ok) {
+                    const results = await searchRes.json();
+                    if (results && results.length > 0) {
+                        // Pick random result from first 10
+                        const randomIndex = Math.floor(Math.random() * Math.min(10, results.length));
+                        const found = results[randomIndex];
+                        video = { id: found.videoId, title: found.title?.substring(0, 50) || searchTerm };
+                    }
+                }
+            } catch (e) {
+                log('Search failed, using fallback', 'warn');
+            }
+
+            log(`Found: ${video.title}`, 'ok');
             log('Embedding YouTube video...', 'info');
 
             // Show video in modal
