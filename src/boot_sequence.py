@@ -1568,6 +1568,62 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     display_log("C.O.R.A IS READY", "ok")
 
+    # ================================================================
+    # CORA ANNOUNCES HER ABILITIES
+    # ================================================================
+    abilities_list = """
+Here's what I can do for you:
+
+CONVERSATION & VOICE:
+- Talk to me naturally - I'll respond with my voice
+- Ask me anything - I'm pretty smart when I feel like it
+
+VISION & MEDIA:
+- Take screenshots and describe what I see on your screen
+- Look through your camera and describe what's there
+- Generate images from any description you give me
+- Play music and control media playback
+
+PRODUCTIVITY:
+- Set reminders and alarms - I'll bug you when it's time
+- Manage your calendar and schedule events
+- Create and track tasks and to-do lists
+- Take notes and remember things for you
+
+WEB & RESEARCH:
+- Search the web and summarize what I find
+- Open websites and browse for information
+- Fetch and read web pages
+
+FILES & SYSTEM:
+- Read and write files on your computer
+- Run system commands and scripts
+- Check system stats like CPU and memory
+- Control windows and applications
+
+CODE & DEVELOPMENT:
+- Write and explain code in any language
+- Debug and fix code problems
+- Run Python scripts
+
+EMAIL & COMMUNICATION:
+- Send and read emails
+- Draft messages for you
+
+Just tell me what you need.
+"""
+
+    display_log("─── CORA's Abilities ───", "info")
+    # Have CORA announce this in her own goth style
+    abilities_prompt = f"Now that boot is done, tell the user what you can do for them. Be yourself - sarcastic, goth, direct. Here's the list of your abilities to mention: {abilities_list}"
+    abilities_response = cora_respond("Abilities announcement", abilities_prompt, "ok")
+    speak(abilities_response)
+
+    # Also print the abilities to the console
+    for line in abilities_list.strip().split('\n'):
+        if line.strip():
+            display_log(line.strip(), "info")
+
     # Stop the display update thread so mainloop can take over
     global _boot_complete
     _boot_complete = True
