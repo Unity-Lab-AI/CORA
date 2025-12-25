@@ -1017,8 +1017,9 @@ WHEN RESPONDING:
             return models.some(m => m.name && m.name.toLowerCase().includes(name.toLowerCase()));
         }
 
-        async function initSetupTerminal() {
-            if (setupTerminalInitialized) return;
+        async function initSetupTerminal(forceRefresh = false) {
+            // Always run fresh checks when user opens setup terminal
+            if (setupTerminalInitialized && !forceRefresh) return;
             setupTerminalInitialized = true;
 
             const container = document.getElementById('setupLog');
@@ -4526,8 +4527,8 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
                 btn.textContent = '[ SETUP TERMINAL ]';
-                // Initialize the setup terminal with real checks
-                initSetupTerminal();
+                // Initialize the setup terminal with real checks (force refresh)
+                initSetupTerminal(true);
             } else if (viewMode === 'setup') {
                 // Console only
                 viewMode = 'console';
