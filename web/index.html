@@ -56,12 +56,49 @@
             overflow: hidden;
         }
 
-        /* Two Column Layout */
+        /* Two Column Layout - matches desktop boot_display.py */
         .container {
             display: grid;
             grid-template-columns: 400px 1fr;
             height: 100vh;
             gap: 0;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        /* Fullscreen mode - console only */
+        .container.fullscreen-console {
+            grid-template-columns: 0 1fr;
+        }
+        .container.fullscreen-console .left-panel {
+            display: none;
+        }
+
+        /* Fullscreen mode - status only */
+        .container.fullscreen-status {
+            grid-template-columns: 1fr 0;
+        }
+        .container.fullscreen-status .right-panel {
+            display: none;
+        }
+
+        /* Toggle button */
+        .toggle-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid var(--accent-magenta);
+            color: var(--accent-magenta);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+        }
+        .toggle-btn:hover {
+            background: var(--accent-magenta);
+            color: #000;
         }
 
         /* Left Panel */
@@ -518,8 +555,11 @@
         </div>
     </div>
 
+    <!-- Toggle Button -->
+    <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
+
     <!-- Main Container -->
-    <div class="container">
+    <div class="container" id="mainContainer">
         <div class="left-panel">
             <div class="header">
                 <h1>C.O.R.A</h1>
@@ -1294,6 +1334,42 @@ You ARE Cora. That's just who you are.`;
         }
 
         document.getElementById('chatInput')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
+
+        // ============================================================
+        // View Toggle - Split / Console / Status (like desktop)
+        // ============================================================
+
+        let viewMode = 'split';  // 'split', 'console', 'status'
+
+        function toggleView() {
+            const container = document.getElementById('mainContainer');
+            const btn = document.getElementById('toggleBtn');
+
+            if (viewMode === 'split') {
+                viewMode = 'console';
+                container.classList.remove('fullscreen-status');
+                container.classList.add('fullscreen-console');
+                btn.textContent = '[ CONSOLE ONLY ]';
+            } else if (viewMode === 'console') {
+                viewMode = 'status';
+                container.classList.remove('fullscreen-console');
+                container.classList.add('fullscreen-status');
+                btn.textContent = '[ STATUS ONLY ]';
+            } else {
+                viewMode = 'split';
+                container.classList.remove('fullscreen-console', 'fullscreen-status');
+                btn.textContent = '[ SPLIT VIEW ]';
+            }
+        }
+
+        // Keyboard shortcut: F key toggles view
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' || e.key === 'F') {
+                if (document.activeElement.tagName !== 'INPUT') {
+                    toggleView();
+                }
+            }
+        });
 
         // ============================================================
         // Modal Handlers
