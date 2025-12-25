@@ -1,7 +1,50 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: ALL CRITICAL FIXES COMPLETE**
-> Updated: 2025-12-25 12:31 | Session: Unity Workflow
+> **STATUS: CRITICAL TTS/WAVEFORM BUGS**
+> Updated: 2025-12-25 15:45 | Session: Unity Workflow
+
+---
+
+## CRITICAL BUG: TTS + WAVEFORM BROKEN (2025-12-25)
+
+### User's Exact Words:
+- "i hear the tts kokoro loaded tts and wave forme but all subseqyent corea response do not play anything"
+- "the pink line fore the wave froem breaks londg before i get hiere"
+- "nope the wave form starts out busted never shows a base line"
+- "are we sure its start up and constant run is in the corect pahse with and before the tts?"
+- "it was working fucking fine why are you changing everything u just broke it randomly"
+
+### Symptoms:
+1. **First TTS works**: "Voice synthesis online. Kokoro TTS loaded and ready." - audio plays, waveform shows
+2. **Subsequent TTS broken**: All CORA responses after that do NOT play audio
+3. **Waveform broken from start**: The pink baseline never shows properly
+4. **Waveform dies early**: When TTS does play, waveform stops long before audio finishes
+
+### Suspected Issues:
+- [ ] Waveform initWaveform() timing - may not be ready before TTS starts
+- [ ] Waveform _animate() loop may not be running when TTS starts
+- [ ] startWaveform()/feedAudioChunk() timing with handleAudioReady()
+- [ ] Subsequent TTS calls not triggering handleAudioReady correctly
+- [ ] pendingCallbacks system may have race condition
+- [ ] Worker may only generate audio once
+
+### Files Involved:
+- `web/index.html` - handleAudioReady(), speak(), speakAndWait(), initWaveform(), _animate(), startWaveform(), feedAudioChunk()
+- `web/kokoro-worker.js` - handleGenerate()
+
+### Failed Fix Attempts:
+1. Added empty audio buffer checks in handleAudioReady - BROKE waveform completely
+2. Added byteLength validation - BROKE waveform
+3. Added text validation in speak() - removed
+4. Added text validation in worker - removed
+5. All reverted back to original with just debug logs
+
+### What's Needed:
+- Trace exact flow: initWaveform() → TTS init → speak() → worker → handleAudioReady → waveform
+- Ensure waveform animation loop is running BEFORE any TTS
+- Ensure startWaveform() is called and audio_is_active=true when audio plays
+- Ensure feedAudioChunk() is being called during audio playback
+- Fix whatever breaks subsequent TTS calls
 
 ---
 

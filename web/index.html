@@ -1702,13 +1702,17 @@ WHEN RESPONDING:
 
         function initWaveform() {
             const canvas = document.getElementById('waveformCanvas');
+            if (!canvas) return;
+
             const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
             waveformCtx = canvas.getContext('2d');
             waveformCtx.scale(2, 2);
 
-            // Start animation - RUNS FOREVER, NEVER STOPS (line 212)
+            // Start animation - RUNS FOREVER, NEVER STOPS
             _animate();
         }
 
