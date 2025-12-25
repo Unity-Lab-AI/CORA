@@ -1,40 +1,102 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: ALL VERIFICATION COMPLETE**
-> Updated: 2025-12-25 08:25 | Session: Unity Workflow
+> **STATUS: AMBIENT AWARENESS IMPLEMENTATION**
+> Updated: 2025-12-25 08:45 | Session: Unity Workflow
 
 ---
 
-## NO ACTIVE TASKS
+## P0 - AMBIENT AWARENESS SYSTEM (IN PROGRESS)
 
-All web version verification tasks have been completed and moved to FINALIZED.md.
+**Goal:** Make CORA fully aware and contextual in web version - just like desktop `voice/ambient_awareness.py`
 
-The web version (web/index.html) now matches the desktop (boot_sequence.py) in all 18 phases.
+### What's Already Done:
+- [x] `ambientContext` object created - stores speech, messages, camera, mood
+- [x] `addAmbientSpeech()` - stores everything CORA hears (last 20 transcripts)
+- [x] `addMessageHistory()` - stores chat history (last 20 messages)
+- [x] `captureAndAnalyzeCamera()` - periodic camera snapshots (every 60s)
+- [x] `buildAmbientContextPrompt()` - builds full context for AI
+- [x] `onWakeWordDetected()` - now uses ambient context instead of hardcoded response
+- [x] Wake word listener stores ALL speech, not just wake words
+
+### What Still Needs Doing:
+
+#### 1. Update `sendChat()` to store message history
+```javascript
+// In sendChat(), add:
+addMessageHistory('USER', msg);
+// After getting response:
+addMessageHistory('CORA', reply);
+```
+
+#### 2. Send camera snapshots to llava for real analysis
+```javascript
+// In captureAndAnalyzeCamera(), convert canvas to base64 and send to:
+// POST http://localhost:11434/api/generate
+// model: 'llava'
+// images: [base64Image]
+// prompt: 'Describe what you see. Is the user there? What are they doing?'
+```
+
+#### 3. Add screenshot capture and analysis
+```javascript
+// Use getDisplayMedia() to capture screen periodically
+// Send to llava for analysis
+// Store in ambientContext.lastScreenshot
+```
+
+#### 4. Add chat context to regular chat (not just wake word)
+```javascript
+// In sendChat(), include recent context:
+const context = buildAmbientContextPrompt();
+prompt: `${context}\n\nUSER: ${msg}`
+```
+
+#### 5. Proactive interjections (like desktop)
+- CORA can speak up when she notices something relevant
+- Based on friend_threshold setting (0.0-1.0)
+- Triggers: user seems stressed, interesting topic heard, long silence, etc.
 
 ---
 
-## SESSION SUMMARY (2025-12-25)
+## Desktop Reference: `voice/ambient_awareness.py`
 
-### Permission Prompts Added
-- [x] Camera (Phase 3.1) - `showPermissionPrompt()` before getUserMedia
-- [x] Location (Phase 6.0) - `showPermissionPrompt()` before geolocation
-- [x] Vision Camera (Phase 8.0) - `showPermissionPrompt()` before vision test
+### Key Features to Port:
+1. **AmbientContext dataclass** - tracks speech, visual, screen, timing, state
+2. **friend_threshold** - 0.0 (quiet) to 1.0 (chatty friend)
+3. **Interjection reasons** - helpful_info, joke, check_in, comment, question, alert, vibe
+4. **Topic detection** - helpful topics, fun topics, stress indicators
+5. **Periodic monitoring** - screenshot every 60s, camera every 45s
+6. **Probability-based interjection** - cooldowns, busy detection
 
-### Phase Verification (All 18 Phases)
-- [x] 0.8-0.9: Waveform + About - VERIFIED
-- [x] 1.0: Voice Synthesis - VERIFIED
-- [x] 2.0-2.1: AI Engine + Models - VERIFIED
-- [x] 3.0: Hardware Check - VERIFIED
-- [x] 3.1: Live Camera (3sec) - VERIFIED
-- [x] 4.0-4.3: Tools, Code, YouTube, Modals - VERIFIED
-- [x] 5.0: Voice Systems + Wake Word - VERIFIED
-- [x] 6.0-6.1: Location, Weather, Audio - VERIFIED
-- [x] 7.0: News Headlines - VERIFIED
-- [x] 8.0: Vision (Screenshot + Camera) - VERIFIED
-- [x] 9.0: Image Generation (Pollinations) - VERIFIED
-- [x] 10.0: Final Check + Abilities - VERIFIED
+### Desktop Interjection Logic:
+```python
+# If user mentions helpful topic -> 40% boost to interjection chance
+# If user seems stressed -> 50% boost, reason = CHECK_IN
+# If question detected -> 35% boost
+# If user chilling + random vibe -> low chance comment
+# If user busy -> reduce all probabilities by 70%
+```
 
-**All tasks moved to FINALIZED.md**
+---
+
+## P0 - CORA PERSONALITY FIXES (DONE)
+
+- [x] Simplified `coraRespond()` prompt - just `[BOOT - ${context}] ${result}`
+- [x] Let system_prompt.txt handle personality, no constraints
+- [x] Temperature 0.9, num_predict 150
+
+---
+
+## Files Modified This Session:
+- `web/index.html` - ambient awareness, wake word context, simplified prompts
+
+---
+
+## Quick Test Checklist:
+- [ ] Say something near mic, then say "Hey CORA" - does she reference what she heard?
+- [ ] Chat with CORA, then say "Hey CORA" - does she remember the conversation?
+- [ ] Does camera capture happen every 60 seconds? (check console)
+- [ ] Does CORA sound like herself (goth, sarcastic, profane)?
 
 ---
 

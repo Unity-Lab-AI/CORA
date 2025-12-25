@@ -1792,7 +1792,105 @@
         }
 
         // ============================================================
+        // AMBIENT AWARENESS SYSTEM - Like desktop ambient_awareness.py
+        // CORA monitors audio, camera, screen and builds context
+        // ============================================================
+
+        const ambientContext = {
+            recentSpeech: [],          // Last 20 things CORA heard
+            messageHistory: [],         // Last 20 chat messages
+            lastCameraAnalysis: '',     // What CORA last saw through camera
+            lastScreenshot: '',         // What CORA last saw on screen
+            userActivity: 'unknown',    // working, relaxing, talking, away
+            userMood: 'neutral',        // positive, negative, neutral, stressed
+            lastInteraction: Date.now()
+        };
+
+        // Store ambient speech (everything CORA hears)
+        function addAmbientSpeech(text) {
+            if (!text.trim()) return;
+            ambientContext.recentSpeech.push({
+                text: text.trim(),
+                time: new Date().toLocaleTimeString()
+            });
+            if (ambientContext.recentSpeech.length > 20) {
+                ambientContext.recentSpeech.shift();
+            }
+        }
+
+        // Store message history
+        function addMessageHistory(role, text) {
+            ambientContext.messageHistory.push({
+                role: role,
+                text: text.substring(0, 500),
+                time: new Date().toLocaleTimeString()
+            });
+            if (ambientContext.messageHistory.length > 20) {
+                ambientContext.messageHistory.shift();
+            }
+            ambientContext.lastInteraction = Date.now();
+        }
+
+        // Capture and analyze camera periodically
+        async function captureAndAnalyzeCamera() {
+            if (!navigator.mediaDevices?.getUserMedia) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.autoplay = true;
+                await new Promise(r => video.onloadedmetadata = r);
+                await new Promise(r => setTimeout(r, 500));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                stream.getTracks().forEach(t => t.stop());
+
+                // TODO: Send to llava for analysis when available
+                // For now just store that we captured
+                const timestamp = new Date().toLocaleTimeString();
+                ambientContext.lastCameraAnalysis = `Camera captured at ${timestamp}`;
+                console.log('[AMBIENT] Camera snapshot taken');
+            } catch (e) {
+                console.log('[AMBIENT] Camera capture failed:', e.message);
+            }
+        }
+
+        // Build full context for AI
+        function buildAmbientContextPrompt() {
+            let context = '';
+
+            // Recent ambient speech (what CORA overheard)
+            if (ambientContext.recentSpeech.length > 0) {
+                context += 'AMBIENT AUDIO (what you overheard recently):\n';
+                ambientContext.recentSpeech.slice(-5).forEach(s => {
+                    context += `- [${s.time}] "${s.text}"\n`;
+                });
+                context += '\n';
+            }
+
+            // Recent chat history
+            if (ambientContext.messageHistory.length > 0) {
+                context += 'RECENT CONVERSATION:\n';
+                ambientContext.messageHistory.slice(-5).forEach(m => {
+                    context += `- [${m.time}] ${m.role}: ${m.text}\n`;
+                });
+                context += '\n';
+            }
+
+            // Camera context
+            if (ambientContext.lastCameraAnalysis) {
+                context += `CAMERA: ${ambientContext.lastCameraAnalysis}\n\n`;
+            }
+
+            return context;
+        }
+
+        // ============================================================
         // Wake Word Detection - "Hey CORA" using Web Speech API
+        // Now with AMBIENT AWARENESS context!
         // ============================================================
 
         let wakeWordRecognition = null;
@@ -1810,6 +1908,11 @@
             wakeWordRecognition.onresult = (event) => {
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript.toLowerCase().trim();
+
+                    // Store ALL speech for ambient awareness (not just wake word)
+                    if (event.results[i].isFinal && transcript.length > 3) {
+                        addAmbientSpeech(transcript);
+                    }
 
                     // Check for wake words
                     if (transcript.includes('hey cora') ||
@@ -1829,20 +1932,21 @@
                 if (event.error !== 'no-speech' && event.error !== 'aborted') {
                     console.log('Wake word error:', event.error);
                 }
-                // Restart on error (except if manually stopped)
                 if (wakeWordActive) {
                     setTimeout(() => startWakeWordListening(), 1000);
                 }
             };
 
             wakeWordRecognition.onend = () => {
-                // Auto-restart when it ends (continuous listening)
                 if (wakeWordActive) {
                     setTimeout(() => startWakeWordListening(), 100);
                 }
             };
 
             startWakeWordListening();
+
+            // Start periodic camera captures (every 60 seconds)
+            setInterval(captureAndAnalyzeCamera, 60000);
         }
 
         function startWakeWordListening() {
@@ -1850,9 +1954,7 @@
                 try {
                     wakeWordActive = true;
                     wakeWordRecognition.start();
-                } catch (e) {
-                    // Already started
-                }
+                } catch (e) {}
             }
         }
 
@@ -1865,16 +1967,45 @@
             }
         }
 
-        function onWakeWordDetected() {
-            log('Wake word detected! Listening...', 'ok');
-            speakAndWait("Yes? I'm listening.").then(() => {
-                // Focus the chat input so user can type or speak
-                const chatInput = document.getElementById('chatInput');
-                if (chatInput) {
-                    chatInput.focus();
-                    chatInput.placeholder = "I'm listening... type or speak";
+        async function onWakeWordDetected() {
+            log('Wake word detected!', 'ok');
+
+            // Build context from ambient awareness
+            const context = buildAmbientContextPrompt();
+
+            // Ask AI for a contextual response
+            try {
+                const res = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral:7b',
+                        prompt: `[WAKE WORD - User just said "Hey CORA"]\n\n${context}\nRespond naturally based on what you know. If you overheard something relevant, reference it. If there's no context, just acknowledge them.`,
+                        system: CORA_SYSTEM_PROMPT,
+                        stream: false,
+                        options: { temperature: 0.9, num_predict: 150 }
+                    })
+                });
+
+                if (res.ok) {
+                    const d = await res.json();
+                    let response = d.response?.trim() || "Yeah? What's up?";
+                    if (response.toLowerCase().startsWith('cora:')) response = response.slice(5).trim();
+                    log(`CORA: "${response}"`, 'cora');
+                    await speakAndWait(response);
+                } else {
+                    await speakAndWait("Yeah? What do you need?");
                 }
-            });
+            } catch (e) {
+                await speakAndWait("I'm here. What's up?");
+            }
+
+            // Focus chat input
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.focus();
+                chatInput.placeholder = "I'm listening...";
+            }
         }
 
         // ============================================================
