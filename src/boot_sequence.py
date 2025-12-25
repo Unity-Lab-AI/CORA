@@ -1510,19 +1510,19 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                         except:
                             pass
 
-                    # Play the video using mpv WITH video in a window (10 seconds)
+                    # Play the video using mpv WITH video in a window (20 seconds for loading + 10 sec play)
                     def play_video():
                         try:
-                            # Play 10 seconds WITH video in mpv window
+                            # Play 20 seconds WITH video in mpv window (accounts for loading time)
                             subprocess.run(
                                 ['mpv',
-                                 '--length=10',           # Play 10 seconds
+                                 '--length=20',           # Play 20 seconds total (loading + playback)
                                  '--geometry=640x360',    # Small window
                                  '--title=CORA YouTube Test',
                                  '--ontop',               # Keep on top during test
                                  '--no-terminal',
                                  video_url],
-                                capture_output=True, timeout=20
+                                capture_output=True, timeout=30
                             )
                         except:
                             pass
@@ -1943,12 +1943,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
         if video_url:
             try:
-                # Play audio with mpv (no video, 8 second limit)
+                # Play audio with mpv (no video, 20 second limit for loading + playback)
                 print(f"  Playing with mpv...")
                 display_result(f"Playing: {test_name}")
 
                 mpv_process = subprocess.Popen(
-                    ['mpv', '--no-video', '--length=8', '--really-quiet', '--no-terminal', video_url],
+                    ['mpv', '--no-video', '--length=20', '--really-quiet', '--no-terminal', video_url],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
@@ -1957,14 +1957,14 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 BOOT_STATUS['audio_test'] = test_name
 
                 # Let it play for a bit, then speak while it's playing
-                responsive_sleep(2)
+                responsive_sleep(3)
 
                 response = cora_respond("Audio Playback", f"Audio working. Playing {test_name}.", "ok")
                 speak(response)
 
-                # Wait for mpv to finish (max 8 sec total)
+                # Wait for mpv to finish (max 20 sec total for loading + 10 sec playback)
                 try:
-                    mpv_process.wait(timeout=6)
+                    mpv_process.wait(timeout=18)
                 except subprocess.TimeoutExpired:
                     mpv_process.terminate()
 

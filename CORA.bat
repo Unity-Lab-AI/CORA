@@ -78,6 +78,89 @@ if "%OLLAMA_EXE%"=="" (
 echo         Found: %OLLAMA_EXE%
 echo.
 
+:: Check .env file for API keys
+:check_env
+echo [CHECK] Environment Configuration...
+set "ENV_MISSING="
+set "POLLINATIONS_OK="
+set "GITHUB_OK="
+set "WEATHER_OK="
+set "NEWS_OK="
+
+if not exist ".env" (
+    echo.
+    echo         [WARN] .env file not found!
+    echo         Copy env.example to .env and add your API keys.
+    echo         See SETUP.md for instructions.
+    echo.
+    set "ENV_MISSING=1"
+    goto :env_skip_prompt
+)
+
+:: Check for Pollinations API key
+findstr /i "POLLINATIONS_API_KEY=pk_" ".env" >nul 2>&1
+if not errorlevel 1 (
+    echo         Pollinations API - OK
+    set "POLLINATIONS_OK=1"
+) else (
+    echo         [WARN] Pollinations API key missing - image generation disabled
+)
+
+:: Check for GitHub token
+findstr /i "GITHUB_TOKEN=ghp_" ".env" >nul 2>&1
+if not errorlevel 1 (
+    echo         GitHub Token - OK
+    set "GITHUB_OK=1"
+) else (
+    echo         [WARN] GitHub token missing - git operations limited
+)
+
+:: Check for Weather API
+findstr /i "WEATHER_API_KEY=" ".env" | findstr /v "your_" >nul 2>&1
+if not errorlevel 1 (
+    echo         Weather API - OK
+    set "WEATHER_OK=1"
+) else (
+    echo         [WARN] Weather API key missing - weather features disabled
+)
+
+:: Check for News API
+findstr /i "NEWS_API_KEY=" ".env" | findstr /v "your_" >nul 2>&1
+if not errorlevel 1 (
+    echo         News API - OK
+    set "NEWS_OK=1"
+) else (
+    echo         [WARN] News API key missing - news features disabled
+)
+
+:env_skip_prompt
+if defined ENV_MISSING (
+    echo.
+    echo   Would you like to:
+    echo     [1] Continue without .env ^(limited features^)
+    echo     [2] Open env.example to set up API keys
+    echo     [3] Exit and set up manually
+    echo.
+    set /p ENV_CHOICE="   Enter choice (1-3): "
+    if "%ENV_CHOICE%"=="2" (
+        start notepad env.example
+        echo.
+        echo   After editing, save as .env and press any key to recheck...
+        pause >nul
+        goto :check_env
+    )
+    if "%ENV_CHOICE%"=="3" (
+        echo.
+        echo   See SETUP.md and env.example for instructions.
+        pause
+        exit /b 0
+    )
+    echo.
+    echo   Continuing with limited features...
+    echo.
+)
+echo.
+
 :: Check/Pull required models
 echo [CHECK] AI Models...
 echo.

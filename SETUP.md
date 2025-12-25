@@ -53,6 +53,71 @@ python src/boot_sequence.py
 
 ---
 
+---
+
+## API Keys Setup
+
+CORA works great with NO API keys - Ollama runs locally for free! But these optional keys enable extra features:
+
+### Pollinations.AI (FREE - Image Generation)
+
+1. Go to: https://enter.pollinations.ai/
+2. Click "Get API Key" or sign up
+3. Copy your API key (starts with `pk_`)
+4. Add to your `.env` file:
+   ```
+   POLLINATIONS_API_KEY=pk_your_key_here
+   ```
+
+### GitHub Token (FREE - Git Operations)
+
+1. Go to: https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Name it "CORA" and select scopes: `repo`, `user`
+4. Copy the token (starts with `ghp_`)
+5. Add to your `.env` file:
+   ```
+   GITHUB_TOKEN=ghp_your_token_here
+   ```
+
+### Weather API (FREE - Weather Data)
+
+1. Go to: https://openweathermap.org/api
+2. Sign up for free account
+3. Go to "API Keys" tab
+4. Copy your API key
+5. Add to your `.env` file:
+   ```
+   WEATHER_API_KEY=your_key_here
+   ```
+
+### News API (FREE - Headlines)
+
+1. Go to: https://newsapi.org/
+2. Click "Get API Key"
+3. Sign up for free
+4. Copy your API key
+5. Add to your `.env` file:
+   ```
+   NEWS_API_KEY=your_key_here
+   ```
+
+### Setting Up Your .env File
+
+1. Copy `env.example` to `.env`:
+   ```bash
+   copy env.example .env
+   ```
+2. Open `.env` in a text editor
+3. Replace the placeholder values with your actual keys
+4. Save the file
+
+**Note:** The `.env` file contains secrets - never commit it to git!
+
+See `env.example` for detailed instructions on each API key.
+
+---
+
 ## Detailed Installation
 
 ### System Requirements

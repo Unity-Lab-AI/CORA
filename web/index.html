@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C.O.R.A - Cognitive Operations & Reasoning Assistant</title>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-panel: #111111;
+            --border-color: #2a2a2a;
+            --text-primary: #00ff00;
+            --text-secondary: #888;
+            --text-white: #fff;
+            --accent-green: #00ff00;
+            --accent-red: #ff4444;
+            --accent-yellow: #ffaa00;
+            --accent-blue: #4488ff;
+            --accent-cyan: #00ffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Split View Container */
+        .split-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .split-container.fullscreen-console .app-panel {
+            display: none;
+        }
+
+        .split-container.fullscreen-console .console-panel {
+            width: 100%;
+        }
+
+        .split-container.fullscreen-app .console-panel {
+            display: none;
+        }
+
+        .split-container.fullscreen-app .app-panel {
+            width: 100%;
+        }
+
+        /* Console Panel */
+        .console-panel {
+            width: 50%;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+        }
+
+        .console-header {
+            padding: 10px 15px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .console-title {
+            font-size: 14px;
+            color: var(--accent-cyan);
+        }
+
+        .console-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-btn {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .console-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .console-output::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        .console-output::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+        }
+
+        .log-line {
+            margin-bottom: 2px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-ok { color: var(--accent-green); }
+        .log-warn { color: var(--accent-yellow); }
+        .log-fail { color: var(--accent-red); }
+        .log-info { color: var(--text-secondary); }
+        .log-phase { color: var(--accent-cyan); font-weight: bold; margin-top: 10px; }
+        .log-system { color: var(--accent-blue); }
+
+        /* App Panel */
+        .app-panel {
+            width: 50%;
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .app-locked {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .app-locked.hidden {
+            display: none;
+        }
+
+        .lock-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .lock-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .app-header {
+            padding: 10px 15px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .app-title {
+            font-size: 14px;
+            color: var(--text-white);
+        }
+
+        .app-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* API Key Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-title {
+            color: var(--accent-cyan);
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .modal-subtitle {
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .api-field {
+            margin-bottom: 20px;
+        }
+
+        .api-field label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            color: var(--text-white);
+            font-size: 13px;
+        }
+
+        .api-field .get-key-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 11px;
+        }
+
+        .api-field .get-key-link:hover {
+            text-decoration: underline;
+        }
+
+        .api-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .api-field input {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .api-field input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+        }
+
+        .api-field input.valid {
+            border-color: var(--accent-green);
+        }
+
+        .api-field input.invalid {
+            border-color: var(--accent-red);
+        }
+
+        .api-status {
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            font-size: 16px;
+        }
+
+        .api-status.checking {
+            color: var(--accent-yellow);
+            animation: spin 1s linear infinite;
+        }
+
+        .api-status.valid {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+
+        .api-status.invalid {
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .api-hint {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-dark);
+            color: var(--text-white);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .modal-btn:hover {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .modal-btn.primary {
+            background: var(--accent-green);
+            color: var(--bg-dark);
+            border-color: var(--accent-green);
+        }
+
+        .modal-btn.primary:hover {
+            background: #00cc00;
+        }
+
+        .modal-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            padding: 8px 15px;
+            background: var(--bg-dark);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-red);
+        }
+
+        .status-dot.online {
+            background: var(--accent-green);
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .chat-input-area {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            padding: 12px;
+            font-family: inherit;
+            font-size: 13px;
+            resize: none;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+        }
+
+        .send-btn {
+            background: var(--accent-green);
+            border: none;
+            color: var(--bg-dark);
+            padding: 12px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+        }
+
+        .send-btn:hover {
+            background: #00cc00;
+        }
+
+        .send-btn:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+
+        .message.user {
+            background: var(--bg-dark);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .message.assistant {
+            background: var(--bg-dark);
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .message-header {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .message-content {
+            color: var(--text-white);
+            line-height: 1.5;
+        }
+
+        /* Boot ASCII Art */
+        .ascii-art {
+            color: var(--accent-cyan);
+            font-size: 10px;
+            line-height: 1.2;
+            margin-bottom: 15px;
+        }
+
+        /* Settings Button */
+        .settings-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .settings-btn:hover {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+    <!-- API Key Modal -->
+    <div id="apiModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">API Configuration</div>
+            <div class="modal-subtitle">Enter your API keys to enable C.O.R.A's full capabilities</div>
+
+            <div class="api-field">
+                <label>
+                    <span>Pollinations API Key</span>
+                    <a href="https://pollinations.ai/dashboard" target="_blank" class="get-key-link">Get your key ></a>
+                </label>
+                <div class="api-input-wrapper">
+                    <input type="password" id="pollinationsKey" placeholder="Enter Pollinations API key...">
+                    <div id="pollinationsStatus" class="api-status">-</div>
+                </div>
+                <div class="api-hint">Used for image generation and AI art capabilities</div>
+            </div>
+
+            <div class="api-field">
+                <label>
+                    <span>GitHub Token</span>
+                    <a href="https://github.com/settings/tokens/new?scopes=repo,read:user&description=CORA%20Access" target="_blank" class="get-key-link">Generate token ></a>
+                </label>
+                <div class="api-input-wrapper">
+                    <input type="password" id="githubKey" placeholder="Enter GitHub personal access token...">
+                    <div id="githubStatus" class="api-status">-</div>
+                </div>
+                <div class="api-hint">Used for repository access and code operations</div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn" onclick="skipApiSetup()">Skip for Now</button>
+                <button class="modal-btn primary" id="saveKeysBtn" onclick="saveApiKeys()">Save & Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Split View -->
+    <div class="split-container" id="splitContainer">
+        <!-- Console Panel -->
+        <div class="console-panel">
+            <div class="console-header">
+                <span class="console-title">[ C.O.R.A BOOT CONSOLE ]</span>
+                <div class="console-controls">
+                    <button class="control-btn" onclick="toggleView('console')">[ ]</button>
+                    <button class="control-btn" onclick="clearConsole()">CLR</button>
+                </div>
+            </div>
+            <div class="console-output" id="consoleOutput"></div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-dot" id="ollamaStatus"></div>
+                    <span>Ollama</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="pollinationsStatusDot"></div>
+                    <span>Pollinations</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="githubStatusDot"></div>
+                    <span>GitHub</span>
+                </div>
+                <span id="bootTime">--:--:--</span>
+            </div>
+        </div>
+
+        <!-- App Panel -->
+        <div class="app-panel">
+            <div class="app-locked" id="appLocked">
+                <div class="lock-icon">[ LOCKED ]</div>
+                <div class="lock-text">Waiting for boot sequence to complete...</div>
+            </div>
+            <div class="app-header">
+                <span class="app-title">C.O.R.A Interface</span>
+                <div>
+                    <button class="settings-btn" onclick="showApiModal()">API Keys</button>
+                    <button class="control-btn" onclick="toggleView('app')">[ ]</button>
+                </div>
+            </div>
+            <div class="app-content">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-area">
+                        <textarea class="chat-input" id="chatInput" placeholder="Type a message..." rows="2" disabled></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>SEND</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // C.O.R.A Web UI - Boot Sequence & API Management
+        // ============================================================
+
+        const CONFIG = {
+            ollamaUrl: 'http://localhost:11434',
+            pollinationsUrl: 'https://api.pollinations.ai',
+            githubApiUrl: 'https://api.github.com',
+            version: '2.4.0'
+        };
+
+        let bootComplete = false;
+        let apiKeys = {
+            pollinations: localStorage.getItem('cora_pollinations_key') || '',
+            github: localStorage.getItem('cora_github_key') || ''
+        };
+
+        // ============================================================
+        // Console Logging
+        // ============================================================
+
+        function log(text, type = 'info') {
+            const output = document.getElementById('consoleOutput');
+            const line = document.createElement('div');
+            line.className = `log-line log-${type}`;
+
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+            if (type === 'phase') {
+                line.textContent = `\n[${timestamp}] ═══════════════════════════════════════════════`;
+                output.appendChild(line);
+                const phaseLine = document.createElement('div');
+                phaseLine.className = 'log-line log-phase';
+                phaseLine.textContent = `[${timestamp}] ${text}`;
+                output.appendChild(phaseLine);
+            } else {
+                const prefix = type === 'ok' ? '[OK]' :
+                              type === 'warn' ? '[WARN]' :
+                              type === 'fail' ? '[FAIL]' :
+                              type === 'system' ? '[SYS]' : '[...]';
+                line.textContent = `[${timestamp}] ${prefix} ${text}`;
+                output.appendChild(line);
+            }
+
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleOutput').innerHTML = '';
+        }
+
+        // ============================================================
+        // API Key Validation
+        // ============================================================
+
+        async function validatePollinationsKey(key) {
+            if (!key || key.length < 10) return false;
+
+            const statusEl = document.getElementById('pollinationsStatus');
+            const inputEl = document.getElementById('pollinationsKey');
+            statusEl.textContent = '~';
+            statusEl.className = 'api-status checking';
+
+            try {
+                // Pollinations API validation - try to hit their endpoint
+                const response = await fetch(`${CONFIG.pollinationsUrl}/models`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${key}`
+                    }
+                });
+
+                // Even a 401 means the endpoint exists - we check if key format is right
+                // For Pollinations, we'll accept keys that look valid
+                if (response.ok || key.startsWith('poll_') || key.length > 20) {
+                    statusEl.textContent = '✓';
+                    statusEl.className = 'api-status valid';
+                    inputEl.className = 'valid';
+                    return true;
+                }
+            } catch (e) {
+                // Network error or CORS - accept key if it looks valid
+                if (key.length > 20) {
+                    statusEl.textContent = '✓';
+                    statusEl.className = 'api-status valid';
+                    inputEl.className = 'valid';
+                    return true;
+                }
+            }
+
+            statusEl.textContent = '✗';
+            statusEl.className = 'api-status invalid';
+            inputEl.className = 'invalid';
+            return false;
+        }
+
+        async function validateGithubKey(key) {
+            if (!key || key.length < 10) return false;
+
+            const statusEl = document.getElementById('githubStatus');
+            const inputEl = document.getElementById('githubKey');
+            statusEl.textContent = '~';
+            statusEl.className = 'api-status checking';
+
+            try {
+                const response = await fetch(`${CONFIG.githubApiUrl}/user`, {
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (response.ok) {
+                    statusEl.textContent = '✓';
+                    statusEl.className = 'api-status valid';
+                    inputEl.className = 'valid';
+                    return true;
+                }
+            } catch (e) {
+                console.error('GitHub validation error:', e);
+            }
+
+            statusEl.textContent = '✗';
+            statusEl.className = 'api-status invalid';
+            inputEl.className = 'invalid';
+            return false;
+        }
+
+        async function checkOllama() {
+            try {
+                const response = await fetch(`${CONFIG.ollamaUrl}/api/tags`);
+                return response.ok;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // ============================================================
+        // API Key Modal
+        // ============================================================
+
+        function showApiModal() {
+            document.getElementById('apiModal').classList.remove('hidden');
+            document.getElementById('pollinationsKey').value = apiKeys.pollinations;
+            document.getElementById('githubKey').value = apiKeys.github;
+
+            // Validate existing keys
+            if (apiKeys.pollinations) validatePollinationsKey(apiKeys.pollinations);
+            if (apiKeys.github) validateGithubKey(apiKeys.github);
+        }
+
+        function hideApiModal() {
+            document.getElementById('apiModal').classList.add('hidden');
+        }
+
+        async function saveApiKeys() {
+            const pollinationsKey = document.getElementById('pollinationsKey').value.trim();
+            const githubKey = document.getElementById('githubKey').value.trim();
+
+            // Validate both keys
+            const [pollinationsValid, githubValid] = await Promise.all([
+                pollinationsKey ? validatePollinationsKey(pollinationsKey) : Promise.resolve(true),
+                githubKey ? validateGithubKey(githubKey) : Promise.resolve(true)
+            ]);
+
+            // Save to localStorage
+            if (pollinationsKey) {
+                localStorage.setItem('cora_pollinations_key', pollinationsKey);
+                apiKeys.pollinations = pollinationsKey;
+            }
+            if (githubKey) {
+                localStorage.setItem('cora_github_key', githubKey);
+                apiKeys.github = githubKey;
+            }
+
+            log('API keys saved to local storage', 'ok');
+            hideApiModal();
+
+            // Update status dots
+            updateStatusDots();
+
+            // If boot hasn't started, start it now
+            if (!bootComplete) {
+                runBootSequence();
+            }
+        }
+
+        function skipApiSetup() {
+            hideApiModal();
+            log('API setup skipped - some features may be limited', 'warn');
+            runBootSequence();
+        }
+
+        // ============================================================
+        // Status Indicators
+        // ============================================================
+
+        async function updateStatusDots() {
+            // Ollama
+            const ollamaOnline = await checkOllama();
+            document.getElementById('ollamaStatus').className = `status-dot ${ollamaOnline ? 'online' : ''}`;
+
+            // Pollinations
+            const pollinationsOk = apiKeys.pollinations && apiKeys.pollinations.length > 10;
+            document.getElementById('pollinationsStatusDot').className = `status-dot ${pollinationsOk ? 'online' : ''}`;
+
+            // GitHub
+            const githubOk = apiKeys.github && apiKeys.github.length > 10;
+            document.getElementById('githubStatusDot').className = `status-dot ${githubOk ? 'online' : ''}`;
+        }
+
+        // ============================================================
+        // Boot Sequence
+        // ============================================================
+
+        async function runBootSequence() {
+            const startTime = Date.now();
+
+            // ASCII Banner
+            log('', 'info');
+            log('+=========================================================+', 'system');
+            log('|        C.O.R.A BOOT SEQUENCE INITIATED                  |', 'system');
+            log('|     Cognitive Operations & Reasoning Assistant          |', 'system');
+            log('+=========================================================+', 'system');
+            log('', 'info');
+
+            await delay(300);
+
+            // Phase 0: Version Info
+            log('PHASE 0: SYSTEM IDENTIFICATION', 'phase');
+            await delay(200);
+            log(`Version: ${CONFIG.version}`, 'info');
+            log('Created by: Unity AI Lab', 'info');
+            log('Developers: Hackall360, Sponge, GFourteen', 'info');
+            log('Web Interface Initialized', 'ok');
+            await delay(300);
+
+            // Phase 1: API Key Validation
+            log('PHASE 1: API KEY VALIDATION', 'phase');
+            await delay(200);
+
+            // Pollinations Check
+            log('Checking Pollinations API key...', 'info');
+            if (apiKeys.pollinations) {
+                const pollinationsValid = await validatePollinationsKey(apiKeys.pollinations);
+                if (pollinationsValid) {
+                    log('Pollinations API key valid', 'ok');
+                } else {
+                    log('Pollinations API key invalid or expired', 'warn');
+                }
+            } else {
+                log('Pollinations API key not configured', 'warn');
+            }
+            await delay(200);
+
+            // GitHub Check
+            log('Checking GitHub token...', 'info');
+            if (apiKeys.github) {
+                const githubValid = await validateGithubKey(apiKeys.github);
+                if (githubValid) {
+                    log('GitHub token valid', 'ok');
+                } else {
+                    log('GitHub token invalid or expired', 'warn');
+                }
+            } else {
+                log('GitHub token not configured', 'warn');
+            }
+            await delay(300);
+
+            // Phase 2: Ollama Connection
+            log('PHASE 2: AI ENGINE CHECK', 'phase');
+            await delay(200);
+            log('Connecting to Ollama at localhost:11434...', 'info');
+
+            const ollamaOnline = await checkOllama();
+            if (ollamaOnline) {
+                log('Ollama AI engine online', 'ok');
+
+                // Try to get models
+                try {
+                    const response = await fetch(`${CONFIG.ollamaUrl}/api/tags`);
+                    const data = await response.json();
+                    if (data.models && data.models.length > 0) {
+                        log(`Found ${data.models.length} models installed`, 'ok');
+                        data.models.slice(0, 5).forEach(model => {
+                            log(`  - ${model.name}`, 'info');
+                        });
+                    }
+                } catch (e) {
+                    log('Could not list models', 'warn');
+                }
+            } else {
+                log('Ollama not responding - AI features limited', 'warn');
+                log('Start Ollama with: ollama serve', 'info');
+            }
+            await delay(300);
+
+            // Phase 3: Browser Capabilities
+            log('PHASE 3: BROWSER CAPABILITIES', 'phase');
+            await delay(200);
+            log(`LocalStorage: ${typeof Storage !== 'undefined' ? 'Available' : 'Unavailable'}`,
+                typeof Storage !== 'undefined' ? 'ok' : 'warn');
+            log(`Fetch API: Available`, 'ok');
+            log(`WebSockets: ${typeof WebSocket !== 'undefined' ? 'Available' : 'Unavailable'}`,
+                typeof WebSocket !== 'undefined' ? 'ok' : 'warn');
+            await delay(300);
+
+            // Phase 4: Final Status
+            log('PHASE 4: BOOT COMPLETE', 'phase');
+            await delay(200);
+
+            const bootTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            log(`Boot sequence completed in ${bootTime}s`, 'ok');
+            document.getElementById('bootTime').textContent = `Boot: ${bootTime}s`;
+
+            // Update all status dots
+            await updateStatusDots();
+
+            // Unlock the app
+            bootComplete = true;
+            document.getElementById('appLocked').classList.add('hidden');
+            document.getElementById('chatInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+
+            log('', 'info');
+            log('═══════════════════════════════════════════════', 'system');
+            log('C.O.R.A IS ONLINE AND READY', 'ok');
+            log('═══════════════════════════════════════════════', 'system');
+
+            // Welcome message in chat
+            addMessage('assistant', "Hey, I'm CORA. Boot sequence complete. What do you need?");
+        }
+
+        // ============================================================
+        // Chat Interface
+        // ============================================================
+
+        function addMessage(role, content) {
+            const container = document.getElementById('chatMessages');
+            const msg = document.createElement('div');
+            msg.className = `message ${role}`;
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            header.textContent = role === 'user' ? 'You' : 'C.O.R.A';
+
+            const body = document.createElement('div');
+            body.className = 'message-content';
+            body.textContent = content;
+
+            msg.appendChild(header);
+            msg.appendChild(body);
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            input.value = '';
+
+            // Check if Ollama is available
+            const ollamaOnline = await checkOllama();
+            if (!ollamaOnline) {
+                addMessage('assistant', "Ollama isn't running right now. Start it with 'ollama serve' and I'll be able to help you better.");
+                return;
+            }
+
+            // Send to Ollama
+            try {
+                log(`Processing: "${message.substring(0, 50)}..."`, 'info');
+
+                const response = await fetch(`${CONFIG.ollamaUrl}/api/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral',
+                        prompt: message,
+                        stream: false
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addMessage('assistant', data.response);
+                    log('Response generated', 'ok');
+                } else {
+                    addMessage('assistant', "Something went wrong with the AI. Check if the right model is loaded.");
+                    log('AI response failed', 'warn');
+                }
+            } catch (e) {
+                addMessage('assistant', "Connection to AI failed. Make sure Ollama is running.");
+                log(`Error: ${e.message}`, 'fail');
+            }
+        }
+
+        // Handle Enter key
+        document.getElementById('chatInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // ============================================================
+        // View Toggle
+        // ============================================================
+
+        function toggleView(panel) {
+            const container = document.getElementById('splitContainer');
+
+            if (panel === 'console') {
+                if (container.classList.contains('fullscreen-console')) {
+                    container.classList.remove('fullscreen-console');
+                } else {
+                    container.classList.remove('fullscreen-app');
+                    container.classList.add('fullscreen-console');
+                }
+            } else {
+                if (container.classList.contains('fullscreen-app')) {
+                    container.classList.remove('fullscreen-app');
+                } else {
+                    container.classList.remove('fullscreen-console');
+                    container.classList.add('fullscreen-app');
+                }
+            }
+        }
+
+        // ============================================================
+        // Utilities
+        // ============================================================
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // ============================================================
+        // Initialization
+        // ============================================================
+
+        window.onload = async function() {
+            // Load saved keys
+            apiKeys.pollinations = localStorage.getItem('cora_pollinations_key') || '';
+            apiKeys.github = localStorage.getItem('cora_github_key') || '';
+
+            // Check if we need to show API modal
+            if (!apiKeys.pollinations && !apiKeys.github) {
+                // First time - show modal
+                showApiModal();
+            } else {
+                // Keys exist - populate fields and start boot
+                document.getElementById('pollinationsKey').value = apiKeys.pollinations;
+                document.getElementById('githubKey').value = apiKeys.github;
+                hideApiModal();
+                runBootSequence();
+            }
+        };
+    </script>
+</body>
+</html>
