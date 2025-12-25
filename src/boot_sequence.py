@@ -206,19 +206,17 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         system_prompt = get_system_prompt()
 
         # Build appropriate prompt based on context type
-        # IMPORTANT: Remind CORA to cuss and be herself in EVERY prompt
-        cuss_reminder = "Remember: you're a goth bitch who cusses. Say fuck, shit, damn, hell, ass, etc. Be sarcastic and edgy. Keep it short."
-
+        # Just give CORA the data - let the system prompt handle her personality
         if "headline" in context.lower() or "news" in context.lower():
-            prompt = f"{cuss_reminder} Announce these news headlines: {result}"
+            prompt = f"Announce these news headlines: {result}"
         elif "weather" in context.lower() or "forecast" in context.lower():
-            prompt = f"{cuss_reminder} Announce this weather: {result}"
+            prompt = f"Announce this weather: {result}"
         elif "location" in context.lower():
-            prompt = f"{cuss_reminder} Announce this location: {result}"
+            prompt = f"Announce this location: {result}"
         elif "abilities" in context.lower():
-            prompt = f"{cuss_reminder} Tell the user what the fuck you can do for them. Be brief but cover these abilities: {result}"
+            prompt = f"Tell the user what you can do for them: {result}"
         else:
-            prompt = f"{cuss_reminder} Announce this: {context} - {result}"
+            prompt = f"Announce this: {context} - {result}"
 
         response = generate(
             prompt=prompt,
@@ -1619,15 +1617,13 @@ Just tell me what you need.
 """
 
     display_log("─── CORA's Abilities ───", "info")
-    # Have CORA announce this in her own goth style - use generate directly for longer response
+    # Have CORA announce abilities - just give her the data, system prompt handles personality
     try:
         from ai.ollama import generate
 
-        abilities_prompt = f"""Alright bitch, boot is done. Now tell the user what the fuck you can do.
-Be yourself - cuss, be sarcastic, be a goth bitch about it. Say fuck, shit, damn, whatever.
-Keep it to 2-3 sentences max but hit the main points.
+        abilities_prompt = f"""Boot is done. Tell the user what you can do for them.
 Your abilities: voice chat, vision/screenshots/camera, image generation, reminders/calendar/tasks,
-web search, file management, code help, email. What do they want to do?"""
+web search, file management, code help, email. Ask what they want to do."""
 
         abilities_result = generate(
             prompt=abilities_prompt,
@@ -1647,10 +1643,10 @@ web search, file management, code help, email. What do they want to do?"""
             speak(abilities_response)
         else:
             # Fallback
-            speak("So what the fuck do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
+            speak("So what do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
     except Exception as e:
         print(f"  [WARN] Abilities announcement failed: {e}")
-        speak("So what the fuck do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
+        speak("So what do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
 
     # Also print the abilities to the console
     for line in abilities_list.strip().split('\n'):
