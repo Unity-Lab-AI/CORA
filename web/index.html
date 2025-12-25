@@ -1424,13 +1424,30 @@ WHEN RESPONDING:
                     }
                 };
 
-                // ONLY log and show text AFTER audio actually starts
-                source.onended = () => {
+                // Track if we've resolved to prevent double-resolve
+                let resolved = false;
+                const doResolve = () => {
+                    if (resolved) return;
+                    resolved = true;
                     cancelAnimationFrame(animFrame);
                     stopWaveform();
-                    console.log('[TTS] Audio finished playing');
                     resolve();
                 };
+
+                // ONLY resolve when audio actually finishes
+                source.onended = () => {
+                    console.log('[TTS] Audio finished (onended)');
+                    doResolve();
+                };
+
+                // Fallback: if onended doesn't fire, wait for audio duration + buffer
+                const fallbackMs = (duration * 1000) + 500;
+                setTimeout(() => {
+                    if (!resolved) {
+                        console.log('[TTS] Audio fallback timeout (onended never fired)');
+                        doResolve();
+                    }
+                }, fallbackMs);
 
                 // Start audio FIRST, then show text
                 startWaveform();
@@ -1442,7 +1459,7 @@ WHEN RESPONDING:
                     document.getElementById('speechText').textContent = `"${text}"`;
                     log(`CORA: "${text}"`, 'cora');
                 }
-                console.log('[TTS] Audio started playing');
+                console.log(`[TTS] Audio started, will wait ${duration.toFixed(1)}s`);
 
             } catch (e) {
                 console.error('[TTS] Audio playback error:', e);
