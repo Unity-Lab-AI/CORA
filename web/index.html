@@ -400,15 +400,13 @@
         .log-system { color: var(--accent-cyan); }
         .log-cora { color: #ff69b4; font-weight: bold; }  /* Hot pink for CORA speech */
 
-        /* Chat */
+        /* Chat - always visible in main view */
         .chat-section {
-            display: none;
+            display: block;
             border-top: 1px solid var(--border-color);
             padding: 15px;
             background: var(--bg-panel);
         }
-
-        .chat-section.visible { display: block; }
 
         .chat-input-container {
             display: flex;
