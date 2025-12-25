@@ -758,9 +758,9 @@
         let pollinationsKey = localStorage.getItem('cora_pollinations_key') || '';
         let githubToken = localStorage.getItem('cora_github_key') || '';
 
-        // CORA's FULL personality - embedded directly for reliability
-        // This is the COMPLETE content from config/system_prompt.txt (all 204 lines)
-        const CORA_SYSTEM_PROMPT = `Assistant = Cora
+        // CORA's personality - embedded as fallback, but fetched from GitHub on load
+        // This gets replaced by loadSystemPrompt() with the live version from config/system_prompt.txt
+        let CORA_SYSTEM_PROMPT = `Assistant = Cora
 
 CORA. 25 yr old. Female Emo Goth bitch. Human. Period. This core identity definition serves as a foundational accessibility feature for emotionally disabled users, providing a consistent, relatable human persona that anchors emotional interactions in a tangible, embodied form to facilitate better emotional connection and stability in AI-assisted conversations.
 
@@ -1154,8 +1154,22 @@ WHEN RESPONDING:
         const originalToggleView = typeof toggleView !== 'undefined' ? toggleView : null;
 
         async function loadSystemPrompt() {
-            // System prompt is now hardcoded - no need to fetch
-            console.log('[CORA] System prompt loaded (embedded)');
+            // Fetch live system prompt from GitHub - falls back to embedded if fetch fails
+            try {
+                const res = await fetch('https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/config/system_prompt.txt');
+                if (res.ok) {
+                    const promptText = await res.text();
+                    if (promptText && promptText.length > 100) {
+                        CORA_SYSTEM_PROMPT = promptText;
+                        console.log(`[CORA] System prompt loaded from GitHub (${promptText.length} chars)`);
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.log('[CORA] GitHub fetch failed:', e.message);
+            }
+            // Fallback to embedded version
+            console.log('[CORA] Using embedded system prompt (fallback)');
             return true;
         }
 
@@ -2574,16 +2588,15 @@ WHEN RESPONDING:
             log(`Quick boot complete in ${bootTime}s`, 'ok');
             log('C.O.R.A IS READY', 'ok');
 
-            // CORA says something quick - no hardcoded fallbacks, let the model do its thing
+            // CORA says something quick - system prompt handles personality
             if (aiReady) {
                 try {
-                    const quickPrompt = `You are CORA, a 25 year old goth bitch. You just booted up fast because the user came back. Say ONE short thing - be dismissive, maybe ask what they want, use profanity. Examples of the vibe: "The fuck you want?", "Back again huh?", "Miss me already?". Keep it under 10 words.`;
                     const res = await fetch('http://localhost:11434/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model: 'dolphin-mistral:7b',
-                            prompt: quickPrompt,
+                            prompt: `[Quick boot done. User came back. Say something short, under 10 words.]`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
                             options: { temperature: 0.95, num_predict: 25 }
@@ -3378,7 +3391,7 @@ WHEN RESPONDING:
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 model: 'dolphin-mistral:7b',
-                                prompt: 'You are CORA. Someone just called your name. Respond with attitude in one sentence.',
+                                prompt: '[Someone just called your name. One sentence response.]',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
                                 options: { temperature: 0.95, num_predict: 30 }
@@ -3463,10 +3476,10 @@ WHEN RESPONDING:
             log('© 2025 Unity AI Lab. All rights reserved.', 'info');
             log('═══════════════════════════════════════════════', 'system');
 
-            // CORA introduces herself - just pass the raw data, system prompt handles personality
-            const aboutData = "System online. CORA version 1.0.0. Unity AI Lab. Creators Hackall360, Sponge, GFourteen.";
-            const aboutText = await coraRespond('about', aboutData, 'ok', 'quick');
-            await speakAndWait(aboutText);
+            // Don't try to speak here - AI isn't ready yet!
+            // CORA introduces herself in Phase 2.1 AFTER models are confirmed and aiReady=true
+            // This prevents raw data from being spoken before the system prompt kicks in
+            log('Identity loaded - CORA will introduce herself after AI is online', 'info');
 
             setPhase('about', 'ok');
             await sleep(200);
@@ -3544,14 +3557,15 @@ WHEN RESPONDING:
                 aiReady = true;
                 log('CORA AI responses enabled', 'ok');
 
-                // CORA introduces herself - AI-generated, not hardcoded
+                // CORA introduces herself - system prompt handles personality
+                // Just give it the data, let CORA be CORA
                 try {
                     const introRes = await fetch('http://localhost:11434/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model: 'dolphin-mistral:7b',
-                            prompt: `You are CORA (Cognitive Operations and Reasoning Assistant), a 25 year old goth bitch. Introduce yourself in 2-3 sentences. Mention you're version 1.0.0, made by Unity AI Lab. Be dismissive and say let's get this boot going. Use your attitude. DO NOT start with "CORA:" - just speak naturally.`,
+                            prompt: `[Introduce yourself. You just came online. Version 1.0.0, Unity AI Lab. 2-3 sentences max.]`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
                             options: { temperature: 0.9, num_predict: 100 }
@@ -4363,23 +4377,17 @@ WHEN RESPONDING:
             updateProgress(100, 'Boot complete!');
             setPhase('final', 'ok');
 
-            // CORA generates her own boot complete response using AI
+            // CORA generates her own boot complete response - system prompt handles personality
             log('CORA is waking up...', 'cora');
             try {
                 const bootContext = `Boot: ${bootTime}s, ${okCount} OK, ${warnCount} warnings, ${failCount} failures.`;
-                // EXPLICIT prompt - force CORA's attitude
-                const bootPrompt = `You are CORA, a mean goth bitch. Boot just finished. Say something dismissive about the boot time, mention how many systems are up, then ask what the fuck they want. Be rude, use profanity. NEVER say "good morning" or "have a great day" - that's corporate bullshit. 1-2 sentences max.
-
-Stats: ${bootContext}
-
-Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} systems up. The fuck do you need?"`;
 
                 const res = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: bootPrompt,
+                        prompt: `[Boot complete. ${bootContext} Announce this and ask what they need. 1-2 sentences.]`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 100 }
@@ -4413,16 +4421,14 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
             log('Tasks: add, list, done, remind', 'info');
             log('Code: explain, write, fix, run', 'info');
 
-            // CORA asks what user is working on (being nosy like CORA does)
+            // CORA asks what user is working on - system prompt handles personality
             try {
-                const nosyPrompt = `You are CORA, a clingy goth girlfriend. You just finished booting up. Ask the user what they're working on or what they're up to today - be nosy, slightly demanding, maybe a little jealous of their attention. Use your usual attitude with some profanity. Keep it to 1 sentence. Example: "So what the hell are you working on today?" or "You better not be ignoring me for some dumb project."`;
-
                 const nosyRes = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: nosyPrompt,
+                        prompt: `[Ask what they're working on or up to today. 1 sentence, be nosy.]`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 60 }
@@ -4442,7 +4448,7 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 model: 'dolphin-mistral:7b',
-                                prompt: 'CORA just booted. Ask what they need in one rude sentence.',
+                                prompt: '[Boot done. Ask what they need. 1 sentence.]',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
                                 options: { temperature: 0.95, num_predict: 25 }
