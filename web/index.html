@@ -1534,6 +1534,49 @@ python services/stats_server.py</pre>
             return { success: false };
         }
 
+        async function get3DayForecast(location = '') {
+            // Uses wttr.in JSON format for 3-day forecast (same as desktop app)
+            try {
+                const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+                const res = await fetch(url, {
+                    headers: { 'User-Agent': 'CORA/2.0' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const weather = data.weather || [];
+                    const forecast = [];
+                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+                    for (let i = 0; i < Math.min(3, weather.length); i++) {
+                        const day = weather[i];
+                        const dateStr = day.date || '';
+                        let dayName = i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : '');
+                        if (!dayName && dateStr) {
+                            try {
+                                const d = new Date(dateStr);
+                                dayName = dayNames[d.getDay()];
+                            } catch { dayName = `Day ${i + 1}`; }
+                        }
+                        // Get midday conditions
+                        const hourly = day.hourly || [];
+                        const midIdx = Math.min(4, hourly.length - 1);
+                        const conditions = hourly[midIdx]?.weatherDesc?.[0]?.value || 'N/A';
+
+                        forecast.push({
+                            day: dayName,
+                            high: day.maxtempF + '°F',
+                            low: day.mintempF + '°F',
+                            conditions: conditions
+                        });
+                    }
+                    return { forecast, success: true };
+                }
+            } catch (e) {
+                log(`Forecast error: ${e.message}`, 'warn');
+            }
+            return { forecast: [], success: false };
+        }
+
         async function getNews() {
             try {
                 const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=en-US');
@@ -1978,59 +2021,76 @@ python services/stats_server.py</pre>
             setPhase('external', 'ok');
 
             // ================================================================
-            // PHASE 6.1: AUDIO TEST - Actually play a test tone!
+            // PHASE 6.1: AUDIO TEST - Random music like desktop version!
             // ================================================================
             setPhase('audio', 'running');
             log('PHASE 6.1: AUDIO PLAYBACK TEST', 'phase');
             updateProgress(68, 'Testing audio...');
 
-            // Actually play a test tone using Web Audio API
+            // Random audio tests - same genres as desktop app
+            const audioTests = [
+                { query: 'lofi hip hop beats', name: 'Lofi Hip Hop', id: 'jfKfPfyJRdk' },
+                { query: 'synthwave music', name: 'Synthwave', id: '4xDzrJKXOOY' },
+                { query: 'ambient space music', name: 'Ambient Space', id: 'tNkZsRW7h2c' },
+                { query: 'jazz piano relaxing', name: 'Jazz Piano', id: 'Dx5qFachd3A' },
+                { query: 'classical piano beautiful', name: 'Classical Piano', id: 'VHd7s4A0Jqg' },
+                { query: 'cyberpunk music mix', name: 'Cyberpunk Mix', id: 'BklVB6rEJE4' },
+            ];
+            const audioTest = audioTests[Math.floor(Math.random() * audioTests.length)];
+            log(`Testing audio playback: ${audioTest.name}`, 'info');
+            log(`Searching YouTube for: ${audioTest.query}`, 'info');
+
+            // Play in a small modal for ~10 seconds
             try {
-                log('Creating audio context...', 'info');
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
+                const audioModal = showVideoModal(audioTest.id, `Audio Test: ${audioTest.name}`);
+                log(`Playing: ${audioTest.name}`, 'ok');
+                log('Audio stream playing in modal', 'ok');
 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-
-                // Fade out
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
-
-                oscillator.start();
-                log('Playing 440Hz test tone...', 'ok');
-
-                // Stop after 2 seconds
+                // Close after 10 seconds
                 setTimeout(() => {
-                    oscillator.stop();
-                    audioCtx.close();
-                }, 2000);
-
-                log('Audio test tone playing!', 'ok');
+                    if (audioModal) audioModal.close();
+                }, 10000);
             } catch (e) {
                 log(`Audio test failed: ${e.message}`, 'warn');
             }
 
-            // Get weather using wttr.in (free, no API key needed)
-            log('Fetching weather from wttr.in...', 'info');
+            // Get weather AND 3-day forecast using wttr.in (free, no API key needed)
+            log('Fetching weather and 3-day forecast from wttr.in...', 'info');
             const weather = await getWeather(location?.city || '');
+            const forecastData = await get3DayForecast(location?.city || '');
+
             if (weather.success) {
-                log(`Weather: ${weather.temp}, ${weather.conditions}`, 'ok');
+                log(`Current: ${weather.temp}, ${weather.conditions}`, 'ok');
                 log(`Feels like: ${weather.feels_like}`, 'info');
                 log(`Humidity: ${weather.humidity}`, 'info');
                 document.getElementById('statWeather').textContent = weather.temp;
                 document.getElementById('statWeather').className = 'stat-value';
+
+                // Show 3-day forecast
+                if (forecastData.success && forecastData.forecast.length > 0) {
+                    log('3-Day Forecast:', 'ok');
+                    forecastData.forecast.forEach(day => {
+                        log(`  ${day.day}: ${day.high}/${day.low} - ${day.conditions}`, 'info');
+                    });
+                }
+
                 setPhase('audio', 'ok');
-                await speakAndWait(`Audio working. That beep was a 440 hertz test tone. Weather is ${weather.temp} and ${weather.conditions.toLowerCase()}.`);
+
+                // Build speech with forecast - say "degrees Fahrenheit" for TTS clarity
+                const tempSpoken = weather.temp.replace('°F', ' degrees Fahrenheit').replace('+', '');
+                let weatherSpeech = `Audio working. Now playing ${audioTest.name}. Current weather is ${tempSpoken} and ${weather.conditions.toLowerCase()}.`;
+                if (forecastData.success && forecastData.forecast.length >= 2) {
+                    const tomorrow = forecastData.forecast[1];
+                    const highSpoken = tomorrow.high.replace('°F', '');
+                    const lowSpoken = tomorrow.low.replace('°F', '');
+                    weatherSpeech += ` Tomorrow: high of ${highSpoken}, low of ${lowSpoken} degrees Fahrenheit, ${tomorrow.conditions.toLowerCase()}.`;
+                }
+                await speakAndWait(weatherSpeech);
             } else {
                 document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('audio', 'ok');
-                await speakAndWait("Audio test complete. Weather data unavailable.");
+                await speakAndWait(`Audio working. Now playing ${audioTest.name}. Weather data unavailable.`);
             }
 
             // ================================================================
