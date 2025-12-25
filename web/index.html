@@ -1195,14 +1195,13 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
+                // Give CORA the info, tell her to respond. System prompt handles personality.
                 if (mode === 'quick') {
-                    // Short status updates - system prompt already has personality
-                    prompt = `[Announce this in 1-2 sentences, include the key info]\n${result}`;
+                    prompt = `${result} Respond.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    // Full mode for weather, news, camera descriptions, etc.
-                    prompt = `[Announce this, include the key details]\n${result}`;
+                    prompt = `${result} Give your take.`;
                     temperature = 0.8;
                     maxTokens = 300;
                 }
@@ -2597,7 +2596,7 @@ WHEN RESPONDING:
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model: CORA_MODEL,
-                            prompt: `[Quick boot done. User came back. Say something short, under 10 words.]`,
+                            prompt: `Quick boot finished.`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
                             options: { temperature: 0.95, num_predict: 25 }
@@ -3259,22 +3258,23 @@ WHEN RESPONDING:
             // Build context
             const context = buildAmbientContextPrompt();
 
+            // Proactive prompts - direct context, no middleman bullshit
             let prompt = '';
             switch (trigger.reason) {
                 case InterjectReason.CHECK_IN:
-                    prompt = `[PROACTIVE - check in because user seems ${trigger.topic === 'silence' ? 'quiet for a while' : 'stressed'}]\n${context}\nBriefly check on them or offer help. Be caring but still yourself.`;
+                    prompt = `${context}\n\n${trigger.topic === 'silence' ? 'Been quiet for a while.' : 'Seems stressed.'}`;
                     break;
                 case InterjectReason.HELPFUL_INFO:
-                    prompt = `[PROACTIVE - user mentioned "${trigger.topic}"]\n${context}\nOffer a brief helpful comment or ask if they need help. Keep it short.`;
+                    prompt = `${context}\n\nHeard mention of "${trigger.topic}".`;
                     break;
                 case InterjectReason.COMMENT:
-                    prompt = `[PROACTIVE - overheard something about "${trigger.topic}"]\n${context}\nMake a brief casual comment about it. Be natural.`;
+                    prompt = `${context}\n\nOverheard: "${trigger.topic}".`;
                     break;
                 case InterjectReason.VIBE:
-                    prompt = `[PROACTIVE - random check in]\n${context}\nMake a very brief casual comment or observation. Keep it chill.`;
+                    prompt = `${context}`;
                     break;
                 default:
-                    prompt = `[PROACTIVE]\n${context}\nMake a brief relevant comment based on what you know.`;
+                    prompt = `${context}`;
             }
 
             try {
@@ -3371,7 +3371,7 @@ WHEN RESPONDING:
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: CORA_MODEL,
-                        prompt: `[WAKE WORD - User just said "Hey CORA"]\n\n${fullContext}\nRespond naturally based on what you know and see. If you see the user or overheard something relevant, reference it. Be contextual.`,
+                        prompt: `${fullContext}\n\nHey CORA.`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 150 }
@@ -3392,7 +3392,7 @@ WHEN RESPONDING:
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 model: CORA_MODEL,
-                                prompt: '[Someone just called your name. One sentence response.]',
+                                prompt: 'Someone just called your name.',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
                                 options: { temperature: 0.95, num_predict: 30 }
@@ -4403,7 +4403,7 @@ WHEN RESPONDING:
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: CORA_MODEL,
-                        prompt: `[Boot complete. ${bootContext} Announce this and ask what they need. 1-2 sentences.]`,
+                        prompt: `Boot sequence complete. ${bootContext}`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 100 }
@@ -4444,7 +4444,7 @@ WHEN RESPONDING:
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: CORA_MODEL,
-                        prompt: `[Ask what they're working on or up to today. 1 sentence, be nosy.]`,
+                        prompt: `Boot complete. Ready.`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 60 }
@@ -4464,7 +4464,7 @@ WHEN RESPONDING:
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 model: CORA_MODEL,
-                                prompt: '[Boot done. Ask what they need. 1 sentence.]',
+                                prompt: 'Boot done.',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
                                 options: { temperature: 0.95, num_predict: 25 }
