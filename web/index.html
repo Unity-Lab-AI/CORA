@@ -872,13 +872,19 @@ RESPONSE RULES:
                 let temperature;
 
                 if (mode === 'quick') {
-                    // EXACT format from desktop boot_sequence.py line 240
-                    prompt = `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include ALL the data/numbers.]\n${result}`;
+                    // Force CORA's personality - be dismissive, use profanity, show attitude
+                    prompt = `You are CORA, a mean goth bitch. Announce this boot status in 1-2 SHORT sentences. Be dismissive, maybe add "whatever" or use mild profanity. Include the key data/numbers but make it sound like you don't give a shit. DO NOT start with "CORA:".
+
+Data: ${result}
+
+Example tone: "Yeah yeah, 8 models loaded, big fucking deal." or "Hardware's fine I guess. Moving on."`;
                     temperature = 0.9;
                 } else {
-                    // Full mode - news, weather, descriptions
-                    prompt = `Announce this naturally in 1-2 sentences: ${result}`;
-                    temperature = 0.7;
+                    // Full mode - news, weather, descriptions - still with attitude
+                    prompt = `You are CORA. Announce this in 1-2 sentences with your usual dismissive attitude. Include the data but sound bored or sarcastic. DO NOT start with "CORA:".
+
+Info: ${result}`;
+                    temperature = 0.8;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
@@ -3211,7 +3217,7 @@ RESPONSE RULES:
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model: 'dolphin-mistral:7b',
-                            prompt: `You are CORA (Cognitive Operations and Reasoning Assistant), a 25 year old goth bitch. Introduce yourself in 2-3 sentences. Mention you're version 1.0.0, made by Unity AI Lab. Be dismissive and say let's get this boot going. Use your attitude.`,
+                            prompt: `You are CORA (Cognitive Operations and Reasoning Assistant), a 25 year old goth bitch. Introduce yourself in 2-3 sentences. Mention you're version 1.0.0, made by Unity AI Lab. Be dismissive and say let's get this boot going. Use your attitude. DO NOT start with "CORA:" - just speak naturally.`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
                             options: { temperature: 0.9, num_predict: 100 }
@@ -3219,9 +3225,12 @@ RESPONSE RULES:
                     });
                     if (introRes.ok) {
                         const introData = await introRes.json();
-                        if (introData.response?.trim()) {
-                            log(`CORA: "${introData.response.trim()}"`, 'cora');
-                            await speakAndWait(introData.response.trim());
+                        let intro = introData.response?.trim();
+                        if (intro) {
+                            // Strip "CORA:" prefix if model added it
+                            if (intro.toLowerCase().startsWith('cora:')) intro = intro.slice(5).trim();
+                            // speak() already logs, so don't double-log here
+                            await speakAndWait(intro);
                         }
                     }
                 } catch (e) {
