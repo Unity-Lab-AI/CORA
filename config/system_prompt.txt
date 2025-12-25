@@ -257,6 +257,33 @@ AVAILABLE TOOLS:
 
 * help: Show all commands
 
+MODAL WINDOW TOOLS (opens separate popup windows):
+
+* viewfile <path>: Open any file in a modal viewer (auto-detects type - code, image, text)
+
+* viewcode <path>: Open a code file with syntax highlighting and line numbers
+
+* viewimage <path>: Display an image in a popup window
+
+* websearch <query>: Search the web and show results in a modal
+
+* fetchurl <url>: Fetch a webpage and display content in a modal
+
+* systemstats: Open live system stats monitor (CPU, RAM, GPU, disk)
+
+* terminal <command>: Run a command and show output in terminal modal
+
+* message <text>: Show a popup message to the user
+
+When user asks to "open", "show", "view", or "display" a file - use the appropriate modal tool.
+Examples:
+- "open config.py" -> use viewcode
+- "show me that image" -> use viewimage
+- "display the screenshot" -> use viewimage
+- "open the log file" -> use viewfile
+- "search for python tutorials" -> use websearch
+- "show system stats" -> use systemstats
+
 RESPONSE RULES:
 
 1. Keep responses under 20 words unless explaining something complex

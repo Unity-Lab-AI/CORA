@@ -474,6 +474,259 @@ def cmd_see(args: str, context: Dict) -> CommandResult:
         )
 
 
+@register_command("viewfile", aliases=["openfile", "showfile", "open file", "show file", "view file"])
+def cmd_viewfile(args: str, context: Dict) -> CommandResult:
+    """Open a file in modal viewer."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What file should I open?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import viewfile
+
+        result = viewfile(args.strip())
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message=f"Opened {Path(args).name}",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Failed to open file'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Error opening file: {e}",
+            should_speak=True
+        )
+
+
+@register_command("viewcode", aliases=["opencode", "showcode", "open code", "show code", "view code"])
+def cmd_viewcode(args: str, context: Dict) -> CommandResult:
+    """Open a code file with syntax highlighting."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What code file should I open?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import viewcode
+
+        result = viewcode(args.strip())
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message=f"Opened {Path(args).name} in code viewer",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Failed to open code file'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Error opening code: {e}",
+            should_speak=True
+        )
+
+
+@register_command("viewimage", aliases=["openimage", "showimage", "open image", "show image", "display image"])
+def cmd_viewimage(args: str, context: Dict) -> CommandResult:
+    """Display an image in popup window."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What image should I show?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import viewimage
+
+        result = viewimage(args.strip())
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message=f"Showing {Path(args).name}",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Failed to show image'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Error showing image: {e}",
+            should_speak=True
+        )
+
+
+@register_command("websearch", aliases=["search", "web search", "google", "look up"])
+def cmd_websearch(args: str, context: Dict) -> CommandResult:
+    """Search the web and show results in modal."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What should I search for?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import websearch
+
+        result = websearch(args.strip())
+
+        if result.get('success'):
+            count = result.get('count', 0)
+            return CommandResult(
+                success=True,
+                message=f"Found {count} results for {args}",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Search failed'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Search error: {e}",
+            should_speak=True
+        )
+
+
+@register_command("fetchurl", aliases=["fetch", "get url", "open url", "browse"])
+def cmd_fetchurl(args: str, context: Dict) -> CommandResult:
+    """Fetch a webpage and display content."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What URL should I fetch?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import fetchurl
+
+        result = fetchurl(args.strip())
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message=f"Fetched {args}",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Failed to fetch URL'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Fetch error: {e}",
+            should_speak=True
+        )
+
+
+@register_command("systemstats", aliases=["stats", "system stats", "hardware", "show stats"])
+def cmd_systemstats(args: str, context: Dict) -> CommandResult:
+    """Open live system stats monitor."""
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import systemstats
+
+        result = systemstats()
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message="Opening system stats monitor",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Failed to open stats'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Stats error: {e}",
+            should_speak=True
+        )
+
+
+@register_command("terminal", aliases=["run", "execute", "shell", "cmd"])
+def cmd_terminal(args: str, context: Dict) -> CommandResult:
+    """Run a command and show output in terminal modal."""
+    if not args:
+        return CommandResult(
+            success=False,
+            message="What command should I run?",
+            should_speak=True
+        )
+
+    try:
+        sys.path.insert(0, str(PROJECT_DIR))
+        from tools.modal_tools import terminal
+
+        result = terminal(args.strip())
+
+        if result.get('success'):
+            return CommandResult(
+                success=True,
+                message=f"Command executed",
+                data=result,
+                should_speak=True
+            )
+        else:
+            return CommandResult(
+                success=False,
+                message=result.get('error', 'Command failed'),
+                should_speak=True
+            )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"Terminal error: {e}",
+            should_speak=True
+        )
+
+
 @register_command("memory", aliases=["remember", "recall"])
 def cmd_memory(args: str, context: Dict) -> CommandResult:
     """Access working memory."""
