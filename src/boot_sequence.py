@@ -167,24 +167,14 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         # Load CORA's full system prompt
         system_prompt = get_system_prompt()
 
-        # Build appropriate prompt based on context type
-        # Just give CORA the data - let the system prompt handle her personality
-        if "headline" in context.lower() or "news" in context.lower():
-            prompt = f"Announce these news headlines: {result}"
-        elif "weather" in context.lower() or "forecast" in context.lower():
-            prompt = f"Announce this weather: {result}"
-        elif "location" in context.lower():
-            prompt = f"Announce this location: {result}"
-        elif "abilities" in context.lower():
-            prompt = f"Tell the user what you can do for them: {result}"
-        else:
-            prompt = f"Announce this: {context} - {result}"
+        # Simple, direct prompt - system prompt handles personality
+        prompt = f"Say this info in 1-2 sentences max: {result}"
 
         response = generate(
             prompt=prompt,
             system=system_prompt,
-            temperature=0.9,
-            max_tokens=150
+            temperature=0.7,
+            max_tokens=60  # Keep it short
         )
 
         if response.content:
@@ -200,6 +190,11 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # # headers
             text = re.sub(r'\n+', ' ', text)  # newlines to spaces
             text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
+
+            # Truncate if still too long (take first 2 sentences max)
+            sentences = re.split(r'(?<=[.!?])\s+', text)
+            if len(sentences) > 2:
+                text = ' '.join(sentences[:2])
 
             if len(text) > 10:
                 return text
