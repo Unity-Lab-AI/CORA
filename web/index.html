@@ -3753,9 +3753,25 @@ WHEN RESPONDING:
                         perms.camera = 'granted';
                         localStorage.setItem('cora_permissions', JSON.stringify(perms));
 
-                        // Show camera in modal for 3 seconds like desktop
-                        const { content, close } = createDynamicModal('CORA - Live Camera Feed', 800, 600);
-                        cameraTestModal = { close };
+                        // Show camera in modal - stays live until user closes it
+                        const { content, close, modal } = createDynamicModal('CORA - Live Camera Feed', 800, 600);
+
+                        // Store stream reference so it stops when modal closes
+                        const originalClose = close;
+                        cameraTestModal = {
+                            close: () => {
+                                stream.getTracks().forEach(t => t.stop());
+                                log('Camera feed closed', 'info');
+                                originalClose();
+                            },
+                            modal: modal,
+                            minimize: () => {
+                                if (modal) modal.style.zIndex = '100';  // Send behind main content
+                            },
+                            restore: () => {
+                                if (modal) modal.style.zIndex = '2000';  // Bring back to front
+                            }
+                        };
 
                         const video = document.createElement('video');
                         video.srcObject = stream;
@@ -3764,8 +3780,8 @@ WHEN RESPONDING:
                         content.style.padding = '0';
                         content.appendChild(video);
 
-                        log('Showing live feed for 3 seconds...', 'info');
-                        await sleep(3000);
+                        log('Camera feed live - window stays open', 'info');
+                        await sleep(2000);  // Brief pause to let video stabilize
 
                         // Take snapshot for AI analysis
                         const canvas = document.createElement('canvas');
@@ -3787,12 +3803,12 @@ WHEN RESPONDING:
                             log('Vision analysis skipped', 'warn');
                         }
 
-                        // Stop camera
-                        stream.getTracks().forEach(t => t.stop());
-                        log('Camera feed closed', 'ok');
-
+                        // DON'T stop camera - keep it live until user closes modal
                         liveCameraWorking = true;
                         setPhase('camera', 'ok');
+
+                        // Minimize modal during TTS so it doesn't block the log
+                        cameraTestModal.minimize();
 
                         // Camera phase - give CORA the vision data
                         let camResponse;
@@ -3803,10 +3819,9 @@ WHEN RESPONDING:
                         }
                         await speakAndWait(camResponse);
 
-                        // Wait then close modal before moving on
-                        await sleep(1000);
-                        cameraTestModal.close();
-                        log('Camera test complete, modal closed', 'info');
+                        // Restore modal after TTS - user can close when ready
+                        cameraTestModal.restore();
+                        log('Camera stays live - close window when done', 'info');
 
                     } catch (e) {
                         log('Live camera not available: ' + e.message, 'warn');
@@ -3873,7 +3888,7 @@ WHEN RESPONDING:
                     log('Code browser opened - browse CORA source!', 'ok');
 
                     setPhase('code_import', 'ok');
-                    const codeResponse = await coraRespond('Code Browser', `Code browser loaded. ${fileCount} files from Unity-Lab-AI/CORA repo. Report.`, 'ok');
+                    const codeResponse = await coraRespond('Code Browser', `My source code is now viewable. ${fileCount} files loaded. Respond briefly.`, 'ok');
                     await speakAndWait(codeResponse);
 
                     // Give time to browse, then close before moving on
