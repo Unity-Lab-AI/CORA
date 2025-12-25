@@ -3719,8 +3719,10 @@ WHEN RESPONDING:
                         }
                         await speakAndWait(camResponse);
 
-                        // Close modal after speaking
-                        setTimeout(() => cameraTestModal.close(), 1000);
+                        // Wait then close modal before moving on
+                        await sleep(1000);
+                        cameraTestModal.close();
+                        log('Camera test complete, modal closed', 'info');
 
                     } catch (e) {
                         log('Live camera not available: ' + e.message, 'warn');
@@ -3790,9 +3792,10 @@ WHEN RESPONDING:
                     const codeResponse = await coraRespond('Code Browser', `My codebase is now viewable. ${fileCount} items loaded. Browse away.`, 'ok');
                     await speakAndWait(codeResponse);
 
-                    // Keep modal open for user to browse (don't auto-close)
-                    // User can close it manually with X button
-                    await sleep(5000);  // Give time to see it before boot continues
+                    // Give time to browse, then close before moving on
+                    await sleep(5000);
+                    modal.close();
+                    log('Code browser closed, moving on', 'info');
                 } else {
                     throw new Error(`GitHub API returned ${testResp.status}`);
                 }
@@ -3831,8 +3834,10 @@ WHEN RESPONDING:
             const ytResponse = await coraRespond('YouTube Test', `Found: ${video.title}. Playing sample.`, 'ok');
             await speakAndWait(ytResponse);
 
-            // Auto-close after 5 seconds
-            setTimeout(() => videoModal.close(), 5000);
+            // Wait for video to play, then close before moving on
+            await sleep(5000);
+            videoModal.close();
+            log('YouTube test complete, modal closed', 'info');
 
             // ================================================================
             // PHASE 4.3: MODAL WINDOWS - Show actual test modal!
@@ -3861,8 +3866,10 @@ WHEN RESPONDING:
             const modalResponse = await coraRespond('Modal Windows', 'Modal windows working.', 'ok');
             await speakAndWait(modalResponse);
 
-            // Auto-close after speaking
-            setTimeout(() => quoteModal.close(), 2000);
+            // Wait then close modal before moving on
+            await sleep(2000);
+            quoteModal.close();
+            log('Modal test complete, modal closed', 'info');
 
             // ================================================================
             // PHASE 5.0: VOICE SYSTEMS
@@ -4145,8 +4152,10 @@ WHEN RESPONDING:
                         log('Camera vision analysis skipped', 'warn');
                     }
 
-                    // Close modal
-                    setTimeout(() => visionModal.close(), 1000);
+                    // Wait then close modal before moving on
+                    await sleep(1000);
+                    visionModal.close();
+                    log('Vision test complete, modal closed', 'info');
                 } catch (e) {
                     log('Vision camera: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message), 'warn');
                 }
@@ -4260,8 +4269,10 @@ WHEN RESPONDING:
                     await speakAndWait(imgFail);
                 }
 
-                // Auto-close after viewing
-                setTimeout(() => imgModal.close(), 5000);
+                // Wait then close modal before moving on
+                await sleep(5000);
+                imgModal.close();
+                log('Image generation complete, modal closed', 'info');
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
