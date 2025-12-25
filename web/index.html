@@ -1436,25 +1436,34 @@ WHEN RESPONDING:
                     kokoroWorker.onmessage = (e) => {
                         const { type, id, data, error } = e.data;
 
+                        // Log ALL messages from worker for debugging
+                        console.log(`[WORKER] Message: type=${type}, id=${id}, hasData=${!!data}, hasError=${!!error}`);
+
                         if (type === 'progress' && id === initId) {
                             if (progressCallback) progressCallback(data.message, data.progress);
                         }
                         else if (type === 'initComplete' && id === initId) {
+                            console.log('[WORKER] Init complete, Kokoro ready');
                             kokoroReady = true;
                             kokoroLoading = false;
                             resolve(true);
                         }
                         else if (type === 'error' && id === initId) {
-                            console.error('Kokoro init error:', error);
+                            console.error('[WORKER] Kokoro init error:', error);
                             kokoroLoading = false;
                             resolve(false);
                         }
                         else if (type === 'audioReady') {
+                            console.log(`[WORKER] Audio ready for id=${id}, buffer size=${data?.audio?.byteLength || 0}`);
                             handleAudioReady(id, data);
+                        }
+                        else if (type === 'generating') {
+                            console.log(`[WORKER] Generating audio for id=${id}`);
+                            // Audio is being generated - could show a loading indicator here
                         }
                         else if (type === 'error') {
                             // Audio generation failed - resolve the pending callback so boot continues
-                            console.error(`Kokoro TTS error for id ${id}:`, error);
+                            console.error(`[WORKER] TTS error for id=${id}:`, error);
                             if (pendingCallbacks[id]) {
                                 const { resolve, text, timeoutId } = pendingCallbacks[id];
                                 delete pendingCallbacks[id];
@@ -1468,8 +1477,8 @@ WHEN RESPONDING:
                                 resolve();
                             }
                         }
-                        else if (type === 'generating') {
-                            // Audio is being generated, keep waveform active
+                        else {
+                            console.log(`[WORKER] Unknown message type: ${type}`);
                         }
                     };
 
@@ -1483,10 +1492,14 @@ WHEN RESPONDING:
             }
         }
 
+        // Track active audio playback to prevent overlapping
+        let currentAudioSource = null;
+
         async function handleAudioReady(id, data) {
-            console.log(`[TTS] handleAudioReady called, id=${id}, pendingCallbacks[id]=${!!pendingCallbacks[id]}`);
+            console.log(`[TTS] handleAudioReady called, id=${id}, pendingCallbacks keys=${Object.keys(pendingCallbacks).join(',')}`);
+
             if (!pendingCallbacks[id]) {
-                console.warn(`[TTS] No pending callback for id=${id}, returning`);
+                console.warn(`[TTS] No pending callback for id=${id}, available ids: ${Object.keys(pendingCallbacks).join(',')}`);
                 return;
             }
 
@@ -1497,6 +1510,12 @@ WHEN RESPONDING:
             if (timeoutId) clearTimeout(timeoutId);
 
             try {
+                // Ensure audio context exists and is ready
+                if (!audioContext) {
+                    console.log('[TTS] Creating new AudioContext');
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
                 // Resume audio context if suspended (browser requires user interaction)
                 console.log(`[TTS] AudioContext state: ${audioContext.state}`);
                 if (audioContext.state === 'suspended') {
@@ -1504,11 +1523,32 @@ WHEN RESPONDING:
                     console.log('[TTS] AudioContext resumed');
                 }
 
+                // Validate data.audio exists and has content
+                if (!data.audio || data.audio.byteLength === 0) {
+                    console.error('[TTS] Received empty audio buffer');
+                    if (text) {
+                        document.getElementById('speechText').textContent = `"${text}"`;
+                        log(`CORA: "${text}"`, 'cora');
+                    }
+                    resolve();
+                    return;
+                }
+
                 // Convert ArrayBuffer back to Float32Array
                 const float32Audio = new Float32Array(data.audio);
                 const sampleRate = data.sampleRate || 24000;
                 const duration = float32Audio.length / sampleRate;
-                console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${duration.toFixed(1)}s duration`);
+                console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${sampleRate}Hz, ${duration.toFixed(2)}s duration`);
+
+                // Stop any currently playing audio first
+                if (currentAudioSource) {
+                    try {
+                        currentAudioSource.stop();
+                    } catch (e) {
+                        // Source may have already ended
+                    }
+                    currentAudioSource = null;
+                }
 
                 // Create audio buffer and play it
                 const audioBuffer = audioContext.createBuffer(1, float32Audio.length, sampleRate);
@@ -1517,6 +1557,7 @@ WHEN RESPONDING:
                 const source = audioContext.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(audioContext.destination);
+                currentAudioSource = source;
 
                 // Create analyser to feed real-time audio to waveform
                 const analyser = audioContext.createAnalyser();
@@ -1524,12 +1565,14 @@ WHEN RESPONDING:
                 source.connect(analyser);
                 const dataArray = new Float32Array(analyser.frequencyBinCount);
 
-                // Update waveform while playing
+                // Update waveform while playing - use a flag specific to THIS playback
+                let isThisPlaybackActive = true;
                 let animFrame;
                 const updateWaveform = () => {
+                    if (!isThisPlaybackActive) return;
                     analyser.getFloatTimeDomainData(dataArray);
                     feedAudioChunk(Array.from(dataArray));
-                    if (audio_is_active) {
+                    if (audio_is_active && isThisPlaybackActive) {
                         animFrame = requestAnimationFrame(updateWaveform);
                     }
                 };
@@ -1539,37 +1582,44 @@ WHEN RESPONDING:
                 const doResolve = () => {
                     if (resolved) return;
                     resolved = true;
+                    isThisPlaybackActive = false;
                     cancelAnimationFrame(animFrame);
+                    if (currentAudioSource === source) {
+                        currentAudioSource = null;
+                    }
                     stopWaveform();
+                    console.log(`[TTS] Playback complete for id=${id}`);
                     resolve();
                 };
 
                 // ONLY resolve when audio actually finishes
                 source.onended = () => {
-                    console.log('[TTS] Audio finished (onended)');
+                    console.log(`[TTS] Audio finished (onended) for id=${id}`);
                     doResolve();
                 };
 
                 // Fallback: if onended doesn't fire, wait for audio duration + buffer
-                const fallbackMs = (duration * 1000) + 500;
+                const fallbackMs = (duration * 1000) + 1000;  // Extra buffer
                 setTimeout(() => {
                     if (!resolved) {
-                        console.log('[TTS] Audio fallback timeout (onended never fired)');
+                        console.log(`[TTS] Audio fallback timeout for id=${id} (onended never fired)`);
                         doResolve();
                     }
                 }, fallbackMs);
 
-                // Start audio FIRST, then show text
+                // Start waveform FIRST so it's active when audio starts
                 startWaveform();
-                source.start();
-                updateWaveform();
 
-                // NOW show the speech text - audio is playing
+                // NOW show the speech text - we're about to play
                 if (text) {
                     document.getElementById('speechText').textContent = `"${text}"`;
                     log(`CORA: "${text}"`, 'cora');
                 }
-                console.log(`[TTS] Audio started, will wait ${duration.toFixed(1)}s`);
+
+                // Start audio and waveform update loop
+                source.start(0);
+                updateWaveform();
+                console.log(`[TTS] Audio started for id=${id}, will wait ${duration.toFixed(2)}s`);
 
             } catch (e) {
                 console.error('[TTS] Audio playback error:', e);
@@ -1579,6 +1629,7 @@ WHEN RESPONDING:
                     log(`CORA: "${text}"`, 'cora');
                 }
                 stopWaveform();
+                currentAudioSource = null;
                 // Wait a bit before resolving so boot doesn't race ahead
                 await new Promise(r => setTimeout(r, 500));
                 resolve();
@@ -1609,12 +1660,20 @@ WHEN RESPONDING:
             const displayText = text;  // Full text for log
             const speakText = stripUrlsForSpeech(text);  // Clean text for TTS
 
+            // Skip empty text
+            if (!speakText || speakText.trim().length === 0) {
+                console.log('[TTS] speak() called with empty text, skipping');
+                if (callback) setTimeout(callback, 10);
+                return;
+            }
+
             console.log(`[TTS] speak() called: kokoroReady=${kokoroReady}, useFallback=${useFallbackTTS}, text="${speakText.substring(0,50)}..."`);
 
-            if (kokoroReady && !useFallbackTTS) {
+            if (kokoroReady && !useFallbackTTS && kokoroWorker) {
                 // Use Kokoro neural TTS - speakText for TTS, displayText for log
                 const id = ++messageId;
-                console.log(`[TTS] Using Kokoro, id=${id}`);
+                console.log(`[TTS] Using Kokoro, id=${id}, current pending: ${Object.keys(pendingCallbacks).join(',') || 'none'}`);
+
                 pendingCallbacks[id] = {
                     resolve: callback || (() => {}),
                     startTime: Date.now(),
@@ -1640,12 +1699,20 @@ WHEN RESPONDING:
                 pendingCallbacks[id].timeoutId = timeoutId;
 
                 // Send CLEAN text (no URLs) to TTS
-                console.log(`[TTS] Posting to worker, id=${id}`);
-                kokoroWorker.postMessage({
-                    type: 'generate',
-                    id,
-                    data: { text: speakText, voice: 'af_bella', speed: 1.0 }
-                });
+                console.log(`[TTS] Posting to worker, id=${id}, text length=${speakText.length}`);
+                try {
+                    kokoroWorker.postMessage({
+                        type: 'generate',
+                        id,
+                        data: { text: speakText, voice: 'af_bella', speed: 1.0 }
+                    });
+                    console.log(`[TTS] Message posted to worker for id=${id}`);
+                } catch (e) {
+                    console.error(`[TTS] Failed to post to worker: ${e.message}`);
+                    delete pendingCallbacks[id];
+                    clearTimeout(timeoutId);
+                    if (callback) callback();
+                }
             } else {
                 // Fallback to Web Speech API
                 if ('speechSynthesis' in window) {
@@ -1700,17 +1767,38 @@ WHEN RESPONDING:
         let audio_chunk_time = null;  // When chunk was received
         let audio_is_active = false;  // Is TTS currently speaking
 
+        let waveformInitialized = false;  // Track if waveform animation is running
+
         function initWaveform() {
+            // Prevent double-init
+            if (waveformInitialized) {
+                console.log('[WAVEFORM] Already initialized, skipping');
+                return;
+            }
+
             const canvas = document.getElementById('waveformCanvas');
-            if (!canvas) return;
+            if (!canvas) {
+                console.warn('[WAVEFORM] Canvas not found, retrying in 100ms');
+                setTimeout(initWaveform, 100);
+                return;
+            }
 
             const rect = canvas.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+            console.log(`[WAVEFORM] Canvas rect: ${rect.width}x${rect.height}`);
+
+            if (rect.width === 0 || rect.height === 0) {
+                console.warn('[WAVEFORM] Canvas has zero dimensions, retrying in 100ms');
+                setTimeout(initWaveform, 100);
+                return;
+            }
 
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
             waveformCtx = canvas.getContext('2d');
             waveformCtx.scale(2, 2);
+
+            waveformInitialized = true;
+            console.log('[WAVEFORM] Initialized successfully, starting animation loop');
 
             // Start animation - RUNS FOREVER, NEVER STOPS
             _animate();

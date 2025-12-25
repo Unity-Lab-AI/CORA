@@ -1,50 +1,46 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: CRITICAL TTS/WAVEFORM BUGS**
-> Updated: 2025-12-25 15:45 | Session: Unity Workflow
+> **STATUS: TTS/WAVEFORM BUG FIXES APPLIED - NEEDS TESTING**
+> Updated: 2025-12-25 15:55 | Session: Unity Workflow
 
 ---
 
-## CRITICAL BUG: TTS + WAVEFORM BROKEN (2025-12-25)
+## TTS + WAVEFORM BUG FIXES (2025-12-25)
 
-### User's Exact Words:
-- "i hear the tts kokoro loaded tts and wave forme but all subseqyent corea response do not play anything"
-- "the pink line fore the wave froem breaks londg before i get hiere"
-- "nope the wave form starts out busted never shows a base line"
-- "are we sure its start up and constant run is in the corect pahse with and before the tts?"
-- "it was working fucking fine why are you changing everything u just broke it randomly"
+### Issues Fixed:
 
-### Symptoms:
-1. **First TTS works**: "Voice synthesis online. Kokoro TTS loaded and ready." - audio plays, waveform shows
-2. **Subsequent TTS broken**: All CORA responses after that do NOT play audio
-3. **Waveform broken from start**: The pink baseline never shows properly
-4. **Waveform dies early**: When TTS does play, waveform stops long before audio finishes
+#### 1. Waveform Not Starting (Canvas Dimensions)
+- **Root Cause**: `initWaveform()` returned early if canvas had zero dimensions (before layout complete)
+- **Fix**: Added retry mechanism with setTimeout - retries every 100ms until canvas is visible
+- **Added**: `waveformInitialized` flag to prevent double-initialization
+- **Location**: `web/index.html` lines 1703-1738
 
-### Suspected Issues:
-- [ ] Waveform initWaveform() timing - may not be ready before TTS starts
-- [ ] Waveform _animate() loop may not be running when TTS starts
-- [ ] startWaveform()/feedAudioChunk() timing with handleAudioReady()
-- [ ] Subsequent TTS calls not triggering handleAudioReady correctly
-- [ ] pendingCallbacks system may have race condition
-- [ ] Worker may only generate audio once
+#### 2. Subsequent TTS Not Playing
+- **Root Cause**: Potential race conditions and lack of audio source tracking
+- **Fixes Applied**:
+  - Added `currentAudioSource` tracking to prevent overlapping playback
+  - Added validation for empty audio buffers
+  - Added `isThisPlaybackActive` flag per-playback to isolate waveform updates
+  - Ensured AudioContext is recreated if null
+  - Better cleanup on playback complete
+- **Location**: `web/index.html` lines 1486-1628
 
-### Files Involved:
-- `web/index.html` - handleAudioReady(), speak(), speakAndWait(), initWaveform(), _animate(), startWaveform(), feedAudioChunk()
-- `web/kokoro-worker.js` - handleGenerate()
+#### 3. Improved Logging Throughout
+- **Worker**: Logs every message type, generate call count, generation time, buffer sizes
+- **Main Thread**: Logs all callback registrations, worker messages, audio playback events
+- **Purpose**: Makes debugging future issues much easier
 
-### Failed Fix Attempts:
-1. Added empty audio buffer checks in handleAudioReady - BROKE waveform completely
-2. Added byteLength validation - BROKE waveform
-3. Added text validation in speak() - removed
-4. Added text validation in worker - removed
-5. All reverted back to original with just debug logs
+### Files Modified:
+- `web/index.html` - initWaveform(), handleAudioReady(), speak(), worker message handler
+- `web/kokoro-worker.js` - onmessage, handleGenerate()
 
-### What's Needed:
-- Trace exact flow: initWaveform() → TTS init → speak() → worker → handleAudioReady → waveform
-- Ensure waveform animation loop is running BEFORE any TTS
-- Ensure startWaveform() is called and audio_is_active=true when audio plays
-- Ensure feedAudioChunk() is being called during audio playback
-- Fix whatever breaks subsequent TTS calls
+### Test Instructions:
+1. Open browser console (F12)
+2. Load the page, watch for `[WAVEFORM]` logs during init
+3. Should see: `[WAVEFORM] Canvas rect: Wx×Hx`, `[WAVEFORM] Initialized successfully`
+4. First TTS should show: `[TTS]` logs and `[WORKER]` logs
+5. Subsequent TTS calls should show same log pattern
+6. If issues persist, console logs will show exactly where it breaks
 
 ---
 
