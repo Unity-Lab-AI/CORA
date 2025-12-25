@@ -605,11 +605,11 @@
                 <div class="stats-panel">
                     <div class="stats-header">── LIVE SYSTEM STATS ──</div>
                     <div class="stats-grid">
-                        <div class="stat-item"><span class="stat-label">CPU:</span><span class="stat-value na">0%</span></div>
-                        <div class="stat-item"><span class="stat-label">MEM:</span><span class="stat-value na">0%</span></div>
-                        <div class="stat-item"><span class="stat-label">DISK:</span><span class="stat-value na">0%</span></div>
-                        <div class="stat-item"><span class="stat-label">GPU:</span><span class="stat-value na">N/A</span></div>
-                        <div class="stat-item"><span class="stat-label">VRAM:</span><span class="stat-value na">0%</span></div>
+                        <div class="stat-item"><span class="stat-label">CPU:</span><span class="stat-value" id="statCpu">--</span></div>
+                        <div class="stat-item"><span class="stat-label">MEM:</span><span class="stat-value" id="statMem">--</span></div>
+                        <div class="stat-item"><span class="stat-label">DISK:</span><span class="stat-value" id="statDisk">--</span></div>
+                        <div class="stat-item"><span class="stat-label">GPU:</span><span class="stat-value" id="statGpu">--</span></div>
+                        <div class="stat-item"><span class="stat-label">VRAM:</span><span class="stat-value" id="statVram">--</span></div>
                         <div class="stat-item"><span class="stat-label">NET:</span><span class="stat-value" id="statNet">--</span></div>
                     </div>
                 </div>
@@ -1232,6 +1232,78 @@
         }
 
         // ============================================================
+        // Stats Server (localhost:11435) - Real GPU/CPU/RAM from host
+        // ============================================================
+
+        const STATS_URL = 'http://localhost:11435';
+        let statsServerAvailable = false;
+
+        async function fetchSystemStats() {
+            try {
+                const res = await fetch(`${STATS_URL}/stats`, { method: 'GET' });
+                if (res.ok) {
+                    const stats = await res.json();
+                    statsServerAvailable = true;
+                    updateStatsDisplay(stats);
+                    return stats;
+                }
+            } catch (e) {
+                statsServerAvailable = false;
+            }
+            return null;
+        }
+
+        function updateStatsDisplay(stats) {
+            if (!stats) return;
+
+            // CPU
+            document.getElementById('statCpu').textContent = `${Math.round(stats.cpu.percent)}%`;
+            document.getElementById('statCpu').className = 'stat-value';
+
+            // Memory
+            document.getElementById('statMem').textContent = `${Math.round(stats.memory.percent)}%`;
+            document.getElementById('statMem').className = 'stat-value';
+
+            // Disk
+            document.getElementById('statDisk').textContent = `${Math.round(stats.disk.percent)}%`;
+            document.getElementById('statDisk').className = 'stat-value';
+
+            // GPU
+            if (stats.gpu && stats.gpu.available) {
+                document.getElementById('statGpu').textContent = `${stats.gpu.utilization}%`;
+                document.getElementById('statGpu').className = 'stat-value';
+                // VRAM
+                const vramPercent = Math.round((stats.gpu.memory_used / stats.gpu.memory_total) * 100);
+                document.getElementById('statVram').textContent = `${vramPercent}%`;
+                document.getElementById('statVram').className = 'stat-value';
+            } else {
+                document.getElementById('statGpu').textContent = 'N/A';
+                document.getElementById('statGpu').className = 'stat-value na';
+                document.getElementById('statVram').textContent = 'N/A';
+                document.getElementById('statVram').className = 'stat-value na';
+            }
+
+            // Network
+            document.getElementById('statNet').textContent = 'Online';
+            document.getElementById('statNet').className = 'stat-value';
+        }
+
+        // Start polling stats every second
+        let statsInterval = null;
+        function startStatsPolling() {
+            if (statsInterval) return;
+            statsInterval = setInterval(fetchSystemStats, 1000);
+            fetchSystemStats(); // Initial fetch
+        }
+
+        function stopStatsPolling() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // ============================================================
         // API Checks
         // ============================================================
 
@@ -1607,20 +1679,46 @@
             }
 
             // ================================================================
-            // PHASE 3.0: HARDWARE CHECK
+            // PHASE 3.0: HARDWARE CHECK - Fetch from local stats server
             // ================================================================
             setPhase('hardware', 'running');
             log('PHASE 3.0: HARDWARE CHECK', 'phase');
             updateProgress(30, 'Checking hardware...');
-            log('CPU Usage: 0% (web mode - no access)', 'system');
-            log('Memory: 0% (web mode - no access)', 'system');
-            log('Disk: 0% (web mode - no access)', 'system');
-            log('GPU: Not accessible from browser', 'system');
-            const netStatus = navigator.onLine ? 'Connected' : 'Disconnected';
-            log(`Network: ${netStatus}`, navigator.onLine ? 'ok' : 'warn');
-            document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
-            setPhase('hardware', 'ok');
-            await speakAndWait("Hardware check complete. Running in web mode, no GPU access.");
+
+            // Try to fetch real stats from localhost:11435
+            log('Connecting to stats server...', 'info');
+            const stats = await fetchSystemStats();
+
+            if (stats) {
+                log(`CPU Usage: ${Math.round(stats.cpu.percent)}%`, 'ok');
+                log(`Memory: ${Math.round(stats.memory.percent)}% (${stats.memory.used_gb}GB / ${stats.memory.total_gb}GB)`, 'ok');
+                log(`Disk: ${Math.round(stats.disk.percent)}%`, 'ok');
+
+                if (stats.gpu && stats.gpu.available) {
+                    log(`GPU: ${stats.gpu.name}`, 'ok');
+                    log(`GPU Load: ${stats.gpu.utilization}%`, 'ok');
+                    log(`VRAM: ${stats.gpu.memory_used}MB / ${stats.gpu.memory_total}MB`, 'ok');
+                    log(`GPU Temp: ${stats.gpu.temperature}°C`, 'ok');
+                } else {
+                    log('GPU: No NVIDIA GPU detected', 'warn');
+                }
+
+                log('Network: Connected', 'ok');
+                setPhase('hardware', 'ok');
+
+                // Start polling for live updates
+                startStatsPolling();
+
+                const gpuMsg = stats.gpu?.available ? `GPU at ${stats.gpu.utilization}%` : 'no GPU detected';
+                await speakAndWait(`Hardware check complete. CPU at ${Math.round(stats.cpu.percent)}%, ${gpuMsg}.`);
+            } else {
+                // Stats server not running - fallback to basic info
+                log('Stats server not running (start with: python services/stats_server.py)', 'warn');
+                log('Network: ' + (navigator.onLine ? 'Connected' : 'Disconnected'), navigator.onLine ? 'ok' : 'warn');
+                document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
+                setPhase('hardware', 'warn');
+                await speakAndWait("Hardware stats unavailable. Run the stats server for real GPU monitoring.");
+            }
 
             // ================================================================
             // PHASE 3.1: CAMERA FEED

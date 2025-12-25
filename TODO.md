@@ -61,6 +61,14 @@ This TODO was specifically for the **WEB VERSION** (web/index.html) which is dep
 - [x] Clear All Data button with TRIPLE warning
 - [x] Clears localStorage, sessionStorage, cookies
 
+### Real System Stats (Phase 3.0)
+- [x] stats_server.py on localhost:11435 (like Ollama on 11434)
+- [x] Real GPU stats via nvidia-smi
+- [x] Real CPU/RAM/Disk stats via psutil
+- [x] Web version fetches from stats server
+- [x] 1-second polling for live updates
+- [x] CORA.bat auto-starts stats server
+
 ---
 
 ## P1 - Nice to Have (Future)
@@ -98,6 +106,7 @@ This TODO was specifically for the **WEB VERSION** (web/index.html) which is dep
 
 | Phase | Action |
 |-------|--------|
+| 3.0 | Real GPU/CPU/RAM stats from localhost:11435 |
 | 4.1 | Fetches real code from GitHub, shows in modal |
 | 4.2 | Embeds YouTube video in modal, plays it |
 | 4.3 | Shows quote modal popup |
@@ -105,6 +114,7 @@ This TODO was specifically for the **WEB VERSION** (web/index.html) which is dep
 | 8.0 | Opens camera, shows live feed in modal |
 | 9.0 | Generates image via Pollinations, shows in modal |
 
+**Stats update every 1 second with real GPU/CPU/RAM data from stats_server.py**
 **Settings accessible anytime via Settings button (top right)**
 **Clear All Data available with triple confirmation safety**
 

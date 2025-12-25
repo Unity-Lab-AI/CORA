@@ -146,6 +146,28 @@
 
 ---
 
+### Real System Stats Server (2025-12-25)
+
+| Task | Status | Files Modified |
+|------|--------|----------------|
+| Create stats_server.py for web version | DONE | `services/stats_server.py` |
+| Add GPU stats via nvidia-smi | DONE | `services/stats_server.py` |
+| Add CPU/RAM/Disk stats via psutil | DONE | `services/stats_server.py` |
+| Add stats fetching to web version | DONE | `web/index.html` |
+| Add 1-second polling for live stats | DONE | `web/index.html` |
+| Update CORA.bat to start stats server | DONE | `CORA.bat` |
+| Remove OpenWeatherMap, use wttr.in | DONE | `web/index.html` |
+
+**Details:**
+- Stats server runs on localhost:11435 (alongside Ollama on 11434)
+- Web version fetches real GPU/CPU/RAM stats from host machine
+- GPU data: name, utilization, VRAM used/total, temperature
+- Stats update every 1 second for live monitoring
+- CORA.bat auto-starts stats server in minimized window
+- Weather switched to wttr.in (free, no API key required)
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |
