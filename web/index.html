@@ -937,8 +937,13 @@
         function handleAudioReady(id, data) {
             if (!pendingCallbacks[id]) return;
 
-            const { resolve, startTime } = pendingCallbacks[id];
+            const { resolve, startTime, text } = pendingCallbacks[id];
             delete pendingCallbacks[id];
+
+            // NOW show the speech text - audio is about to play
+            if (text) {
+                document.getElementById('speechText').textContent = `"${text}"`;
+            }
 
             try {
                 // Convert ArrayBuffer back to Float32Array
@@ -996,10 +1001,8 @@
         }
 
         function speak(text, callback) {
-            // Show speech text with quotes like desktop boot_display.py
-            document.getElementById('speechText').textContent = `"${text}"`;
-
-            // Log CORA speech in hot pink to stand out
+            // DON'T show speech text yet - wait until audio actually starts playing
+            // Log is immediate but display waits for waveform
             log(`CORA: "${text}"`, 'cora');
 
             if (kokoroReady && !useFallbackTTS) {
@@ -1007,10 +1010,11 @@
                 const id = ++messageId;
                 pendingCallbacks[id] = {
                     resolve: callback || (() => {}),
-                    startTime: Date.now()
+                    startTime: Date.now(),
+                    text: text  // Store text to display when audio starts
                 };
 
-                startWaveform();
+                // Don't start waveform yet - wait for audio ready
                 kokoroWorker.postMessage({
                     type: 'generate',
                     id,
@@ -1033,7 +1037,11 @@
                     ) || voices[0];
                     if (femaleVoice) utterance.voice = femaleVoice;
 
-                    utterance.onstart = () => startWaveform();
+                    // Show text only when audio starts
+                    utterance.onstart = () => {
+                        document.getElementById('speechText').textContent = `"${text}"`;
+                        startWaveform();
+                    };
                     utterance.onend = () => { stopWaveform(); if (callback) callback(); };
                     utterance.onerror = () => { stopWaveform(); if (callback) callback(); };
 
