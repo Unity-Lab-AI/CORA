@@ -575,7 +575,7 @@
             <div class="speech-container">
                 <div class="speech-label">▶ CORA SPEAKING</div>
                 <div id="speechText">"Initializing..."</div>
-                <div class="tts-notice">Web uses browser TTS • <a href="https://github.com/Unity-Lab-AI/CORA.git" target="_blank">Desktop app</a> uses Kokoro neural voice</div>
+                <div class="tts-notice" id="ttsNotice">Loading Kokoro neural voice (af_bella)...</div>
             </div>
 
             <div class="progress-container">
@@ -643,7 +643,7 @@
         const PHASES = [
             { id: 'waveform', name: '0.8 Waveform', status: 'pending' },
             { id: 'about', name: '0.9 About', status: 'pending' },
-            { id: 'voice', name: '1.0 Voice', status: 'pending' },
+            { id: 'kokoro', name: '1.0 Kokoro TTS', status: 'pending' },  // Neural voice
             { id: 'ai_engine', name: '2.0 AI Engine', status: 'pending' },
             { id: 'ai_models', name: '2.1 Models', status: 'pending' },
             { id: 'hardware', name: '3.0 Hardware', status: 'pending' },
@@ -658,8 +658,6 @@
         ];
 
         let bootStartTime = null;
-        let ttsEnabled = false;
-        let speechSynth = null;
         let waveformActive = false;
         let waveformCtx = null;
         let animationId = null;
@@ -669,16 +667,102 @@
         let weatherKey = localStorage.getItem('cora_weather_key') || '';
 
         // ============================================================
-        // TTS - Web Speech API
+        // KOKORO TTS - Neural voice (same as desktop af_bella)
+        // Falls back to Web Speech API if Kokoro fails
         // ============================================================
 
-        function initTTS() {
-            if ('speechSynthesis' in window) {
-                speechSynth = window.speechSynthesis;
-                ttsEnabled = true;
-                return true;
+        let kokoroWorker = null;
+        let kokoroReady = false;
+        let kokoroLoading = false;
+        let audioContext = null;
+        let pendingCallbacks = {};
+        let messageId = 0;
+        let useFallbackTTS = false;
+
+        async function initKokoro(progressCallback) {
+            if (kokoroReady) return true;
+            if (kokoroLoading) return false;
+
+            kokoroLoading = true;
+
+            try {
+                // Create audio context (must happen on user interaction for some browsers)
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Create web worker
+                kokoroWorker = new Worker('kokoro-worker.js', { type: 'module' });
+
+                return new Promise((resolve) => {
+                    const initId = ++messageId;
+
+                    kokoroWorker.onmessage = (e) => {
+                        const { type, id, data, error } = e.data;
+
+                        if (type === 'progress' && id === initId) {
+                            if (progressCallback) progressCallback(data.message, data.progress);
+                        }
+                        else if (type === 'initComplete' && id === initId) {
+                            kokoroReady = true;
+                            kokoroLoading = false;
+                            resolve(true);
+                        }
+                        else if (type === 'error' && id === initId) {
+                            console.error('Kokoro init error:', error);
+                            kokoroLoading = false;
+                            resolve(false);
+                        }
+                        else if (type === 'audioReady') {
+                            handleAudioReady(id, data);
+                        }
+                        else if (type === 'generating') {
+                            // Audio is being generated, keep waveform active
+                        }
+                    };
+
+                    kokoroWorker.postMessage({ type: 'init', id: initId, data: {} });
+                });
+
+            } catch (e) {
+                console.error('Failed to init Kokoro:', e);
+                kokoroLoading = false;
+                return false;
             }
-            return false;
+        }
+
+        function handleAudioReady(id, data) {
+            if (!pendingCallbacks[id]) return;
+
+            const { resolve, startTime } = pendingCallbacks[id];
+            delete pendingCallbacks[id];
+
+            try {
+                // Convert ArrayBuffer back to Float32Array
+                const float32Audio = new Float32Array(data.audio);
+                const sampleRate = data.sampleRate || 24000;
+
+                // Create audio buffer and play it
+                const audioBuffer = audioContext.createBuffer(1, float32Audio.length, sampleRate);
+                audioBuffer.copyToChannel(float32Audio, 0);
+
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+
+                source.onended = () => {
+                    stopWaveform();
+                    resolve();
+                };
+
+                startWaveform();
+                source.start();
+
+            } catch (e) {
+                console.error('Audio playback error:', e);
+                stopWaveform();
+                resolve();
+            }
         }
 
         function speak(text, callback) {
@@ -688,31 +772,46 @@
             // Also log to console like desktop
             log(`CORA: "${text}"`, 'system');
 
-            if (!ttsEnabled || !speechSynth) {
-                if (callback) setTimeout(callback, 100);
-                return;
+            if (kokoroReady && !useFallbackTTS) {
+                // Use Kokoro neural TTS
+                const id = ++messageId;
+                pendingCallbacks[id] = {
+                    resolve: callback || (() => {}),
+                    startTime: Date.now()
+                };
+
+                startWaveform();
+                kokoroWorker.postMessage({
+                    type: 'generate',
+                    id,
+                    data: { text, voice: 'af_bella', speed: 1.0 }
+                });
+            } else {
+                // Fallback to Web Speech API
+                if ('speechSynthesis' in window) {
+                    const synth = window.speechSynthesis;
+                    synth.cancel();
+
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.1;
+
+                    const voices = synth.getVoices();
+                    const femaleVoice = voices.find(v =>
+                        v.name.includes('Zira') || v.name.includes('Samantha') ||
+                        v.name.toLowerCase().includes('female')
+                    ) || voices[0];
+                    if (femaleVoice) utterance.voice = femaleVoice;
+
+                    utterance.onstart = () => startWaveform();
+                    utterance.onend = () => { stopWaveform(); if (callback) callback(); };
+                    utterance.onerror = () => { stopWaveform(); if (callback) callback(); };
+
+                    synth.speak(utterance);
+                } else {
+                    if (callback) setTimeout(callback, 100);
+                }
             }
-
-            speechSynth.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 1.0;
-            utterance.pitch = 1.1;
-            utterance.volume = 1.0;
-
-            const voices = speechSynth.getVoices();
-            const femaleVoice = voices.find(v =>
-                v.name.includes('Zira') || v.name.includes('Samantha') ||
-                v.name.toLowerCase().includes('female')
-            ) || voices[0];
-
-            if (femaleVoice) utterance.voice = femaleVoice;
-
-            utterance.onstart = () => startWaveform();
-            utterance.onend = () => { stopWaveform(); if (callback) callback(); };
-            utterance.onerror = () => { stopWaveform(); if (callback) callback(); };
-
-            speechSynth.speak(utterance);
         }
 
         function speakAndWait(text) {
@@ -1058,21 +1157,35 @@
             setPhase('about', 'ok');
             await sleep(300);
 
-            // PHASE 1.0: VOICE
-            setPhase('voice', 'running');
-            log('PHASE 1.0: VOICE SYNTHESIS', 'phase');
-            updateProgress(15, 'Initializing voice...');
-            const voiceOk = initTTS();
-            if (voiceOk) {
-                log('Web Speech API initialized', 'ok');
-                setPhase('voice', 'ok');
-                await speakAndWait("Voice synthesis online. Web Speech API loaded and ready.");
-                await speakAndWait("Hey, I'm CORA. Cognitive Operations and Reasoning Assistant. Version 2.4.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. Let's get this boot going.");
+            // PHASE 1.0: KOKORO TTS (Neural Voice)
+            setPhase('kokoro', 'running');
+            log('PHASE 1.0: KOKORO TTS (Neural Voice)', 'phase');
+            updateProgress(12, 'Loading Kokoro neural voice...');
+            log('Initializing Kokoro-82M neural TTS model...', 'info');
+            log('Voice: af_bella (CORA\'s voice)', 'info');
+
+            const kokoroOk = await initKokoro((msg, progress) => {
+                log(msg, 'info');
+                updateProgress(12 + (progress * 0.08), msg);
+            });
+
+            if (kokoroOk) {
+                log('Kokoro TTS initialized - Neural voice ready!', 'ok');
+                document.getElementById('ttsNotice').textContent = 'Kokoro TTS (af_bella) - Neural voice active';
+                document.getElementById('ttsNotice').style.color = '#00ff88';
+                setPhase('kokoro', 'ok');
+                updateProgress(20, 'Neural voice online');
+                await speakAndWait("Neural voice synthesis online. Kokoro loaded and ready.");
+                await speakAndWait("Hey, I'm CORA. Cognitive Operations and Reasoning Assistant. Version 2.4.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. Let's fucking go.");
             } else {
-                log('Web Speech API not available', 'warn');
-                setPhase('voice', 'warn');
+                log('Kokoro failed - falling back to browser TTS', 'warn');
+                document.getElementById('ttsNotice').innerHTML = 'Browser TTS (fallback) • <a href="https://github.com/Unity-Lab-AI/CORA.git" target="_blank">Desktop</a> has Kokoro';
+                document.getElementById('ttsNotice').style.color = '#ffaa00';
+                useFallbackTTS = true;
+                setPhase('kokoro', 'warn');
+                updateProgress(20, 'Fallback voice');
+                await speakAndWait("Voice synthesis online. Using browser fallback.");
             }
-            updateProgress(20, 'Voice online');
 
             // PHASE 2.0: AI ENGINE
             setPhase('ai_engine', 'running');
