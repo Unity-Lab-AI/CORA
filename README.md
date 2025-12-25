@@ -35,6 +35,8 @@ A Windows 11 AI-powered personal assistant with full autonomous capabilities: vi
 - **Full Location Announcement** - City, State, Country announced at boot
 - **Persistent Boot Display** - Window stays open with live stats after boot
 
+![CORA Boot Display](docs/images/boot_display.png)
+
 ---
 
 ## Quick Start

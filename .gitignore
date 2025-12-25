@@ -129,6 +129,7 @@ screenshots/
 *.jpeg
 !ui/assets/*.png
 !docs/*.png
+!docs/images/*.png
 
 # ============ DOWNLOADED TOOLS ============
 # The tools/ folder is ONLY for downloaded binaries (mpv, ffmpeg, etc)

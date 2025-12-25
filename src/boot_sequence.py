@@ -2775,8 +2775,8 @@ if __name__ == "__main__":
         info_text.insert('end', "  3. Click 'Check & Continue' below\n\n", 'feature')
 
         info_text.insert('end', "⚠ WARNING: Site has DECEPTIVE ADS!\n", 'warning')
-        info_text.insert('end', "Click DIRECTLY on the filename you want.\n", 'dim')
-        info_text.insert('end', "Ignore all 'Download' buttons - they're ads!\n\n", 'dim')
+        info_text.insert('end', "Click DIRECTLY on the .7z filename in the list.\n", 'dim')
+        info_text.insert('end', "Do NOT click any 'Download' buttons!\n\n", 'dim')
 
         info_text.insert('end', "Folder structure doesn't matter - CORA will\n", 'dim')
         info_text.insert('end', "find mpv.exe anywhere inside the tools folder.\n", 'dim')
