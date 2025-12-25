@@ -7,6 +7,8 @@
 let tts = null;
 let isInitialized = false;
 let isInitializing = false;
+let isGenerating = false;  // Prevent concurrent generation
+let generateQueue = [];    // Queue for pending requests
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 const DEFAULT_VOICE = 'af_bella';  // CORA's voice
@@ -88,7 +90,7 @@ async function handleInit(id, data) {
 }
 
 async function handleGenerate(id, data) {
-    console.log(`[WORKER] handleGenerate: id=${id}, isInitialized=${isInitialized}, hasTTS=${!!tts}`);
+    console.log(`[WORKER] handleGenerate: id=${id}, isInitialized=${isInitialized}, hasTTS=${!!tts}, isGenerating=${isGenerating}`);
 
     if (!isInitialized || !tts) {
         console.error(`[WORKER] TTS not ready: initialized=${isInitialized}, tts=${!!tts}`);
@@ -96,6 +98,26 @@ async function handleGenerate(id, data) {
         return;
     }
 
+    // If already generating, queue this request
+    if (isGenerating) {
+        console.log(`[WORKER] Already generating, queuing id=${id}`);
+        generateQueue.push({ id, data });
+        return;
+    }
+
+    isGenerating = true;
+    await doGenerate(id, data);
+    isGenerating = false;
+
+    // Process next in queue if any
+    if (generateQueue.length > 0) {
+        const next = generateQueue.shift();
+        console.log(`[WORKER] Processing queued request id=${next.id}`);
+        handleGenerate(next.id, next.data);
+    }
+}
+
+async function doGenerate(id, data) {
     const { text, voice, speed } = data;
     console.log(`[WORKER] Generating: text="${text?.substring(0, 50)}...", voice=${voice}, speed=${speed}`);
 
@@ -103,12 +125,21 @@ async function handleGenerate(id, data) {
         self.postMessage({ type: 'generating', id });
 
         const startTime = Date.now();
-        const audio = await tts.generate(text, {
-            voice: voice || DEFAULT_VOICE,
-            speed: speed || 1.0
-        });
-        const genTime = Date.now() - startTime;
 
+        // Add timeout to prevent infinite hang
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Generation timeout (60s)')), 60000);
+        });
+
+        const audio = await Promise.race([
+            tts.generate(text, {
+                voice: voice || DEFAULT_VOICE,
+                speed: speed || 1.0
+            }),
+            timeoutPromise
+        ]);
+
+        const genTime = Date.now() - startTime;
         console.log(`[WORKER] Generation complete in ${genTime}ms, hasAudio=${!!audio}, hasAudioData=${!!(audio?.audio)}`);
 
         if (audio && audio.audio) {
