@@ -1223,17 +1223,15 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // Give CORA the info with EXPLICIT in-character instruction
-                // The model needs to know this is a status update SHE is making, not a question TO her
+                // Simple prompt - system prompt handles personality, just give data and instruction
                 if (mode === 'quick') {
-                    prompt = `[STATUS UPDATE - You are CORA reporting to your user]\n${result}\n\nAcknowledge this briefly. One or two sentences max. Stay completely in character as CORA - edgy, sarcastic, profanity okay. NO offers to help. NO questions back.`;
+                    prompt = `${result}\n\nRespond briefly as CORA. 1-2 sentences. No offers to help.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    // Full mode for weather/news - needs more tokens for detailed commentary
-                    prompt = `[STATUS UPDATE - You are CORA reporting to your user]\n${result}\n\nGive your take on this. 3-4 sentences. Stay completely in character as CORA - edgy, sharp, real. NO offers to help. NO "let me know if you need anything" bullshit.`;
+                    prompt = `${result}\n\nGive your take as CORA. 3-4 sentences. No offers to help.`;
                     temperature = 0.8;
-                    maxTokens = 400;
+                    maxTokens = 300;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
