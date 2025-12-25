@@ -1197,7 +1197,7 @@ MODIFIED CODE:"""
 
         def push_thread():
             try:
-                from tools.git_ops import get_git
+                from cora_tools.git_ops import get_git
 
                 git = get_git(str(Path(self.file_path).parent))
                 self._show_status("Staging changes...")

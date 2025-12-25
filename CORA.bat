@@ -1,10 +1,44 @@
 @echo off
-chcp 437 >nul
+chcp 437 >nul 2>&1
 title C.O.R.A - Cognitive Operations & Reasoning Assistant
 color 0D
 
 :: Change to the script's directory (handles spaces in path)
 cd /d "%~dp0"
+
+:: Find Ollama - check common locations and add to PATH
+set "OLLAMA_EXE="
+
+:: Check if already in PATH
+where ollama.exe >nul 2>&1
+if not errorlevel 1 (
+    for /f "delims=" %%i in ('where ollama.exe 2^>nul') do set "OLLAMA_EXE=%%i"
+    goto :found_ollama
+)
+
+:: Check common install locations
+if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
+    set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+    set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
+    goto :found_ollama
+)
+if exist "%ProgramFiles%\Ollama\ollama.exe" (
+    set "OLLAMA_EXE=%ProgramFiles%\Ollama\ollama.exe"
+    set "PATH=%ProgramFiles%\Ollama;%PATH%"
+    goto :found_ollama
+)
+if exist "%ProgramFiles(x86)%\Ollama\ollama.exe" (
+    set "OLLAMA_EXE=%ProgramFiles(x86)%\Ollama\ollama.exe"
+    set "PATH=%ProgramFiles(x86)%\Ollama;%PATH%"
+    goto :found_ollama
+)
+if exist "%USERPROFILE%\Ollama\ollama.exe" (
+    set "OLLAMA_EXE=%USERPROFILE%\Ollama\ollama.exe"
+    set "PATH=%USERPROFILE%\Ollama;%PATH%"
+    goto :found_ollama
+)
+
+:found_ollama
 
 echo.
 echo   +=========================================+
@@ -33,23 +67,15 @@ echo.
 
 :: Check Ollama
 echo [CHECK] Ollama...
-ollama --version >nul 2>&1
-if errorlevel 1 (
+if "%OLLAMA_EXE%"=="" (
     echo [ERROR] Ollama not found!
     echo.
-    echo Installing Ollama...
-    winget install Ollama.Ollama
-    if errorlevel 1 (
-        echo [ERROR] Failed to install Ollama
-        echo Please install manually from: https://ollama.com
-        pause
-        exit /b 1
-    )
-    echo [OK] Ollama installed. Starting service...
-    start "" ollama serve
-    timeout /t 5 /nobreak >nul
+    echo Please install Ollama from: https://ollama.com
+    echo.
+    pause
+    exit /b 1
 )
-echo         Ollama is installed
+echo         Found: %OLLAMA_EXE%
 echo.
 
 :: Check/Pull required models
@@ -114,13 +140,62 @@ if not exist "data\.setup_complete" (
     echo.
 )
 
+:: Always check/install yt-dlp for YouTube functionality
+echo [CHECK] yt-dlp (YouTube downloader)...
+pip show yt-dlp >nul 2>&1
+if errorlevel 1 (
+    echo         Installing yt-dlp...
+    pip install yt-dlp -q
+    echo         yt-dlp installed
+) else (
+    echo         yt-dlp - OK
+)
+
+:: Check for mpv (media player for YouTube)
+echo [CHECK] mpv media player...
+set "MPV_FOUND="
+
+:: First check if mpv is in PATH
+where mpv >nul 2>&1
+if not errorlevel 1 (
+    echo         mpv - OK ^(in PATH^)
+    set "MPV_FOUND=1"
+    goto :mpv_done
+)
+
+:: Check if mpv exists anywhere in tools folder (any subfolder structure)
+if exist "tools" (
+    for /r "tools" %%f in (mpv.exe) do (
+        if exist "%%f" (
+            echo         mpv - OK ^(found: %%~dpf^)
+            set "PATH=%%~dpf;%PATH%"
+            set "MPV_FOUND=1"
+            goto :mpv_done
+        )
+    )
+)
+
+:: mpv not found anywhere - set flag for Python modal
+if not defined MPV_FOUND (
+    echo         [WARN] mpv not found - YouTube playback limited
+    set "MPV_MISSING=1"
+)
+
+:mpv_done
+
 :: Make sure Ollama is running
 echo [CHECK] Ollama service...
 curl -s http://localhost:11434/api/tags >nul 2>&1
 if errorlevel 1 (
     echo         Starting Ollama service...
-    start "" /min ollama serve
-    timeout /t 3 /nobreak >nul
+    start "" /min "%OLLAMA_EXE%" serve
+    timeout /t 5 /nobreak >nul
+    :: Verify it started
+    curl -s http://localhost:11434/api/tags >nul 2>&1
+    if errorlevel 1 (
+        echo [WARN] Ollama service may still be starting...
+        timeout /t 3 /nobreak >nul
+    )
 )
 echo         Ollama service running
 echo.
@@ -130,8 +205,8 @@ echo.
 echo [LAUNCH] Starting C.O.R.A Boot Sequence...
 echo.
 
-:: Launch boot sequence (not GUI launcher)
-python src\boot_sequence.py
+:: Launch boot sequence with dependency status
+python src\boot_sequence.py --mpv-missing=%MPV_MISSING%
 
 if errorlevel 1 (
     echo.

@@ -179,12 +179,8 @@ def speak(text: str, blocking: bool = True):
     except:
         pass
 
-    # Start waveform animation before speaking
-    if _boot_display:
-        try:
-            _boot_display.start_speaking(text)
-        except:
-            pass
+    # Note: Waveform start/stop is now handled automatically by KokoroTTS.speak()
+    # via the set_boot_display() registration
 
     def do_speak():
         """Actual TTS call - runs in thread."""
@@ -193,13 +189,6 @@ def speak(text: str, blocking: bool = True):
                 _tts_engine.speak(text, emotion='neutral')
             except Exception as e:
                 print(f"[TTS ERROR] {e}")
-
-        # Stop waveform animation after speaking
-        if _boot_display:
-            try:
-                _boot_display.stop_speaking()
-            except:
-                pass
 
         # Clear echo filter now that we're done
         try:
@@ -1002,7 +991,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Memory System
     tools_total += 1
     try:
-        from tools.memory import recall, remember
+        from cora_tools.memory import recall, remember
         print("  [OK] Memory System (recall/remember)")
         display_log("Memory System loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Memory System', 'status': 'OK'})
@@ -1015,7 +1004,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Task Manager
     tools_total += 1
     try:
-        from tools.tasks import TaskManager
+        from cora_tools.tasks import TaskManager
         tm = TaskManager()
         task_count = len(tm.tasks) if hasattr(tm, 'tasks') else 0
         print(f"  [OK] Task Manager ({task_count} tasks)")
@@ -1031,7 +1020,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Reminders
     tools_total += 1
     try:
-        from tools.reminders import ReminderManager
+        from cora_tools.reminders import ReminderManager
         rm = ReminderManager()
         reminder_count = len(rm.reminders) if hasattr(rm, 'reminders') else 0
         print(f"  [OK] Reminders ({reminder_count} active)")
@@ -1047,7 +1036,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # File Operations
     tools_total += 1
     try:
-        from tools.files import read_file, create_file
+        from cora_tools.files import read_file, create_file
         print("  [OK] File Operations")
         display_log("File Operations loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'File Operations', 'status': 'OK'})
@@ -1060,7 +1049,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Screenshot/Vision
     tools_total += 1
     try:
-        from tools.screenshots import desktop, quick_screenshot
+        from cora_tools.screenshots import desktop, quick_screenshot
         print("  [OK] Vision/Screenshots")
         display_log("Vision/Screenshots loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Vision/Screenshots', 'status': 'OK'})
@@ -1073,7 +1062,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Web Browser
     tools_total += 1
     try:
-        from tools.browser import browse_sync
+        from cora_tools.browser import browse_sync
         print("  [OK] Web Browser")
         display_log("Web Browser loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Web Browser', 'status': 'OK'})
@@ -1086,7 +1075,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # System Tools
     tools_total += 1
     try:
-        from tools.system import run_shell, get_system_info
+        from cora_tools.system import run_shell, get_system_info
         print("  [OK] System Commands")
         display_log("System Commands loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'System Commands', 'status': 'OK'})
@@ -1099,7 +1088,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Windows Control
     tools_total += 1
     try:
-        from tools.windows import list_windows, focus_window
+        from cora_tools.windows import list_windows, focus_window
         print("  [OK] Windows Control")
         display_log("Windows Control loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Windows Control', 'status': 'OK'})
@@ -1112,7 +1101,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Code Tools
     tools_total += 1
     try:
-        from tools.code import analyze_code
+        from cora_tools.code import analyze_code
         print("  [OK] Code Analysis")
         display_log("Code Analysis loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Code Analysis', 'status': 'OK'})
@@ -1125,7 +1114,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     # Media Control
     tools_total += 1
     try:
-        from tools.media import MediaController
+        from cora_tools.media import MediaController
         print("  [OK] Media Control")
         display_log("Media Control loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Media Control', 'status': 'OK'})
@@ -2099,7 +2088,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     # Test screenshot capture
     try:
-        from tools.screenshots import desktop, quick_screenshot
+        from cora_tools.screenshots import desktop, quick_screenshot
         print("  Testing screenshot capture...")
         display_tool("Screenshots", "Capturing desktop")
         display_action("Taking screenshot of current display...")
@@ -2323,7 +2312,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("=" * 50)
 
     try:
-        from tools.image_gen import generate_image, show_fullscreen_image
+        from cora_tools.image_gen import generate_image, show_fullscreen_image
         print("  [OK] Image generation module loaded (Pollinations Flux)")
         display_log("Pollinations Flux module loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
@@ -2702,7 +2691,201 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='C.O.R.A Boot Sequence')
     parser.add_argument('--quick', '-q', action='store_true', help='Skip TTS (silent boot)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Extra verbose output')
+    parser.add_argument('--mpv-missing', default='', help='Flag if mpv is missing (set by CORA.bat)')
     args = parser.parse_args()
+
+    # Check for missing dependencies and show modal
+    mpv_missing = args.mpv_missing == '1'
+    if mpv_missing:
+        import tkinter as tk
+        import webbrowser
+
+        # Create custom dialog with selectable text
+        dialog = tk.Tk()
+        dialog.title("Missing Dependency: mpv")
+        dialog.configure(bg='#1a1a1a')
+        dialog.geometry("520x480")
+        dialog.resizable(False, False)
+        dialog.attributes('-topmost', True)
+
+        # Center on screen
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - 520) // 2
+        y = (dialog.winfo_screenheight() - 480) // 2
+        dialog.geometry(f"520x480+{x}+{y}")
+
+        # Use Text widget for selectable content
+        info_text = tk.Text(dialog, font=('Consolas', 10), fg='#ffffff', bg='#1a1a1a',
+                           bd=0, highlightthickness=0, wrap='word', cursor='arrow',
+                           height=18, width=58)
+        info_text.pack(padx=20, pady=(20, 10), fill='both')
+
+        # Configure tags for styling
+        info_text.tag_configure('header', font=('Consolas', 16, 'bold'), foreground='#ffaa00', justify='center')
+        info_text.tag_configure('subheader', font=('Consolas', 10), foreground='#ffffff', justify='center')
+        info_text.tag_configure('warning', font=('Consolas', 10, 'bold'), foreground='#ff6666')
+        info_text.tag_configure('feature', font=('Consolas', 9), foreground='#cccccc')
+        info_text.tag_configure('install', font=('Consolas', 10, 'bold'), foreground='#00ff88')
+        info_text.tag_configure('link', font=('Consolas', 11, 'underline'), foreground='#00aaff')
+        info_text.tag_configure('dim', font=('Consolas', 9), foreground='#888888')
+        info_text.tag_configure('cmd', font=('Consolas', 11, 'bold'), foreground='#00ff88', background='#333333')
+        info_text.tag_configure('center', justify='center')
+
+        # Insert content
+        info_text.insert('end', "Missing: mpv Media Player\n\n", ('header', 'center'))
+        info_text.insert('end', "mpv is needed for YouTube and media playback.\n\n", ('subheader', 'center'))
+
+        info_text.insert('end', "Without mpv, these features are DISABLED:\n", 'warning')
+        info_text.insert('end', "  - YouTube video playback\n", 'feature')
+        info_text.insert('end', "  - Audio streaming\n", 'feature')
+        info_text.insert('end', "  - Media playback commands\n\n", 'feature')
+
+        info_text.insert('end', "To enable, download and extract mpv:\n\n", 'install')
+
+        # Clickable link
+        info_text.insert('end', "https://sourceforge.net/projects/mpv-player-windows/", 'link')
+        info_text.insert('end', "\n\n")
+
+        info_text.tag_bind('link', '<Button-1>', lambda e: webbrowser.open('https://sourceforge.net/projects/mpv-player-windows/files/64bit/'))
+        info_text.tag_bind('link', '<Enter>', lambda e: info_text.config(cursor='hand2'))
+        info_text.tag_bind('link', '<Leave>', lambda e: info_text.config(cursor='arrow'))
+
+        info_text.insert('end', "Steps:\n", 'dim')
+        info_text.insert('end', "  1. Download the .7z or .zip file\n", 'feature')
+        info_text.insert('end', "  2. Extract to: CORA/tools/\n", 'cmd')
+        info_text.insert('end', "  3. Click 'Check & Continue' below\n\n", 'feature')
+
+        info_text.insert('end', "Folder structure doesn't matter - CORA will\n", 'dim')
+        info_text.insert('end', "find mpv.exe anywhere inside the tools folder.\n", 'dim')
+
+        # Make text selectable but not editable
+        info_text.config(state='disabled')
+
+        # Enable selection
+        def enable_select(event):
+            info_text.config(state='normal')
+        def disable_edit(event):
+            info_text.config(state='disabled')
+            return "break"
+
+        info_text.bind('<Button-1>', enable_select)
+        info_text.bind('<Key>', disable_edit)
+        info_text.bind('<Control-c>', lambda e: None)  # Allow copy
+
+        # Button frame
+        btn_frame = tk.Frame(dialog, bg='#1a1a1a')
+        btn_frame.pack(pady=(10, 20))
+
+        def open_download():
+            """Open mpv download page."""
+            webbrowser.open('https://sourceforge.net/projects/mpv-player-windows/files/64bit/')
+            download_btn.config(text="Opening...", bg='#00aaff')
+            status_label.config(text="Download, extract to CORA/tools/, then click Check & Continue", fg='#00aaff')
+
+        def check_mpv_and_continue():
+            """Check if mpv is installed - if found, close dialog and continue boot."""
+            import subprocess
+            import shutil
+            import os
+
+            check_btn.config(text="Checking...", state='disabled')
+            dialog.update()
+
+            found = False
+            mpv_location = None
+
+            # Check system PATH
+            mpv_path = shutil.which('mpv')
+            if mpv_path:
+                found = True
+                mpv_location = mpv_path
+                # Verify it runs
+                try:
+                    result = subprocess.run([mpv_path, '--version'], capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        version = result.stdout.split('\n')[0] if result.stdout else ""
+                        status_label.config(text=f"Found: {version}", fg='#00ff88')
+                except:
+                    status_label.config(text=f"Found at: {mpv_path}", fg='#00ff88')
+
+            # Check CORA tools folder (including subdirectories)
+            if not found:
+                cora_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                mpv_tools_dir = os.path.join(cora_dir, 'tools', 'mpv')
+
+                # First check direct path
+                mpv_local = os.path.join(mpv_tools_dir, 'mpv.exe')
+                if os.path.exists(mpv_local):
+                    found = True
+                    mpv_location = mpv_local
+                    os.environ['PATH'] = os.path.dirname(mpv_local) + os.pathsep + os.environ.get('PATH', '')
+                    status_label.config(text=f"Found in CORA/tools/mpv/", fg='#00ff88')
+                else:
+                    # Search subdirectories for mpv.exe
+                    if os.path.exists(mpv_tools_dir):
+                        for root, dirs, files in os.walk(mpv_tools_dir):
+                            if 'mpv.exe' in files:
+                                mpv_local = os.path.join(root, 'mpv.exe')
+                                found = True
+                                mpv_location = mpv_local
+                                os.environ['PATH'] = root + os.pathsep + os.environ.get('PATH', '')
+                                status_label.config(text=f"Found in tools/mpv/", fg='#00ff88')
+                                break
+
+            # Check common install locations
+            if not found:
+                common_paths = [
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\mpv\mpv.exe'),
+                    os.path.expandvars(r'%ProgramFiles%\mpv\mpv.exe'),
+                    os.path.expandvars(r'%ProgramFiles(x86)%\mpv\mpv.exe'),
+                    r'C:\mpv\mpv.exe',
+                    os.path.expanduser(r'~\scoop\apps\mpv\current\mpv.exe'),
+                ]
+
+                for path in common_paths:
+                    if os.path.exists(path):
+                        found = True
+                        mpv_location = path
+                        os.environ['PATH'] = os.path.dirname(path) + os.pathsep + os.environ.get('PATH', '')
+                        status_label.config(text=f"Found at: {path}", fg='#00ff88')
+                        break
+
+            if found:
+                # mpv found! Show success and close dialog to continue boot
+                check_btn.config(text="Found!", bg='#00ff88')
+                status_label.config(text="mpv detected! Continuing boot...", fg='#00ff88')
+                dialog.update()
+                dialog.after(1500, dialog.destroy)  # Close after 1.5 seconds
+            else:
+                # Not found
+                check_btn.config(text="Not Found", bg='#ff6666', state='normal')
+                status_label.config(text="mpv not detected. Install it or click Skip.", fg='#ff6666')
+
+        def open_download():
+            """Open mpv download page."""
+            webbrowser.open('https://sourceforge.net/projects/mpv-player-windows/files/64bit/')
+            download_btn.config(text="Opening...", bg='#00aaff')
+            status_label.config(text="Download, extract to CORA/tools/mpv/, then click Check & Continue", fg='#00aaff')
+
+        download_btn = tk.Button(btn_frame, text="Download mpv", font=('Consolas', 11, 'bold'),
+                               fg='#000000', bg='#00ff88', activebackground='#00cc66', bd=0,
+                               padx=15, pady=8, command=open_download)
+        download_btn.pack(side='left', padx=5)
+
+        check_btn = tk.Button(btn_frame, text="Check & Continue", font=('Consolas', 11, 'bold'),
+                             fg='#000000', bg='#00aaff', activebackground='#0088cc', bd=0,
+                             padx=15, pady=8, command=check_mpv_and_continue)
+        check_btn.pack(side='left', padx=5)
+
+        tk.Button(btn_frame, text="Skip", font=('Consolas', 11, 'bold'),
+                 fg='#000000', bg='#ff00ff', activebackground='#cc00cc', bd=0,
+                 padx=15, pady=8, command=dialog.destroy).pack(side='left', padx=5)
+
+        # Status label for install feedback
+        status_label = tk.Label(dialog, text="", font=('Consolas', 9), fg='#888888', bg='#1a1a1a')
+        status_label.pack(pady=(0, 10))
+
+        dialog.mainloop()
 
     # Boot result storage
     boot_result = {'done': False, 'result': None}
@@ -2887,9 +3070,18 @@ if __name__ == "__main__":
                 _safe_ui_call(lambda: _boot_display.log(f"Ambient awareness: {e}", 'warn'))
 
     # Create display first (must be on main thread for tkinter)
-    from boot_display import BootDisplay
+    # IMPORTANT: Must use ui.boot_display to get same singleton as tts.py
+    from ui.boot_display import BootDisplay
     _boot_display = BootDisplay()
     _boot_display.create_window()
+    # Waveform starts automatically in create_window() and runs continuously
+
+    # Register display with TTS for speech text updates
+    try:
+        from voice.tts import set_boot_display
+        set_boot_display(_boot_display)
+    except ImportError:
+        pass
 
     # Set up phases - short names with phase numbers
     phase_names = [

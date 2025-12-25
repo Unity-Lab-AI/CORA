@@ -3,9 +3,9 @@ C.O.R.A Tools Module
 Utilities for TTS, file ops, AI, system integration, and more.
 
 Usage:
-    from tools import speak_async, remember, recall, take_screenshot
-    from tools.files import read_file, write_json
-    from tools.system import get_system_info
+    from cora_tools import speak_async, remember, recall, take_screenshot
+    from cora_tools.files import read_file, write_json
+    from cora_tools.system import get_system_info
 """
 
 # TTS Handler - Speech synthesis

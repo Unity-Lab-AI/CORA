@@ -173,6 +173,7 @@ When CORA boots, she runs a 10-phase diagnostic with TTS announcements:
 - **Python 3.10+**
 - **Ollama** (for AI)
 - **NVIDIA GPU** (recommended)
+- **mpv** (optional, for YouTube playback)
 
 ### Install
 ```bash
@@ -184,6 +185,23 @@ pip install -r requirements.txt
 winget install Ollama.Ollama
 ollama pull llama3.2
 ollama pull llava
+```
+
+### mpv Setup (Optional - for YouTube)
+mpv is required for YouTube video/audio playback. CORA will prompt you if it's missing.
+
+**Option 1: Download and Extract**
+1. Download from: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
+2. Extract the .7z or .zip file to `CORA/tools/`
+3. CORA will auto-detect mpv.exe (any subfolder structure works)
+
+**Option 2: Package Manager**
+```bash
+winget install mpv
+# or
+choco install mpv
+# or
+scoop install mpv
 ```
 
 ---

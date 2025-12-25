@@ -308,7 +308,7 @@ def get_calendar_context() -> Dict[str, Any]:
         # Import calendar module
         import sys
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.calendar import get_today_events, get_upcoming, get_events_summary
+        from cora_tools.calendar import get_today_events, get_upcoming, get_events_summary
 
         today_events = get_today_events()
         upcoming = get_upcoming(days=7)

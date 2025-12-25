@@ -104,7 +104,7 @@ def execute_tool(tool_name: str, arg: str = "") -> Dict[str, Any]:
     try:
         # Modal tools
         if tool_name in ['viewfile', 'viewcode', 'viewimage', 'websearch', 'fetchurl', 'systemstats', 'terminal', 'message']:
-            from tools.modal_tools import MODAL_TOOLS
+            from cora_tools.modal_tools import MODAL_TOOLS
             if tool_name in MODAL_TOOLS:
                 if tool_name == 'systemstats':
                     return MODAL_TOOLS[tool_name]()
@@ -113,7 +113,7 @@ def execute_tool(tool_name: str, arg: str = "") -> Dict[str, Any]:
 
         # Screenshot
         if tool_name == 'screenshot':
-            from tools.screenshots import desktop
+            from cora_tools.screenshots import desktop
             result = desktop()
             return {
                 'success': result.success,
@@ -133,7 +133,7 @@ def execute_tool(tool_name: str, arg: str = "") -> Dict[str, Any]:
 
         # Image generation
         if tool_name == 'imagine':
-            from tools.image_gen import generate_image
+            from cora_tools.image_gen import generate_image
             result = generate_image(arg)
             return {
                 'success': result.get('success', False),
@@ -165,7 +165,7 @@ def execute_tool(tool_name: str, arg: str = "") -> Dict[str, Any]:
 
         # Tasks
         if tool_name == 'add_task':
-            from tools.tasks import add_task
+            from cora_tools.tasks import add_task
             task_id = add_task(arg)
             return {
                 'success': bool(task_id),
@@ -174,7 +174,7 @@ def execute_tool(tool_name: str, arg: str = "") -> Dict[str, Any]:
             }
 
         if tool_name == 'list_tasks':
-            from tools.tasks import list_tasks
+            from cora_tools.tasks import list_tasks
             tasks = list_tasks()
             if tasks:
                 task_list = "\n".join([f"- {t.get('text', t.get('description', 'Unknown'))}" for t in tasks[:5]])

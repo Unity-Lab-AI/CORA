@@ -48,7 +48,7 @@ Version 2.4.0
 │                 Services Layer (services/)                  │
 │   Presence → Weather → Location → Audio → Notifications    │
 ├─────────────────────────────────────────────────────────────┤
-│                   Tools Layer (tools/)                      │
+│                  Tools Layer (cora_tools/)                  │
 │   System → Screenshots → Calendar → Memory → Image Gen     │
 ├─────────────────────────────────────────────────────────────┤
 │                  Data Layer (JSON files)                    │
@@ -263,7 +263,7 @@ GET /api/tags       # List models
 - Response limited to 1-2 sentences
 - Focused on specific phase data
 
-### tools/image_gen.py (Image Generation)
+### cora_tools/image_gen.py (Image Generation)
 
 **API:** Pollinations Flux
 
@@ -272,7 +272,7 @@ GET /api/tags       # List models
 https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&model=flux
 
 # Example usage
-from tools.image_gen import generate_image
+from cora_tools.image_gen import generate_image
 path = generate_image("a cyberpunk city at night")
 ```
 
@@ -478,7 +478,7 @@ python cora.py speak "Testing"
 python cora.py imagine "a robot"
 
 # Test image generation
-python -c "from tools.image_gen import generate_image; print(generate_image('test'))"
+python -c "from cora_tools.image_gen import generate_image; print(generate_image('test'))"
 
 # Test TTS with waveform
 python voice/tts.py
@@ -510,7 +510,7 @@ C.O.R.A/
 │   ├── ollama.py            # Ollama API client
 │   ├── context.py           # Context management
 │   └── router.py            # Model routing
-├── tools/
+├── cora_tools/
 │   ├── image_gen.py         # Pollinations AI image gen
 │   ├── screenshots.py       # Screen/window capture
 │   ├── tasks.py             # Task management
@@ -518,6 +518,7 @@ C.O.R.A/
 │   ├── calendar.py          # Calendar integration
 │   ├── reminders.py         # Reminder system
 │   └── ...                  # 17+ tool modules
+├── tools/                    # Downloaded binaries (mpv, etc.)
 ├── services/
 │   ├── weather.py           # Weather API
 │   ├── location.py          # IP geolocation

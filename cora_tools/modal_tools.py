@@ -116,7 +116,7 @@ def websearch(query: str) -> Dict[str, Any]:
         return {"success": False, "error": "Empty search query"}
 
     try:
-        from tools.web import web_search
+        from cora_tools.web import web_search
         # web_search already shows modal, just call it
         result = web_search(query)
         return result
@@ -138,7 +138,7 @@ def fetchurl(url: str) -> Dict[str, Any]:
         return {"success": False, "error": "Empty URL"}
 
     try:
-        from tools.web import fetch_url
+        from cora_tools.web import fetch_url
         # fetch_url already shows modal, just call it
         result = fetch_url(url)
         return result

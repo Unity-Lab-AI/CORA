@@ -148,6 +148,15 @@ python src/boot_sequence.py --quick
 | `see what color is my shirt?` | Ask specific questions about the camera view |
 | `imagine a sunset over mountains` | CORA generates an AI image |
 
+### YouTube & Media
+
+| What to type | What happens |
+|--------------|--------------|
+| `play lofi music` | Searches YouTube and plays |
+| `play https://youtube.com/...` | Plays a YouTube URL |
+
+**Note:** YouTube playback requires mpv. Download from https://sourceforge.net/projects/mpv-player-windows/files/64bit/ and extract to CORA/tools/
+
 ### Other Cool Stuff
 
 | What to type | What happens |
@@ -244,6 +253,10 @@ VOICE:
 VISION:
   see             = Describe webcam view
   imagine <desc>  = Generate an image
+
+MEDIA:
+  play <search>   = Play YouTube video
+  play <url>      = Play YouTube URL
 
 INFO:
   time            = Get the time

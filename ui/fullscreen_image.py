@@ -161,7 +161,7 @@ def show_boot_image(
         True if generated and displayed successfully
     """
     try:
-        from tools.image_gen import generate_boot_image
+        from cora_tools.image_gen import generate_boot_image
 
         print("[*] Generating boot image...")
         result = generate_boot_image(prompt)

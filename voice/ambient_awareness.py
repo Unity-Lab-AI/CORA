@@ -361,7 +361,7 @@ class AmbientAwareness:
     def _analyze_screenshot(self):
         """Take and analyze a screenshot."""
         try:
-            from tools.vision import capture_screenshot
+            from cora_tools.vision import capture_screenshot
             from ai.ollama import analyze_image
 
             # Capture screenshot
@@ -396,7 +396,7 @@ class AmbientAwareness:
     def _analyze_camera(self):
         """Analyze camera feed."""
         try:
-            from tools.vision import capture_camera_snapshot
+            from cora_tools.vision import capture_camera_snapshot
             from ai.ollama import analyze_image
 
             # Capture from camera

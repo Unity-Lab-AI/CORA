@@ -199,7 +199,7 @@ def cmd_calendar(args: str, context: Dict) -> CommandResult:
     """Show today's calendar events."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.calendar import get_today_events, get_events_summary
+        from cora_tools.calendar import get_today_events, get_events_summary
 
         events = get_today_events()
         summary = get_events_summary(events)
@@ -320,7 +320,7 @@ def cmd_remind(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.reminders import add_reminder, parse_time_string
+        from cora_tools.reminders import add_reminder, parse_time_string
 
         # Parse time from args
         # Format: "remind me to X in Y minutes/hours"
@@ -372,7 +372,7 @@ def cmd_screenshot(args: str, context: Dict) -> CommandResult:
     """Take a screenshot."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.screenshots import desktop
+        from cora_tools.screenshots import desktop
 
         result = desktop()
 
@@ -635,7 +635,7 @@ def cmd_viewfile(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import viewfile
+        from cora_tools.modal_tools import viewfile
 
         result = viewfile(args.strip())
 
@@ -672,7 +672,7 @@ def cmd_viewcode(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import viewcode
+        from cora_tools.modal_tools import viewcode
 
         result = viewcode(args.strip())
 
@@ -709,7 +709,7 @@ def cmd_viewimage(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import viewimage
+        from cora_tools.modal_tools import viewimage
 
         result = viewimage(args.strip())
 
@@ -746,7 +746,7 @@ def cmd_websearch(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import websearch
+        from cora_tools.modal_tools import websearch
 
         result = websearch(args.strip())
 
@@ -784,7 +784,7 @@ def cmd_fetchurl(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import fetchurl
+        from cora_tools.modal_tools import fetchurl
 
         result = fetchurl(args.strip())
 
@@ -814,7 +814,7 @@ def cmd_systemstats(args: str, context: Dict) -> CommandResult:
     """Open live system stats monitor."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import systemstats
+        from cora_tools.modal_tools import systemstats
 
         result = systemstats()
 
@@ -851,7 +851,7 @@ def cmd_terminal(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.modal_tools import terminal
+        from cora_tools.modal_tools import terminal
 
         result = terminal(args.strip())
 
@@ -881,7 +881,7 @@ def cmd_memory(args: str, context: Dict) -> CommandResult:
     """Access working memory."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.memory import get_memory
+        from cora_tools.memory import get_memory
 
         mem = get_memory()
 
@@ -933,7 +933,7 @@ def cmd_play(args: str, context: Dict) -> CommandResult:
     """Play media - file, YouTube URL, or search query."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import play, get_media
+        from cora_tools.media import play, get_media
 
         if not args:
             # Toggle play/pause
@@ -965,7 +965,7 @@ def cmd_pause(args: str, context: Dict) -> CommandResult:
     """Pause current media playback."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import pause
+        from cora_tools.media import pause
 
         msg = pause()
         success = msg.startswith("[+]")
@@ -987,7 +987,7 @@ def cmd_resume(args: str, context: Dict) -> CommandResult:
     """Resume media playback."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import resume
+        from cora_tools.media import resume
 
         msg = resume()
         success = msg.startswith("[+]")
@@ -1009,7 +1009,7 @@ def cmd_stop(args: str, context: Dict) -> CommandResult:
     """Stop media playback."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import stop
+        from cora_tools.media import stop
 
         msg = stop()
         success = msg.startswith("[+]")
@@ -1031,7 +1031,7 @@ def cmd_next(args: str, context: Dict) -> CommandResult:
     """Skip to next track."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import next_track
+        from cora_tools.media import next_track
 
         msg = next_track()
         success = msg.startswith("[+]")
@@ -1053,7 +1053,7 @@ def cmd_prev(args: str, context: Dict) -> CommandResult:
     """Go to previous track."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import prev_track
+        from cora_tools.media import prev_track
 
         msg = prev_track()
         success = msg.startswith("[+]")
@@ -1075,7 +1075,7 @@ def cmd_volume(args: str, context: Dict) -> CommandResult:
     """Get or set volume (0-100)."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import volume
+        from cora_tools.media import volume
 
         if args:
             # Try to parse volume level
@@ -1111,7 +1111,7 @@ def cmd_mute(args: str, context: Dict) -> CommandResult:
     """Toggle mute."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import mute
+        from cora_tools.media import mute
 
         msg = mute()
         success = msg.startswith("[+]")
@@ -1133,7 +1133,7 @@ def cmd_now_playing(args: str, context: Dict) -> CommandResult:
     """Get what's currently playing."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.media import now
+        from cora_tools.media import now
 
         msg = now()
         return CommandResult(
@@ -1156,7 +1156,7 @@ def cmd_git_status(args: str, context: Dict) -> CommandResult:
     """Show git repository status."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_status
+        from cora_tools.git_ops import git_status
 
         result = git_status()
         if result['success']:
@@ -1175,7 +1175,7 @@ def cmd_git_pull(args: str, context: Dict) -> CommandResult:
     """Pull latest changes from remote."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_pull
+        from cora_tools.git_ops import git_pull
 
         result = git_pull()
         if result['success']:
@@ -1194,7 +1194,7 @@ def cmd_git_push(args: str, context: Dict) -> CommandResult:
     """Push commits to remote."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_push
+        from cora_tools.git_ops import git_push
 
         result = git_push()
         if result['success']:
@@ -1216,7 +1216,7 @@ def cmd_git_commit(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_commit
+        from cora_tools.git_ops import git_commit
 
         result = git_commit(args)
         if result['success']:
@@ -1235,7 +1235,7 @@ def cmd_git_add(args: str, context: Dict) -> CommandResult:
     """Stage files for commit."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_add
+        from cora_tools.git_ops import git_add
 
         files = args if args else '.'
         result = git_add(files)
@@ -1255,7 +1255,7 @@ def cmd_git_branch(args: str, context: Dict) -> CommandResult:
     """List all branches."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_branch
+        from cora_tools.git_ops import git_branch
 
         result = git_branch()
         if result['success']:
@@ -1278,7 +1278,7 @@ def cmd_git_checkout(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import get_git
+        from cora_tools.git_ops import get_git
 
         git = get_git()
         # Check for -b flag for new branch
@@ -1307,7 +1307,7 @@ def cmd_git_merge(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_merge
+        from cora_tools.git_ops import git_merge
 
         result = git_merge(args)
         if result['success']:
@@ -1329,7 +1329,7 @@ def cmd_git_clone(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_clone
+        from cora_tools.git_ops import git_clone
 
         result = git_clone(args)
         if result['success']:
@@ -1348,7 +1348,7 @@ def cmd_git_log(args: str, context: Dict) -> CommandResult:
     """Show recent commits."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import git_log
+        from cora_tools.git_ops import git_log
 
         count = int(args) if args and args.isdigit() else 5
         result = git_log(count)
@@ -1369,7 +1369,7 @@ def cmd_github_login(args: str, context: Dict) -> CommandResult:
     """Login to GitHub (opens browser for token creation)."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import github_login_browser, github_login
+        from cora_tools.git_ops import github_login_browser, github_login
 
         if args:
             # Token provided directly
@@ -1398,7 +1398,7 @@ def cmd_github_repos(args: str, context: Dict) -> CommandResult:
     """List your GitHub repositories."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import github_repos
+        from cora_tools.git_ops import github_repos
 
         result = github_repos()
         if result['success']:
@@ -1421,7 +1421,7 @@ def cmd_github_create(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from tools.git_ops import github_create_repo
+        from cora_tools.git_ops import github_create_repo
 
         # Parse args: name [description] [--private]
         private = '--private' in args
@@ -1448,7 +1448,7 @@ def cmd_github_create(args: str, context: Dict) -> CommandResult:
 def handle_send_email(args: str = "") -> CommandResult:
     """Send an email using default mail app."""
     try:
-        from tools.email_tool import parse_email_command, send_email
+        from cora_tools.email_tool import parse_email_command, send_email
 
         # Parse natural language command
         parsed = parse_email_command(f"send email {args}" if not args.startswith("to ") else f"send email to {args}")
@@ -1486,7 +1486,7 @@ def handle_send_email(args: str = "") -> CommandResult:
 def handle_check_email(args: str = "") -> CommandResult:
     """Open email inbox in default mail app."""
     try:
-        from tools.email_tool import read_emails
+        from cora_tools.email_tool import read_emails
 
         result = read_emails()
         if result['success']:
@@ -1504,7 +1504,7 @@ def handle_check_email(args: str = "") -> CommandResult:
 def handle_add_contact(args: str = "") -> CommandResult:
     """Add a contact to the address book."""
     try:
-        from tools.email_tool import add_contact
+        from cora_tools.email_tool import add_contact
 
         # Parse: "add contact karen karen@email.com" or "karen is karen@email.com"
         parts = args.strip().split()
@@ -1536,7 +1536,7 @@ def handle_add_contact(args: str = "") -> CommandResult:
 def handle_list_contacts(args: str = "") -> CommandResult:
     """List saved email contacts."""
     try:
-        from tools.email_tool import list_contacts
+        from cora_tools.email_tool import list_contacts
 
         result = list_contacts()
         if result['count'] > 0:

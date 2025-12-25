@@ -523,7 +523,7 @@ def create_default_boot_checks() -> List[tuple]:
 
     def check_calendar():
         try:
-            from tools.calendar import get_today_events, get_events_summary
+            from cora_tools.calendar import get_today_events, get_events_summary
             events = get_today_events()
             return {
                 'count': len(events),

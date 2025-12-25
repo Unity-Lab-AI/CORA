@@ -61,209 +61,327 @@ class BootPhase:
 
 
 # Global audio buffer for sharing between TTS and waveform
-_audio_buffer = None
-_audio_buffer_lock = None
+# Use a class to ensure single instance across imports
+import threading
+
+class _AudioBufferSingleton:
+    """Singleton to share audio data between TTS and waveform."""
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance.data = None
+                    cls._instance.current_chunk = None
+                    cls._instance.chunk_time = None  # None, not 0 - prevents false stale detection
+                    cls._instance.start_time = None
+                    cls._instance.sample_rate = 24000
+                    cls._instance.active = False
+                    cls._instance.data_lock = threading.Lock()
+        return cls._instance
+
+# Single global instance
+_audio_buffer_singleton = _AudioBufferSingleton()
 
 def get_audio_buffer():
     """Get the shared audio buffer for waveform visualization."""
-    global _audio_buffer, _audio_buffer_lock
-    if _audio_buffer_lock is None:
-        import threading
-        _audio_buffer_lock = threading.Lock()
-    if _audio_buffer is None:
-        _audio_buffer = {'data': None, 'start_time': 0, 'active': False, 'sample_rate': 24000}
-    return _audio_buffer
+    return {
+        'data': _audio_buffer_singleton.data,
+        'current_chunk': _audio_buffer_singleton.current_chunk,
+        'chunk_time': _audio_buffer_singleton.chunk_time,
+        'start_time': _audio_buffer_singleton.start_time,
+        'sample_rate': _audio_buffer_singleton.sample_rate,
+        'active': _audio_buffer_singleton.active,
+    }
+
+# Lock for thread-safe access
+_audio_buffer_lock = _audio_buffer_singleton.data_lock
 
 def set_audio_data(audio_array, sample_rate=24000):
     """Set audio data for waveform visualization (called by TTS)."""
-    buf = get_audio_buffer()
-    with _audio_buffer_lock:
-        buf['data'] = audio_array
-        buf['start_time'] = time.time()
-        buf['sample_rate'] = sample_rate
-        buf['active'] = True
+    with _audio_buffer_singleton.data_lock:
+        _audio_buffer_singleton.data = audio_array
+        _audio_buffer_singleton.start_time = time.time()
+        _audio_buffer_singleton.sample_rate = sample_rate
+        _audio_buffer_singleton.active = True
 
 def clear_audio_data():
     """Clear audio data when done speaking."""
-    buf = get_audio_buffer()
-    with _audio_buffer_lock:
-        buf['active'] = False
-        buf['data'] = None
-        buf['current_chunk'] = None
+    with _audio_buffer_singleton.data_lock:
+        _audio_buffer_singleton.active = False
+        _audio_buffer_singleton.data = None
+        _audio_buffer_singleton.current_chunk = None
 
 
 def set_audio_chunk(chunk):
     """Set the current audio chunk being played RIGHT NOW (called from TTS callback)."""
-    buf = get_audio_buffer()
-    with _audio_buffer_lock:
-        buf['current_chunk'] = chunk
-        buf['chunk_time'] = time.time()
+    with _audio_buffer_singleton.data_lock:
+        _audio_buffer_singleton.current_chunk = chunk
+        _audio_buffer_singleton.chunk_time = time.time()
+        _audio_buffer_singleton.active = True
 
 
 class AudioWaveform(tk.Canvas):
-    """Real-time audio waveform visualization using shared audio buffer from TTS."""
+    """Real-time audio waveform visualization - draws actual wave that follows voice."""
 
-    def __init__(self, parent, width=480, height=60, **kwargs):
+    def __init__(self, parent, width=480, height=100, **kwargs):
         super().__init__(parent, width=width, height=height,
-                        bg='#0a0a0a', highlightthickness=0, **kwargs)
+                        bg='#0a0a0a', highlightthickness=1,
+                        highlightbackground='#302050', **kwargs)
         self.width = width
         self.height = height
         self.is_playing = False
-        self.bars = []
-        self.num_bars = 40  # Fewer, wider bars for more visible movement
-        self.bar_width = max(4, (width - 40) // self.num_bars)  # Wider bars
         self.animation_id = None
-        self.audio_data = [0] * self.num_bars
-        self.target_heights = [0] * self.num_bars
-        self.current_heights = [0.0] * self.num_bars
-        self.smoothing = 0.5
-        self.sample_rate = 24000  # Kokoro TTS sample rate
-        self.samples_per_frame = self.sample_rate // 30
+        self.wave_line = None
+        self.glow_line = None
+        self.num_points = 100  # More points = smoother wave
+        self.wave_points = [0.0] * self.num_points
+        self.sample_rate = 24000
 
-        # Colors - vibrant cyberpunk gradient
-        self.color_low = (150, 0, 200)     # Bright purple
-        self.color_mid = (255, 0, 255)     # Bright magenta
-        self.color_high = (255, 100, 255)  # Hot pink
+        # Rolling buffer of actual sample values (not just amplitudes)
+        # This stores downsampled audio samples that scroll across
+        self.sample_buffer = [0.0] * self.num_points
 
-        self._create_bars()
+        # Phase offset for animation smoothness
+        self.phase = 0.0
 
-    def _create_bars(self):
-        """Create the waveform bars."""
+        # Draw initial flat line
+        self._draw_flat_line()
+
+    def _draw_flat_line(self):
+        """Draw a flat center line when idle."""
         self.delete("all")
-        self.bars = []
-        gap = 2
-        total_width = self.num_bars * (self.bar_width + gap)
-        start_x = (self.width - total_width) // 2
+        center_y = self.height // 2
+        # Draw a dim baseline
+        self.create_line(0, center_y, self.width, center_y,
+                        fill='#301040', width=2)
 
-        for i in range(self.num_bars):
-            x = start_x + i * (self.bar_width + gap)
-            bar = self.create_rectangle(
-                x, self.height // 2 - 2,
-                x + self.bar_width, self.height // 2 + 2,
-                fill='#400060', outline=''  # More visible purple
-            )
-            self.bars.append(bar)
+    def _build_wave_coords(self, amplitudes):
+        """Build coordinate list for smooth wave from amplitudes.
 
-    def _get_color(self, intensity):
-        """Get color based on intensity (0-1)."""
-        if intensity < 0.5:
-            # Blend low to mid
-            t = intensity * 2
-            r = int(self.color_low[0] + (self.color_mid[0] - self.color_low[0]) * t)
-            g = int(self.color_low[1] + (self.color_mid[1] - self.color_low[1]) * t)
-            b = int(self.color_low[2] + (self.color_mid[2] - self.color_low[2]) * t)
-        else:
-            # Blend mid to high
-            t = (intensity - 0.5) * 2
-            r = int(self.color_mid[0] + (self.color_high[0] - self.color_mid[0]) * t)
-            g = int(self.color_mid[1] + (self.color_high[1] - self.color_mid[1]) * t)
-            b = int(self.color_mid[2] + (self.color_high[2] - self.color_mid[2]) * t)
-        return f'#{r:02x}{g:02x}{b:02x}'
+        Args:
+            amplitudes: List of amplitude values (0-1 range) for each point
+
+        Returns:
+            List of [x0, y0, x1, y1, ...] coordinates for create_line
+        """
+        center_y = self.height // 2
+        max_amplitude = (self.height // 2) - 4  # Leave margin
+
+        coords = []
+        step = self.width / (len(amplitudes) - 1) if len(amplitudes) > 1 else self.width
+
+        for i, amp in enumerate(amplitudes):
+            x = int(i * step)
+            # Amplitude goes both up and down from center
+            y_offset = int(amp * max_amplitude)
+            y = center_y - y_offset  # Negative = up
+            coords.extend([x, y])
+
+        return coords
 
     def start(self):
-        """Start the waveform animation."""
-        self.is_playing = True
-        print("[WAVEFORM] Animation started")
-        self._animate()
+        """Start the waveform animation - runs forever."""
+        if not self.is_playing:
+            self.is_playing = True
+            self.wave_points = [0.0] * self.num_points
+            self.sample_buffer = [0.0] * self.num_points
+            self._animate()
 
     def stop(self):
-        """Stop the waveform animation."""
-        self.is_playing = False
-        if self.animation_id:
-            self.after_cancel(self.animation_id)
-            self.animation_id = None
+        """Stop is now a no-op - waveform runs continuously.
 
-        # Animate bars back to flat
-        self._fade_out()
+        The waveform naturally shows flat when there's no audio.
+        """
+        pass  # Don't stop - keep running forever
 
     def _fade_out(self):
-        """Smoothly fade bars to flat."""
-        center_y = self.height // 2
-        all_flat = True
-
-        for i, bar in enumerate(self.bars):
-            self.current_heights[i] *= 0.7
-            if self.current_heights[i] > 0.5:
-                all_flat = False
-
-            height = max(1, int(self.current_heights[i]))
-            x1, _, x2, _ = self.coords(bar)
-            self.coords(bar, x1, center_y - height, x2, center_y + height)
-
-            if height <= 1:
-                self.itemconfig(bar, fill='#1a0a2a')
-
-        if not all_flat and not self.is_playing:
-            self.after(30, self._fade_out)
+        """Legacy fade out - no longer used."""
+        pass
 
     def _animate(self):
-        """Animate the waveform using real-time audio chunks from TTS callback."""
-        if not self.is_playing:
-            return
+        """Animate the waveform using real-time audio chunks from TTS.
+
+        This creates a scrolling waveform effect where actual audio samples
+        move from right to left, creating visible peaks and valleys that
+        correspond to the voice.
+
+        This runs FOREVER once started - never stops.
+        """
+
+        # Get audio chunk from TTS
+        chunk = None
+        has_audio = False
+
+        try:
+            with _audio_buffer_singleton.data_lock:
+                raw_chunk = _audio_buffer_singleton.current_chunk
+                chunk_time = _audio_buffer_singleton.chunk_time
+                is_active = _audio_buffer_singleton.active
+
+                if chunk_time is not None:
+                    time_since_chunk = time.time() - chunk_time
+                else:
+                    time_since_chunk = 999
+
+                # Accept chunks up to 300ms old
+                if raw_chunk is not None and len(raw_chunk) > 0 and time_since_chunk < 0.3 and is_active:
+                    has_audio = True
+                    if HAS_NUMPY and hasattr(raw_chunk, 'copy'):
+                        chunk = raw_chunk.copy()
+                    else:
+                        chunk = list(raw_chunk)
+        except Exception as e:
+            print(f"[WAVE ERROR] {e}")
+
+        if has_audio and chunk is not None:
+            try:
+                if HAS_NUMPY:
+                    if not isinstance(chunk, np.ndarray):
+                        chunk = np.array(chunk, dtype=np.float32)
+
+                    # Normalize if needed (int16 to float)
+                    max_val = np.max(np.abs(chunk))
+                    if max_val > 1.5:
+                        chunk = chunk / 32768.0
+
+                    # Downsample the chunk to get actual waveform samples
+                    # We want to extract ~10-20 samples per frame to scroll in
+                    chunk_len = len(chunk)
+                    samples_to_add = min(20, self.num_points // 5)  # Add some samples each frame
+
+                    if chunk_len >= samples_to_add:
+                        # Evenly sample from the chunk
+                        indices = np.linspace(0, chunk_len - 1, samples_to_add, dtype=int)
+                        new_samples = chunk[indices]
+
+                        # Amplify HEAVILY for visibility (Kokoro outputs tiny floats 0.01-0.3)
+                        # First find the peak of this chunk for adaptive scaling
+                        chunk_peak = np.max(np.abs(chunk))
+                        if chunk_peak > 0.001:
+                            # Scale so peaks nearly fill the display (0.95 = 95% of height)
+                            scale_factor = 0.95 / chunk_peak
+                            scale_factor = min(scale_factor, 40.0)  # Cap at 40x amplification
+                        else:
+                            scale_factor = 20.0
+                        new_samples = new_samples * scale_factor
+
+                        # Clamp to -1 to 1 range (prevents overflow past boundary)
+                        new_samples = np.clip(new_samples, -1.0, 1.0)
+
+                        # Shift existing samples left and add new ones on right
+                        self.sample_buffer = self.sample_buffer[samples_to_add:] + list(new_samples)
+
+                else:
+                    # Fallback without numpy - take peak samples
+                    chunk_len = len(chunk)
+                    samples_to_add = min(10, self.num_points // 10)
+
+                    if chunk_len >= samples_to_add:
+                        # Find chunk peak for adaptive scaling
+                        chunk_peak = max(abs(float(x)) for x in chunk)
+                        if chunk_peak > 0.001:
+                            scale_factor = min(0.95 / chunk_peak, 40.0)
+                        else:
+                            scale_factor = 20.0
+
+                        step = chunk_len // samples_to_add
+                        new_samples = []
+                        for i in range(samples_to_add):
+                            idx = i * step
+                            val = float(chunk[idx]) * scale_factor
+                            val = max(-1.0, min(1.0, val))
+                            new_samples.append(val)
+
+                        self.sample_buffer = self.sample_buffer[samples_to_add:] + new_samples
+
+                # Copy sample buffer to wave points with smoothing
+                for i in range(self.num_points):
+                    target = self.sample_buffer[i]
+                    # Smooth transition to prevent jitter
+                    self.wave_points[i] = self.wave_points[i] * 0.3 + target * 0.7
+
+            except Exception as e:
+                # On error, just decay
+                for i in range(self.num_points):
+                    self.wave_points[i] *= 0.9
+        else:
+            # No audio - decay existing wave toward zero
+            decay = 0.92
+            for i in range(self.num_points):
+                self.wave_points[i] *= decay
+                self.sample_buffer[i] *= decay
+
+        # Draw the wave
+        self._draw_wave()
+
+        # Schedule next frame (~40 FPS for smooth scrolling)
+        self.animation_id = self.after(25, self._animate)
+
+    def _draw_wave(self):
+        """Draw the waveform on canvas."""
+        self.delete("all")
+
+        # Get actual canvas width (may have been resized)
+        actual_width = self.winfo_width()
+        if actual_width < 10:
+            actual_width = self.width  # Fallback to configured width
 
         center_y = self.height // 2
-        max_height = (self.height // 2) - 5  # Leave some margin
+        max_amp = (self.height // 2) - 5  # Leave small margin
 
-        # Get the CURRENT audio chunk being played right now
-        has_audio = False
-        try:
-            buf = get_audio_buffer()
-            with _audio_buffer_lock:
-                chunk = buf.get('current_chunk')
-                chunk_time = buf.get('chunk_time', 0)
+        # Draw center reference line (dim) - full width
+        self.create_line(0, center_y, actual_width, center_y,
+                        fill='#201030', width=1)
 
-                # Only use chunk if it's fresh (within last 150ms)
-                if chunk is not None and len(chunk) > 0 and (time.time() - chunk_time) < 0.15:
-                    has_audio = True
-                    samples_per_bar = max(1, len(chunk) // self.num_bars)
+        # Build coordinates for the wave - use actual width to fill entire box
+        coords = []
+        step = actual_width / (self.num_points - 1) if self.num_points > 1 else 1
 
-                    for i in range(self.num_bars):
-                        bar_start = i * samples_per_bar
-                        bar_end = min(bar_start + samples_per_bar, len(chunk))
-                        if bar_end > bar_start:
-                            bar_chunk = chunk[bar_start:bar_end]
-                            if HAS_NUMPY:
-                                # Use RMS for more accurate volume representation
-                                rms = float(np.sqrt(np.mean(bar_chunk ** 2)))
-                                peak = float(np.max(np.abs(bar_chunk)))
-                                # Combine RMS and peak, amplify significantly
-                                combined = (rms * 0.6 + peak * 0.4)
-                                self.target_heights[i] = min(1.0, combined * 5.0)
-                            else:
-                                peak = max(abs(float(x)) for x in bar_chunk)
-                                self.target_heights[i] = min(1.0, peak * 5.0)
-                else:
-                    # No fresh audio - decay bars
-                    for i in range(self.num_bars):
-                        self.target_heights[i] = 0
-        except Exception as e:
-            for i in range(self.num_bars):
-                self.target_heights[i] = 0
+        for i, amp in enumerate(self.wave_points):
+            x = int(i * step)
+            y = center_y - int(amp * max_amp)
+            coords.extend([x, y])
 
-        # Animate bars towards target heights
-        for i, bar in enumerate(self.bars):
-            # Smooth interpolation - faster rise, slower fall
-            if self.target_heights[i] > self.current_heights[i]:
-                # Rising - fast response
-                self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.7
-            else:
-                # Falling - slower decay for visual smoothness
-                self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.3
+        if len(coords) >= 4:
+            # Draw outer glow (widest, dimmest)
+            self.create_line(
+                *coords,
+                fill='#400060',
+                width=8,
+                smooth=True,
+                splinesteps=16
+            )
 
-            height = int(self.current_heights[i] * max_height)
-            height = max(2, height)  # Minimum visible height
+            # Draw mid glow
+            self.create_line(
+                *coords,
+                fill='#8000a0',
+                width=5,
+                smooth=True,
+                splinesteps=16
+            )
 
-            x1, _, x2, _ = self.coords(bar)
-            self.coords(bar, x1, center_y - height, x2, center_y + height)
+            # Draw main wave line
+            self.create_line(
+                *coords,
+                fill='#ff40ff',
+                width=3,
+                smooth=True,
+                splinesteps=16
+            )
 
-            # Color based on intensity
-            if self.current_heights[i] > 0.05:
-                color = self._get_color(self.current_heights[i])
-            else:
-                color = '#1a0a2a'  # Dark when quiet
-            self.itemconfig(bar, fill=color)
-
-        self.animation_id = self.after(20, self._animate)  # ~50 FPS for smoother animation
+            # Draw bright core
+            self.create_line(
+                *coords,
+                fill='#ffc0ff',
+                width=1,
+                smooth=True,
+                splinesteps=16
+            )
 
 
 class BootDisplay:
@@ -387,7 +505,7 @@ class BootDisplay:
 
         # Waveform visualization
         wave_frame = tk.Frame(left_frame, bg=self.bg_color)
-        wave_frame.pack(fill='x', pady=5)
+        wave_frame.pack(fill='x', pady=(5, 10))
 
         self.wave_label = tk.Label(
             wave_frame,
@@ -396,11 +514,16 @@ class BootDisplay:
             fg='#666666',
             bg=self.bg_color
         )
-        self.wave_label.pack()
+        self.wave_label.pack(anchor='w')
         self._scalable_widgets.append((self.wave_label, 9, 'Consolas', ''))
 
-        self.waveform = AudioWaveform(wave_frame, width=480, height=50)
-        self.waveform.pack(pady=3, fill='x')
+        # Waveform canvas - 100px tall for visible wave movement
+        self.waveform = AudioWaveform(wave_frame, width=480, height=100)
+        self.waveform.pack(fill='x')
+
+        # Start waveform animation immediately - it runs continuously
+        # and automatically shows waves when receiving audio data
+        self.waveform.start()
 
         # Current speech text (what CORA is saying)
         self.current_text = tk.Label(
@@ -736,16 +859,227 @@ class BootDisplay:
     def _default_process_input(self, text: str):
         """Default input processing using AI chat with mode-based tool use."""
         import threading
+        import re
 
         mode = self.current_mode
+        text_lower = text.lower().strip()
+
+        # ============================================================
+        # NATURAL LANGUAGE COMMAND PARSING
+        # Parse user intent and execute tools directly
+        # ============================================================
 
         def process():
+            nonlocal text_lower, text
+
             try:
+                # ----------------------------------------------------------
+                # CAMERA / VISION COMMANDS
+                # ----------------------------------------------------------
+                camera_patterns = [
+                    r'(show|open|start|run|do|test).*(camera|webcam|cam)',
+                    r'camera.*(feed|test|view)',
+                    r'(look|see|what.*(see|looking))',
+                    r'(show|let).*(see|look)',
+                ]
+                if any(re.search(p, text_lower) for p in camera_patterns):
+                    self.log_action("Opening camera feed...")
+                    self._speak("Opening camera")
+                    try:
+                        from ui.camera_feed import open_live_camera, close_live_camera
+                        import time
+
+                        # Open live camera
+                        camera = open_live_camera(parent=self.root)
+                        if camera and camera.is_active():
+                            self.log_result("Camera feed is live")
+
+                            # Keep it open for viewing - user can close manually
+                            # Or auto-close after 10 seconds if just a test
+                            if 'test' in text_lower:
+                                self._speak("Camera test running. Closing in 5 seconds.")
+                                time.sleep(5)
+                                close_live_camera()
+                                self.log_result("Camera test complete")
+                        else:
+                            self.log_fail("Could not open camera")
+                            self._speak("Camera not available")
+                    except Exception as e:
+                        self.log_fail(f"Camera error: {e}")
+                        self._speak("Camera error")
+                    return
+
+                # ----------------------------------------------------------
+                # SCREENSHOT COMMANDS
+                # ----------------------------------------------------------
+                screenshot_patterns = [
+                    r'(take|capture|grab|get).*(screenshot|screen|snap)',
+                    r'screenshot',
+                    r'(show|what.*(on|is)).*(screen|display)',
+                ]
+                if any(re.search(p, text_lower) for p in screenshot_patterns):
+                    self.log_action("Taking screenshot...")
+                    try:
+                        from cora_tools.screenshots import desktop
+                        result = desktop()
+                        if result.success:
+                            self.log_result(f"Screenshot saved: {result.path}")
+                            # Analyze with vision AI if user asked a question
+                            if '?' in text or 'what' in text_lower or 'describe' in text_lower:
+                                from ai.ollama import generate_with_image
+                                prompt = text if text else "Describe what you see on this screen"
+                                vision_result = generate_with_image(prompt, result.path)
+                                if vision_result.content:
+                                    self.log_result(vision_result.content)
+                                    self._speak(vision_result.content)
+                            else:
+                                self._speak(f"Screenshot captured")
+                        else:
+                            self.log_fail(f"Screenshot failed: {result.error}")
+                    except Exception as e:
+                        self.log_fail(f"Screenshot error: {e}")
+                    return
+
+                # ----------------------------------------------------------
+                # YOUTUBE / MUSIC / PLAY COMMANDS
+                # ----------------------------------------------------------
+                play_patterns = [
+                    r'(play|put on|start|listen).*(music|song|youtube|video|audio)',
+                    r'play\s+(.+)',
+                    r'(youtube|yt)\s+(.+)',
+                ]
+                play_match = re.search(r'play\s+(.+)', text_lower) or re.search(r'(put on|listen to)\s+(.+)', text_lower)
+                if play_match or any(re.search(p, text_lower) for p in play_patterns[:2]):
+                    # Extract what to play
+                    query = play_match.group(1) if play_match else text_lower.replace('play', '').replace('music', '').strip()
+                    if query:
+                        self.log_action(f"Searching YouTube: {query}")
+                        self._speak(f"Playing {query}")
+                        try:
+                            # Use the YouTube/media tool
+                            import subprocess
+                            import shutil
+
+                            # Check if mpv is available
+                            mpv_path = shutil.which('mpv')
+                            if not mpv_path:
+                                # Check tools folder
+                                import os
+                                tools_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools')
+                                for root, dirs, files in os.walk(tools_dir):
+                                    if 'mpv.exe' in files:
+                                        mpv_path = os.path.join(root, 'mpv.exe')
+                                        break
+
+                            if mpv_path:
+                                # Use yt-dlp with mpv
+                                cmd = f'yt-dlp -o - "ytsearch1:{query}" 2>nul | "{mpv_path}" --no-video -'
+                                subprocess.Popen(cmd, shell=True)
+                                self.log_result(f"Playing: {query}")
+                            else:
+                                self.log_fail("mpv not installed - YouTube playback unavailable")
+                                self._speak("mpv media player is needed for YouTube. Check the tools folder.")
+                        except Exception as e:
+                            self.log_fail(f"Playback error: {e}")
+                    else:
+                        self._speak("What would you like me to play?")
+                    return
+
+                # ----------------------------------------------------------
+                # IMAGE GENERATION COMMANDS
+                # ----------------------------------------------------------
+                imagine_patterns = [
+                    r'(imagine|create|generate|draw|make|show me).*(image|picture|photo|art)',
+                    r'(imagine|draw|create)\s+(.+)',
+                ]
+                imagine_match = re.search(r'(imagine|draw|create|generate)\s+(.+)', text_lower)
+                if imagine_match or 'generate' in text_lower and 'image' in text_lower:
+                    prompt = imagine_match.group(2) if imagine_match else text
+                    if prompt:
+                        self.log_action(f"Generating image: {prompt}")
+                        self._speak(f"Creating {prompt}")
+                        try:
+                            from cora_tools.image_gen import generate_image
+                            result = generate_image(prompt)
+                            if result.get('success'):
+                                self.log_result(f"Image saved: {result.get('path')}")
+                                self._speak("Image generated")
+                            else:
+                                self.log_fail(f"Generation failed: {result.get('error')}")
+                        except Exception as e:
+                            self.log_fail(f"Image gen error: {e}")
+                    return
+
+                # ----------------------------------------------------------
+                # SYSTEM INFO COMMANDS
+                # ----------------------------------------------------------
+                if re.search(r'(system|cpu|ram|gpu|memory|disk).*(stats|info|status|usage)', text_lower) or \
+                   re.search(r'(how.*(much|many)|what).*(memory|ram|cpu|gpu|disk)', text_lower):
+                    self.log_action("Getting system stats...")
+                    try:
+                        import psutil
+                        cpu = psutil.cpu_percent(interval=0.5)
+                        ram = psutil.virtual_memory()
+                        disk = psutil.disk_usage('/')
+
+                        stats = f"CPU: {cpu}%, RAM: {ram.percent}% ({ram.used // (1024**3)}GB used), Disk: {disk.percent}%"
+                        self.log_result(stats)
+                        self._speak(f"CPU at {cpu} percent. RAM at {ram.percent} percent. Disk at {disk.percent} percent.")
+                    except Exception as e:
+                        self.log_fail(f"Stats error: {e}")
+                    return
+
+                # ----------------------------------------------------------
+                # TIME / DATE COMMANDS
+                # ----------------------------------------------------------
+                if re.search(r'(what|tell).*(time|date|day)', text_lower) or text_lower in ['time', 'date']:
+                    from datetime import datetime
+                    now = datetime.now()
+                    time_str = now.strftime("%I:%M %p")
+                    date_str = now.strftime("%A, %B %d, %Y")
+                    self.log_result(f"{time_str} - {date_str}")
+                    self._speak(f"It's {time_str} on {date_str}")
+                    return
+
+                # ----------------------------------------------------------
+                # WEATHER COMMANDS
+                # ----------------------------------------------------------
+                if re.search(r'(what|how).*(weather|temperature|temp)', text_lower) or 'weather' in text_lower:
+                    self.log_action("Checking weather...")
+                    try:
+                        from services.weather import get_weather
+                        weather = get_weather()
+                        if weather:
+                            self.log_result(str(weather))
+                            self._speak(f"It's {weather.get('temp', 'unknown')} degrees and {weather.get('condition', 'unknown')}")
+                        else:
+                            self._speak("Couldn't get weather info")
+                    except Exception as e:
+                        self.log_fail(f"Weather error: {e}")
+                    return
+
+                # ----------------------------------------------------------
+                # STOP / QUIET COMMANDS
+                # ----------------------------------------------------------
+                if text_lower in ['stop', 'quiet', 'shut up', 'be quiet', 'silence', 'mute']:
+                    self.log("Okay, I'll be quiet", 'info')
+                    try:
+                        from voice.tts import stop_speaking
+                        stop_speaking()
+                    except:
+                        pass
+                    return
+
+                # ----------------------------------------------------------
+                # FALL THROUGH TO AI CHAT
+                # If no command matched, use AI chat
+                # ----------------------------------------------------------
+
                 # MODE: Screenshot - take screenshot, analyze with AI
                 if mode == 'screenshot':
                     self.log_action("Taking screenshot...")
                     try:
-                        from tools.screenshots import desktop
+                        from cora_tools.screenshots import desktop
                         result = desktop()
                         if result.success:
                             self.log_result(f"Screenshot saved: {result.path}")
@@ -803,7 +1137,7 @@ class BootDisplay:
                         self.log_action(f"Generating image: {text}")
                         self._speak(f"Creating {text}")
                         try:
-                            from tools.image_gen import generate_image
+                            from cora_tools.image_gen import generate_image
                             result = generate_image(text)
                             if result.get('success'):
                                 self.log_result(f"Image saved: {result.get('path')}")
@@ -821,7 +1155,7 @@ class BootDisplay:
                     self.log_action("Loading tasks for context...")
                     task_context = ""
                     try:
-                        from tools.tasks import TaskManager
+                        from cora_tools.tasks import TaskManager
                         tm = TaskManager()
                         if tm.tasks:
                             task_context = f"Current tasks: {[t.get('text', '') for t in tm.tasks[:10]]}"
@@ -886,14 +1220,14 @@ class BootDisplay:
                     self.log_action(f"Generating image: {prompt}")
                     self._speak(f"Fine, I'll make your fucking picture")
                     try:
-                        from tools.image_gen import generate_image
+                        from cora_tools.image_gen import generate_image
                         result = generate_image(prompt)
                         if result.get('success'):
                             self.log_result(f"Image saved: {result.get('path')}")
                             self._speak("There. Your shitty image is done.")
                             # Show the image
                             try:
-                                from tools.image_gen import show_fullscreen_image
+                                from cora_tools.image_gen import show_fullscreen_image
                                 show_fullscreen_image(result.get('path'), duration=5)
                             except:
                                 pass
@@ -929,23 +1263,22 @@ class BootDisplay:
         threading.Thread(target=process, daemon=True).start()
 
     def _speak(self, text: str):
-        """Speak text via TTS - shows text first, then speaks in background."""
-        # Show text in UI FIRST so user can read along while TTS plays
-        self.start_speaking(text)
+        """Speak text via TTS - shows text first, then speaks in background.
+
+        Note: Waveform start/stop is handled automatically by KokoroTTS.speak()
+        via the set_boot_display() registration.
+        """
+        # Log the speech to show what CORA is saying
+        self.log_speech(text)
 
         def speak_thread():
             try:
                 from voice.tts import KokoroTTS
                 tts = KokoroTTS(voice='af_bella', speed=1.0)
                 if tts.initialize():
-                    tts.speak(text)
-
-                # Update UI safely from thread
-                if self.root:
-                    self.root.after(0, self.stop_speaking)
+                    tts.speak(text)  # This handles waveform internally
             except Exception as e:
-                if self.root:
-                    self.root.after(0, self.stop_speaking)
+                print(f"[TTS ERROR] {e}")
 
         # Run TTS in separate thread so UI stays responsive
         threading.Thread(target=speak_thread, daemon=True).start()
@@ -1414,7 +1747,11 @@ class BootDisplay:
             self.stats_update_id = self.root.after(1000, self._update_stats_ui)
 
     def start_speaking(self, text: str):
-        """Start waveform animation when speaking."""
+        """Called when CORA starts speaking - updates UI text.
+
+        Note: The waveform runs continuously and automatically shows waves
+        when receiving audio data. No need to start/stop it.
+        """
         self.is_speaking = True
         try:
             if self.current_text:
@@ -1422,20 +1759,19 @@ class BootDisplay:
                 self.current_text.config(text=f'"{text}"')
             # Log the full speech to the console
             self.log_speech(text)
-            if self.waveform:
-                print(f"[WAVEFORM] Calling waveform.start()")
-                self.waveform.start()
-            else:
-                print(f"[WAVEFORM] No waveform object!")
-        except Exception as e:
-            print(f"[WAVEFORM] start_speaking error: {e}")
+        except Exception:
+            pass
 
     def stop_speaking(self):
-        """Stop waveform animation."""
+        """Called when CORA stops speaking - clears UI text.
+
+        Note: The waveform runs continuously and naturally decays
+        when there's no audio data.
+        """
         self.is_speaking = False
         try:
-            if self.waveform:
-                self.waveform.stop()
+            if self.current_text:
+                self.current_text.config(text="")
         except:
             pass
 
@@ -1519,9 +1855,27 @@ class BootDisplay:
                 pass
 
     def run(self):
-        """Run the tkinter mainloop."""
+        """Run the tkinter mainloop with speech queue processing."""
         if self.root:
+            # Start speech queue processor
+            self._process_speech_queue()
             self.root.mainloop()
+
+    def _process_speech_queue(self):
+        """Process TTS speech queue updates (runs on main thread)."""
+        try:
+            from voice.tts import process_speech_queue
+            process_speech_queue()
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        # Schedule next check in 50ms
+        if self.root:
+            try:
+                self.root.after(50, self._process_speech_queue)
+            except:
+                pass
 
 
 # Global display instance

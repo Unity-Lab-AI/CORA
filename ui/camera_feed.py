@@ -193,9 +193,8 @@ class LiveCameraFeed:
             self.is_running = True
             self.status_label.config(text="Live", fg='#00ff88')
 
-            # Start update thread
-            self._update_thread = threading.Thread(target=self._update_loop, daemon=True)
-            self._update_thread.start()
+            # Start frame updates using after() - thread-safe for tkinter
+            self.window.after(100, self._update_loop)
 
             return True
 
@@ -204,31 +203,37 @@ class LiveCameraFeed:
             return False
 
     def _update_loop(self):
-        """Background thread to update video frames."""
-        while self.is_running and self.cap and self.cap.isOpened():
+        """Update video frames using tkinter's after() for thread safety."""
+        if not self.is_running or not self.cap or not self.cap.isOpened():
+            return
+
+        try:
+            ret, frame = self.cap.read()
+            if ret and frame is not None:
+                self.current_frame = frame
+
+                # Convert to PhotoImage
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_rgb)
+
+                # Resize to fit window
+                img = img.resize((self.width - 10, self.height - 10), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+
+                # Update label
+                if self.frame_label and self.is_running:
+                    self.frame_label.configure(image=photo, text='')
+                    self.frame_label.image = photo  # Keep reference
+
+        except Exception as e:
+            print(f"[Camera] Frame error: {e}")
+
+        # Schedule next frame update (30 FPS = ~33ms)
+        if self.is_running and self.window:
             try:
-                ret, frame = self.cap.read()
-                if ret:
-                    self.current_frame = frame
-
-                    # Convert to PhotoImage
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    img = Image.fromarray(frame_rgb)
-
-                    # Resize to fit window
-                    img = img.resize((self.width - 10, self.height - 10), Image.Resampling.LANCZOS)
-                    photo = ImageTk.PhotoImage(img)
-
-                    # Update label (thread-safe)
-                    if self.frame_label and self.is_running:
-                        self.frame_label.configure(image=photo, text='')
-                        self.frame_label.image = photo
-
-                time.sleep(0.033)  # ~30 FPS
-
-            except Exception as e:
-                print(f"[Camera] Frame error: {e}")
-                time.sleep(0.1)
+                self.window.after(33, self._update_loop)
+            except:
+                pass
 
     def take_snapshot(self) -> Optional[Path]:
         """

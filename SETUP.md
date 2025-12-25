@@ -41,7 +41,12 @@ ollama pull llama3.2
 ollama pull llava
 ```
 
-### Step 5: Run CORA
+### Step 5: Install mpv (Optional - for YouTube)
+Download from: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
+
+Extract to `CORA/tools/` - CORA will find mpv.exe automatically.
+
+### Step 6: Run CORA
 ```bash
 python src/boot_sequence.py
 ```
@@ -60,6 +65,7 @@ python src/boot_sequence.py
 | GPU | None | NVIDIA (CUDA) |
 | VRAM | N/A | 8 GB+ |
 | Storage | 5 GB | 10 GB |
+| mpv | Optional | For YouTube playback |
 
 ### Python Dependencies
 

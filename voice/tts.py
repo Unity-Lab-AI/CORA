@@ -12,6 +12,8 @@ import queue
 import subprocess
 import tempfile
 import threading
+import time
+import numpy as np
 from typing import Optional, Callable
 
 # Import TTS mutex for preventing overlapping speech
@@ -27,6 +29,55 @@ try:
     PRESENCE_AVAILABLE = True
 except ImportError:
     PRESENCE_AVAILABLE = False
+
+# Import waveform audio buffer at module level for reliable sharing
+try:
+    from ui.boot_display import _audio_buffer_singleton
+    WAVEFORM_AVAILABLE = True
+except ImportError:
+    _audio_buffer_singleton = None
+    WAVEFORM_AVAILABLE = False
+
+# Note: Waveform visualization is handled automatically.
+# The waveform in boot_display.py runs continuously and responds to
+# audio data in _audio_buffer_singleton. No explicit start/stop needed.
+
+# Reference to boot display for updating speech text in UI
+_boot_display = None
+
+# Pending speech text updates (thread-safe queue for UI updates)
+import queue
+_speech_queue = queue.Queue()
+
+def set_boot_display(display):
+    """Set the boot display reference for UI text updates."""
+    global _boot_display
+    _boot_display = display
+
+def _update_speech_text(text: str):
+    """Queue speech text update for UI (thread-safe)."""
+    _speech_queue.put(('start', text))
+
+def _clear_speech_text():
+    """Queue speech text clear for UI (thread-safe)."""
+    _speech_queue.put(('stop', None))
+
+def process_speech_queue():
+    """Process pending speech text updates (call from main thread).
+
+    This should be called periodically from the main thread's update loop.
+    """
+    global _boot_display
+    try:
+        while not _speech_queue.empty():
+            action, text = _speech_queue.get_nowait()
+            if _boot_display:
+                if action == 'start' and text:
+                    _boot_display.start_speaking(text)
+                elif action == 'stop':
+                    _boot_display.stop_speaking()
+    except:
+        pass
 
 
 class TTSEngine:
@@ -109,6 +160,9 @@ class KokoroTTS(TTSEngine):
             if not clean_text:
                 return True  # Nothing to speak after cleaning
 
+            # Update UI to show what CORA is saying
+            _update_speech_text(clean_text)
+
             # Get speed modifier based on emotion
             speed = self._get_emotion_speed(emotion)
 
@@ -116,21 +170,17 @@ class KokoroTTS(TTSEngine):
             for result in self.pipeline(clean_text, voice=self.voice, speed=speed):
                 if result.audio is not None:
                     # Share audio data with waveform visualizer BEFORE playing
-                    try:
-                        import sys
-                        from pathlib import Path
-                        # Add project root to path
-                        project_dir = Path(__file__).parent.parent
-                        if str(project_dir) not in sys.path:
-                            sys.path.insert(0, str(project_dir))
-                        from ui.boot_display import set_audio_data, clear_audio_data
-                        # Set audio data - waveform will read from this during playback
-                        audio_len = len(result.audio) if result.audio is not None else 0
-                        audio_max = float(max(abs(result.audio))) if audio_len > 0 else 0
-                        print(f"[WAVEFORM] Setting audio: {audio_len} samples, max amplitude: {audio_max:.4f}")
-                        set_audio_data(result.audio, sample_rate=24000)
-                    except Exception as e:
-                        print(f"[DEBUG] Waveform audio share failed: {e}")
+                    if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+                        try:
+                            audio_len = len(result.audio) if result.audio is not None else 0
+                            audio_max = float(np.max(np.abs(result.audio))) if audio_len > 0 else 0
+                            with _audio_buffer_singleton.data_lock:
+                                _audio_buffer_singleton.data = result.audio
+                                _audio_buffer_singleton.start_time = time.time()
+                                _audio_buffer_singleton.sample_rate = 24000
+                                _audio_buffer_singleton.active = True
+                        except Exception as e:
+                            pass
 
                     # Play audio with real-time level reporting for waveform
                     audio_data = result.audio
@@ -155,12 +205,19 @@ class KokoroTTS(TTSEngine):
                             raise self.sd.CallbackStop()
 
                         # Send current audio chunk to waveform visualizer
-                        try:
-                            from ui.boot_display import set_audio_chunk
-                            chunk = audio_data[start:end] if end <= len(audio_data) else audio_data[start:]
-                            set_audio_chunk(chunk)
-                        except:
-                            pass
+                        if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+                            try:
+                                chunk = audio_data[start:end] if end <= len(audio_data) else audio_data[start:]
+                                # Ensure numpy array for waveform
+                                if not isinstance(chunk, np.ndarray):
+                                    chunk = np.array(chunk, dtype=np.float32)
+                                # Directly update singleton for guaranteed same instance
+                                with _audio_buffer_singleton.data_lock:
+                                    _audio_buffer_singleton.current_chunk = chunk.copy()
+                                    _audio_buffer_singleton.chunk_time = time.time()
+                                    _audio_buffer_singleton.active = True
+                            except Exception:
+                                pass
 
                         position[0] = end
 
@@ -175,14 +232,21 @@ class KokoroTTS(TTSEngine):
                             self.sd.sleep(10)
 
                     # Clear audio data AFTER playback is done
-                    try:
-                        from ui.boot_display import clear_audio_data
-                        clear_audio_data()
-                    except:
-                        pass
+                    if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+                        try:
+                            with _audio_buffer_singleton.data_lock:
+                                _audio_buffer_singleton.active = False
+                                _audio_buffer_singleton.data = None
+                                _audio_buffer_singleton.current_chunk = None
+                        except:
+                            pass
+
+            # Clear speech text from UI
+            _clear_speech_text()
             return True
         except Exception as e:
             print(f"[!] Kokoro TTS error: {e}")
+            _clear_speech_text()
             return False
 
     def get_audio(self, text, emotion='neutral'):

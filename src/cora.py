@@ -676,7 +676,7 @@ def boot_sequence():
 
     # Reminders
     try:
-        from tools.calendar import get_pending_reminders
+        from cora_tools.calendar import get_pending_reminders
         reminders = get_pending_reminders()
         if reminders:
             print(f"[OK] Active Reminders: {len(reminders)}")
@@ -1090,7 +1090,7 @@ def cmd_recall(args, tasks):
 def cmd_remember(args, tasks):
     """Remember/recall working memory. Usage: remember [key] [value] or remember (show all)"""
     try:
-        from tools.memory import get_memory, remember, recall, forget
+        from cora_tools.memory import get_memory, remember, recall, forget
     except ImportError:
         print("Error: Memory module not available")
         return tasks
@@ -2086,7 +2086,7 @@ def cmd_remind(args, tasks):
         message = ' '.join(message_words)
 
     try:
-        from tools.reminders import parse_time_string, ReminderManager
+        from cora_tools.reminders import parse_time_string, ReminderManager
 
         remind_time = parse_time_string(time_str)
         if remind_time is None:
@@ -2121,7 +2121,7 @@ def cmd_open(args, tasks):
     target = ' '.join(args)
 
     try:
-        from tools.system import open_file, launch_app
+        from cora_tools.system import open_file, launch_app
         import os
 
         # Check if it's a file path
@@ -2321,7 +2321,7 @@ def cmd_imagine(args, tasks):
     prompt = ' '.join(args)
 
     try:
-        from tools.image_gen import generate_image, show_fullscreen_image
+        from cora_tools.image_gen import generate_image, show_fullscreen_image
 
         print(f"[CORA]: Creating image: {prompt[:50]}...")
         speak("Generating image. This might take a moment.")
