@@ -211,7 +211,7 @@ class AudioWaveform(tk.Canvas):
                         current_sample = int(elapsed * sample_rate)
 
                         # Get samples around current playback position
-                        samples_per_frame = sample_rate // 30  # ~800 samples at 24kHz
+                        samples_per_frame = sample_rate // 20  # More samples for smoother viz
                         start_pos = max(0, current_sample - samples_per_frame // 2)
                         end_pos = min(len(audio), current_sample + samples_per_frame // 2)
 
@@ -228,16 +228,20 @@ class AudioWaveform(tk.Canvas):
                                     bar_end = min(bar_start + samples_per_bar, len(chunk))
                                     if bar_start < len(chunk):
                                         bar_chunk = chunk[bar_start:bar_end]
-                                        # RMS amplitude
+                                        # RMS amplitude - audio is typically -1 to 1 or -32768 to 32767
                                         if HAS_NUMPY:
-                                            rms = float(np.sqrt(np.mean(bar_chunk**2)))
+                                            # Normalize if needed (Kokoro outputs float32 -1 to 1)
+                                            rms = float(np.sqrt(np.mean(np.abs(bar_chunk)**2)))
+                                            # Much higher sensitivity for speech audio
+                                            self.target_heights[i] = min(1.0, rms * 3.0)
                                         else:
                                             rms = sum(abs(float(x)) for x in bar_chunk) / len(bar_chunk)
-                                        # Scale to 0-1 (adjust multiplier for sensitivity)
-                                        self.target_heights[i] = min(1.0, rms * 10)
+                                            self.target_heights[i] = min(1.0, rms * 3.0)
                                     else:
                                         self.target_heights[i] = 0
             except Exception as e:
+                # Debug: print error
+                print(f"[WAVEFORM] Error: {e}")
                 has_real_audio = False
 
         # If no real audio data, show flat/idle state (not fake waves)

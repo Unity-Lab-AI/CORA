@@ -115,26 +115,30 @@ class KokoroTTS(TTSEngine):
             # Generate audio using Kokoro pipeline
             for result in self.pipeline(clean_text, voice=self.voice, speed=speed):
                 if result.audio is not None:
-                    # Share audio data with waveform visualizer
+                    # Share audio data with waveform visualizer BEFORE playing
                     try:
                         import sys
                         from pathlib import Path
-                        # Ensure ui directory is in path
-                        ui_dir = Path(__file__).parent.parent / 'ui'
-                        if str(ui_dir) not in sys.path:
-                            sys.path.insert(0, str(ui_dir))
-                        from boot_display import set_audio_data, clear_audio_data
+                        # Add project root to path
+                        project_dir = Path(__file__).parent.parent
+                        if str(project_dir) not in sys.path:
+                            sys.path.insert(0, str(project_dir))
+                        from ui.boot_display import set_audio_data, clear_audio_data
+                        # Set audio data - waveform will read from this during playback
+                        audio_len = len(result.audio) if result.audio is not None else 0
+                        audio_max = float(max(abs(result.audio))) if audio_len > 0 else 0
+                        print(f"[WAVEFORM] Setting audio: {audio_len} samples, max amplitude: {audio_max:.4f}")
                         set_audio_data(result.audio, sample_rate=24000)
                     except Exception as e:
                         print(f"[DEBUG] Waveform audio share failed: {e}")
 
                     # Play audio at 24kHz sample rate
                     self.sd.play(result.audio, samplerate=24000)
-                    self.sd.wait()
+                    self.sd.wait()  # Block until audio finishes
 
-                    # Clear audio data when done
+                    # Clear audio data AFTER playback is done
                     try:
-                        from boot_display import clear_audio_data
+                        from ui.boot_display import clear_audio_data
                         clear_audio_data()
                     except:
                         pass
