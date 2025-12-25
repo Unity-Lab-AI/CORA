@@ -1815,12 +1815,12 @@ WHEN RESPONDING:
         function createDynamicModal(title, width = 800, height = 600) {
             const windowId = 'window_' + Date.now();
 
-            // Semi-transparent overlay (click to unfocus, not close)
+            // Transparent overlay (no grey background - windows float freely)
             const overlay = document.createElement('div');
             overlay.id = windowId + '_overlay';
             overlay.style.cssText = `
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.5); z-index: ${windowZIndex - 1};
+                background: transparent; z-index: ${windowZIndex - 1};
                 pointer-events: none;
             `;
 
