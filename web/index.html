@@ -856,7 +856,9 @@ RESPONSE RULES:
         // Flag to track if AI is ready for CORA responses
         let aiReady = false;
 
-        // CORA generates her own responses using AI (EXACT match to desktop cora_respond)
+        // CORA generates her own responses using AI
+        // System prompt (CORA_SYSTEM_PROMPT) contains full personality
+        // Keep prompts simple - let system prompt do the work
         async function coraRespond(context, result, status = 'ok', mode = 'quick') {
             if (!aiReady) {
                 console.log('[CORA] AI not ready yet, using raw result');
@@ -870,21 +872,18 @@ RESPONSE RULES:
             try {
                 let prompt;
                 let temperature;
+                let maxTokens;
 
                 if (mode === 'quick') {
-                    // Force CORA's personality - be dismissive, use profanity, show attitude
-                    prompt = `You are CORA, a mean goth bitch. Announce this boot status in 1-2 SHORT sentences. Be dismissive, maybe add "whatever" or use mild profanity. Include the key data/numbers but make it sound like you don't give a shit. DO NOT start with "CORA:".
-
-Data: ${result}
-
-Example tone: "Yeah yeah, 8 models loaded, big fucking deal." or "Hardware's fine I guess. Moving on."`;
+                    // Short status updates - EXACT format from desktop boot_sequence.py line 240
+                    prompt = `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include ALL the data/numbers.]\n${result}`;
                     temperature = 0.9;
+                    maxTokens = 100;
                 } else {
-                    // Full mode - news, weather, descriptions - still with attitude
-                    prompt = `You are CORA. Announce this in 1-2 sentences with your usual dismissive attitude. Include the data but sound bored or sarcastic. DO NOT start with "CORA:".
-
-Info: ${result}`;
-                    temperature = 0.8;
+                    // Full mode for weather, news, camera descriptions, etc. - allow longer response
+                    prompt = `Announce this naturally with your usual attitude: ${result}`;
+                    temperature = 0.7;
+                    maxTokens = 300;  // Allow more for content-rich responses
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
@@ -895,7 +894,7 @@ Info: ${result}`;
                         prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: temperature, num_predict: 150 }
+                        options: { temperature: temperature, num_predict: maxTokens }
                     })
                 });
 
