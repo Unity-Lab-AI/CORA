@@ -2797,7 +2797,8 @@ WHEN RESPONDING:
             const setupTerminal = document.getElementById('setupTerminal');
             mainContainer.style.display = 'none';
             setupTerminal.style.display = 'flex';
-            document.getElementById('toggleBtn').textContent = '[ MAIN VIEW ]';
+            viewMode = 'setup';  // Track view state correctly
+            document.getElementById('toggleBtn').textContent = '[ BACK TO MAIN ]';
 
             setupLog('', '#ffffff');
             setupLog('============================================================', '#ff00ff');
@@ -4913,6 +4914,13 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             localStorage.setItem('cora_boot_complete', 'true');
             localStorage.setItem('cora_boot_date', new Date().toISOString());
             log('First-time setup saved - next boot will be faster!', 'info');
+
+            // If we're in setup terminal view (from auto-install), switch back to main
+            if (viewMode === 'setup') {
+                setupLog('[BOOT COMPLETE] Switching to main interface...', '#00ff00');
+                await sleep(1000);  // Brief pause so user sees the message
+                backToMain();
+            }
 
             // Show chat interface
             document.getElementById('chatSection').classList.add('visible');
