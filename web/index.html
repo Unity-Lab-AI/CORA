@@ -820,74 +820,132 @@
 
         // ============================================================
         // WAVEFORM - EXACT 1:1 PORT FROM boot_display.py AudioWaveform
+        // Lines 127-384 of boot_display.py
+        // THIS RUNS FOREVER - NEVER STOPS
         // ============================================================
 
-        // EXACT values from boot_display.py line 140-149
-        const NUM_POINTS = 100;
-        let wave_points = new Array(NUM_POINTS).fill(0.0);
-        let sample_buffer = new Array(NUM_POINTS).fill(0.0);
-        let wavePhase = 0.0;
+        // EXACT values from boot_display.py lines 140-146
+        const NUM_POINTS = 100;  // self.num_points = 100
+        let wave_points = new Array(NUM_POINTS).fill(0.0);  // self.wave_points
+        let sample_buffer = new Array(NUM_POINTS).fill(0.0);  // self.sample_buffer
+
+        // Audio state - like _audio_buffer_singleton in desktop
+        let audio_chunk = null;  // Current audio samples
+        let audio_chunk_time = null;  // When chunk was received
+        let audio_is_active = false;  // Is TTS currently speaking
 
         function initWaveform() {
             const canvas = document.getElementById('waveformCanvas');
-            // Set actual pixel size (retina support)
             const rect = canvas.getBoundingClientRect();
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
             waveformCtx = canvas.getContext('2d');
             waveformCtx.scale(2, 2);
 
-            // Start animation loop - runs FOREVER like desktop
+            // Start animation - RUNS FOREVER, NEVER STOPS (line 212)
             _animate();
         }
 
+        // These just set the audio state - animation NEVER stops
         function startWaveform() {
-            waveformActive = true;
+            audio_is_active = true;
+            audio_chunk_time = Date.now();
         }
 
         function stopWaveform() {
-            // Don't stop - waveform runs forever, decays naturally
-            waveformActive = false;
+            audio_is_active = false;
+        }
+
+        // Feed actual audio samples to waveform (like _audio_buffer_singleton)
+        function feedAudioChunk(samples) {
+            audio_chunk = samples;
+            audio_chunk_time = Date.now();
         }
 
         function _animate() {
-            // EXACT port of boot_display.py _animate() method (lines 205-322)
+            // EXACT port of boot_display.py _animate() lines 205-322
+            // "This runs FOREVER once started - never stops."
+
             const canvas = document.getElementById('waveformCanvas');
             const rect = canvas.getBoundingClientRect();
             const width = rect.width;
             const height = rect.height;
 
-            if (waveformActive) {
-                // Simulate audio chunks scrolling in from right
-                // Desktop uses samples_to_add = min(20, num_points // 5) = 20
-                wavePhase += 0.12;
-                const samples_to_add = 8;
+            // Check for audio - like lines 219-236
+            let has_audio = false;
+            let chunk = null;
 
-                // Generate voice-like samples (simulating Kokoro TTS output)
+            if (audio_chunk_time !== null) {
+                const time_since_chunk = Date.now() - audio_chunk_time;
+                // Accept chunks up to 300ms old (line 231)
+                if (audio_chunk !== null && time_since_chunk < 300 && audio_is_active) {
+                    has_audio = true;
+                    chunk = audio_chunk;
+                }
+            }
+
+            if (has_audio && chunk !== null) {
+                // Process audio chunk - lines 240-305
+                const chunk_len = chunk.length;
+                const samples_to_add = Math.min(20, Math.floor(NUM_POINTS / 5));  // line 254
+
+                if (chunk_len >= samples_to_add) {
+                    // Downsample - line 258-259
+                    const new_samples = [];
+                    for (let i = 0; i < samples_to_add; i++) {
+                        const idx = Math.floor(i * chunk_len / samples_to_add);
+                        new_samples.push(chunk[idx]);
+                    }
+
+                    // Find peak for adaptive scaling - lines 263-270
+                    let chunk_peak = 0;
+                    for (let i = 0; i < chunk.length; i++) {
+                        chunk_peak = Math.max(chunk_peak, Math.abs(chunk[i]));
+                    }
+                    let scale_factor = 20.0;
+                    if (chunk_peak > 0.001) {
+                        scale_factor = Math.min(0.95 / chunk_peak, 40.0);
+                    }
+
+                    // Scale and clamp - lines 270-273
+                    for (let i = 0; i < new_samples.length; i++) {
+                        new_samples[i] = Math.max(-1.0, Math.min(1.0, new_samples[i] * scale_factor));
+                    }
+
+                    // Shift buffer left, add new on right - line 276
+                    sample_buffer = sample_buffer.slice(samples_to_add).concat(new_samples);
+                }
+
+                // Smooth transition - lines 302-305
+                for (let i = 0; i < NUM_POINTS; i++) {
+                    wave_points[i] = wave_points[i] * 0.3 + sample_buffer[i] * 0.7;
+                }
+
+            } else if (audio_is_active) {
+                // Active but no chunk yet - simulate voice-like audio
+                const t = Date.now() / 100;
+                const samples_to_add = 8;
                 const new_samples = [];
+
                 for (let i = 0; i < samples_to_add; i++) {
-                    const t = wavePhase + i * 0.25;
-                    // Voice harmonics simulation
-                    let sample = Math.sin(t * 3.2) * 0.5
-                              + Math.sin(t * 6.7) * 0.3
-                              + Math.sin(t * 11.3) * 0.15
-                              + (Math.random() - 0.5) * 0.25;
-                    // Envelope modulation
-                    sample *= (0.6 + Math.sin(t * 0.7) * 0.4);
-                    // Clamp to -1 to 1 (line 273)
+                    const phase = t + i * 0.3;
+                    let sample = Math.sin(phase * 2.1) * 0.5
+                              + Math.sin(phase * 4.3) * 0.3
+                              + Math.sin(phase * 7.2) * 0.15
+                              + (Math.random() - 0.5) * 0.3;
+                    sample *= (0.5 + Math.sin(phase * 0.5) * 0.5);
                     sample = Math.max(-1.0, Math.min(1.0, sample));
                     new_samples.push(sample);
                 }
 
-                // Shift buffer left, add new on right (line 276)
                 sample_buffer = sample_buffer.slice(samples_to_add).concat(new_samples);
 
-                // Smooth transition: wave_points[i] = wave_points[i] * 0.3 + target * 0.7 (line 305)
                 for (let i = 0; i < NUM_POINTS; i++) {
                     wave_points[i] = wave_points[i] * 0.3 + sample_buffer[i] * 0.7;
                 }
+
             } else {
-                // Decay when not speaking (lines 313-316)
+                // No audio - DECAY existing wave toward zero - lines 312-316
                 const decay = 0.92;
                 for (let i = 0; i < NUM_POINTS; i++) {
                     wave_points[i] *= decay;
@@ -895,24 +953,24 @@
                 }
             }
 
-            // Draw the wave - EXACT port of _draw_wave() (lines 324-384)
+            // Draw the wave - line 319
             _draw_wave(width, height);
 
-            // 25ms = ~40 FPS (line 322)
+            // Schedule next frame - 25ms = ~40 FPS - line 322
             setTimeout(() => requestAnimationFrame(_animate), 25);
         }
 
         function _draw_wave(width, height) {
-            // EXACT port of boot_display.py _draw_wave() method
+            // EXACT port of boot_display.py _draw_wave() lines 324-384
             const ctx = waveformCtx;
             const center_y = height / 2;
             const max_amp = (height / 2) - 5;  // line 334
 
-            // Clear canvas (line 326)
+            // Clear - line 326
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, width, height);
 
-            // Draw center reference line - #201030 width 1 (lines 337-338)
+            // Center reference line - lines 337-338
             ctx.strokeStyle = '#201030';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -920,7 +978,7 @@
             ctx.lineTo(width, center_y);
             ctx.stroke();
 
-            // Build coordinates (lines 341-347)
+            // Build coordinates - lines 341-347
             const step = width / (NUM_POINTS - 1);
             const coords = [];
             for (let i = 0; i < NUM_POINTS; i++) {
@@ -930,22 +988,21 @@
             }
 
             if (coords.length >= 4) {
-                // EXACT 4 layers from lines 350-384
+                // 4 glow layers - lines 350-384
                 const layers = [
-                    { fill: '#400060', width: 8 },   // Outer glow
-                    { fill: '#8000a0', width: 5 },   // Mid glow
-                    { fill: '#ff40ff', width: 3 },   // Main wave
-                    { fill: '#ffc0ff', width: 1 }    // Bright core
+                    { color: '#400060', width: 8 },   // Outer glow
+                    { color: '#8000a0', width: 5 },   // Mid glow
+                    { color: '#ff40ff', width: 3 },   // Main wave
+                    { color: '#ffc0ff', width: 1 }    // Bright core
                 ];
 
                 layers.forEach(layer => {
-                    ctx.strokeStyle = layer.fill;
+                    ctx.strokeStyle = layer.color;
                     ctx.lineWidth = layer.width;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
 
-                    // smooth=True, splinesteps=16 in Tkinter
-                    // Use quadratic curves for smooth appearance
+                    // smooth=True, splinesteps=16
                     ctx.beginPath();
                     ctx.moveTo(coords[0][0], coords[0][1]);
 
@@ -955,7 +1012,6 @@
                         ctx.quadraticCurveTo(coords[i][0], coords[i][1], xc, yc);
                     }
 
-                    // Last point
                     const last = coords[coords.length - 1];
                     ctx.lineTo(last[0], last[1]);
                     ctx.stroke();
