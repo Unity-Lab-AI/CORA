@@ -23,6 +23,8 @@
 
 A Windows 11 AI-powered personal assistant with full autonomous capabilities: visual boot display, dynamic AI responses, task management, knowledge base, voice input/output, vision analysis, image generation, and live system monitoring.
 
+**Try the Web Version:** [unityailab.com/CORA](https://unityailab.com/CORA) (requires local Ollama)
+
 ---
 
 ## What's New in v1.0.0
@@ -34,8 +36,38 @@ A Windows 11 AI-powered personal assistant with full autonomous capabilities: vi
 - **Image Generation** - AI-generated art using Pollinations Flux model
 - **Full Location Announcement** - City, State, Country announced at boot
 - **Persistent Boot Display** - Window stays open with live stats after boot
+- **Web Version** - Full CORA in your browser with backend terminal
 
 ![CORA Boot Display](docs/images/boot_display.png)
+
+---
+
+## Web Version
+
+Run CORA in your browser at [unityailab.com/CORA](https://unityailab.com/CORA)
+
+### Web Features
+- **Backend Terminal** - Shows Ollama/model checks like CORA.bat
+- **Live Boot Sequence** - All 18 phases with real checks
+- **Real System Stats** - Via stats_server.py on localhost:11435
+- **CORA's Full Personality** - Edgy, profane, sarcastic responses
+- **Camera/Screenshot Analysis** - Uses llava for vision
+- **Ambient Awareness** - Proactive interjections based on context
+- **Image Generation** - Pollinations Flux integration
+- **YouTube Playback** - Search and embed videos
+
+### Web Requirements
+1. **Ollama** running locally (`ollama serve`)
+2. **Models**: dolphin-mistral:7b, llava, qwen2.5-coder:7b
+3. **Stats Server** (optional): `python services/stats_server.py`
+
+### Backend Terminal
+Click `[ BACKEND TERMINAL ]` to see:
+- CORA ASCII header
+- Ollama status check
+- Model availability (with pull commands if missing)
+- API gate checks (Kokoro TTS, Weather)
+- First-time setup notice
 
 ---
 

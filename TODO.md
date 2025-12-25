@@ -1,45 +1,49 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: IN PROGRESS - WEB BACKEND TERMINAL**
+> **STATUS: READY FOR NEW TASKS**
 > Updated: 2025-12-25 | Session: Unity Workflow
 
 ---
 
-## P0 - CRITICAL: Web Backend Terminal (Split View)
+## Current: No Blocking Tasks
 
-The split view button should show the CORA.bat equivalent terminal startup for web users.
-**This has been requested multiple times and must be implemented now.**
+All P0 critical tasks have been completed. System is operational.
 
-### What CORA.bat Terminal Shows (must match in web):
+---
 
-| Step | CORA.bat Shows | Web Must Show |
-|------|----------------|---------------|
-| 1 | CORA ASCII header | Same header in terminal panel |
-| 2 | Ollama check/download | Check if Ollama running, prompt to download if not |
-| 3 | Model downloads | Download dolphin-mistral:7b, llava if missing |
-| 4 | API checks | Ollama API, Kokoro TTS, weather API verification |
-| 5 | System gates | Pass/fail gates for each requirement |
-| 6 | Initial setup notice | "First run takes a while, subsequent runs are faster" |
-| 7 | Boot sequence log | Real-time log of each phase like CORA.bat |
+## Future Enhancements (P2)
 
-### Tasks:
+- [ ] Add more model options to backend terminal
+- [ ] Implement model download progress in web UI
+- [ ] Add GPU temperature warning thresholds
+- [ ] Voice activity detection for ambient listening
 
-- [ ] **TASK 1**: Split view terminal panel shows CORA ASCII header on open
-- [ ] **TASK 2**: Check if Ollama is running (localhost:11434), show status
-- [ ] **TASK 3**: If Ollama missing, show download link + instructions
-- [ ] **TASK 4**: Check for dolphin-mistral:7b model, show pull command if missing
-- [ ] **TASK 5**: Check for llava model, show pull command if missing
-- [ ] **TASK 6**: Show API gate checks (Ollama, Kokoro, Weather)
-- [ ] **TASK 7**: First-time user notice: "Initial setup takes time, subsequent runs preloaded"
-- [ ] **TASK 8**: Backend terminal logs boot sequence in real-time (not just UI log)
-- [ ] **TASK 9**: Save setup state so returning users skip downloads
+---
 
-### Current Problem:
+## COMPLETED THIS SESSION (2025-12-25)
 
-- Split view opens but shows generic modal demo, not terminal
-- No Ollama/model download guidance for new users
-- Web only works if user already ran CORA.bat (has Ollama + models)
-- No first-run vs returning-run detection
+### Web Backend Terminal - DONE
+- [x] **TASK 1**: Split view terminal panel shows CORA ASCII header on open
+- [x] **TASK 2**: Check if Ollama is running (localhost:11434), show status
+- [x] **TASK 3**: If Ollama missing, show download link + instructions
+- [x] **TASK 4**: Check for dolphin-mistral:7b model, show pull command if missing
+- [x] **TASK 5**: Check for llava model, show pull command if missing
+- [x] **TASK 6**: Show API gate checks (Ollama, Kokoro, Weather)
+- [x] **TASK 7**: First-time user notice: "Initial setup takes time, subsequent runs preloaded"
+- [x] **TASK 8**: Backend terminal logs boot sequence in real-time
+- [x] **TASK 9**: Save setup state so returning users skip downloads
+- [x] **TASK 10**: Fixed terminal visibility (moved outside mainContainer)
+- [x] **TASK 11**: Added fixed BACK/SPLIT VIEW buttons in terminal panel
+
+### CORA Personality Fix - DONE
+- [x] Fixed AI prompts to explicitly demand profanity and attitude
+- [x] Increased char limit from 200 to 350 for personality responses
+- [x] Changed from 2 to 3 sentences allowed
+- [x] Trims long responses instead of falling back to boring data
+
+### TTS Sync Fix - DONE
+- [x] CORA text now appears in log ONLY when audio starts playing
+- [x] Fixed for both Kokoro TTS and Web Speech API fallback
 
 ---
 

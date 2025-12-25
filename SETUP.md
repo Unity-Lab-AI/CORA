@@ -37,8 +37,9 @@ Or download from: [ollama.com](https://ollama.com)
 
 ### Step 4: Download AI Models
 ```bash
-ollama pull llama3.2
-ollama pull llava
+ollama pull dolphin-mistral:7b    # Main chat model (CORA's brain)
+ollama pull llava                  # Vision/image analysis
+ollama pull qwen2.5-coder:7b       # Coding assistance
 ```
 
 ### Step 5: Install mpv (Optional - for YouTube)
@@ -185,15 +186,16 @@ Or it starts automatically when you pull/run a model.
 
 **Required models:**
 ```bash
-ollama pull llama3.2      # Text chat (2.0 GB)
-ollama pull llava         # Vision/image analysis (4.7 GB)
+ollama pull dolphin-mistral:7b   # Main chat - CORA's brain (~4.1 GB)
+ollama pull llava                # Vision/image analysis (~4.7 GB)
+ollama pull qwen2.5-coder:7b     # Coding assistance (~4.4 GB)
 ```
 
 **Optional models:**
 ```bash
-ollama pull codellama     # Code generation
-ollama pull mistral       # Alternative chat
-ollama pull phi           # Small & fast
+ollama pull llama3.2      # Alternative chat (smaller)
+ollama pull codellama     # Alternative code generation
+ollama pull phi           # Small & fast for testing
 ```
 
 ### Verifying Ollama
@@ -278,6 +280,16 @@ python cora.py
 ```bash
 python src/boot_sequence.py --quick
 ```
+
+### Web Version
+Visit [unityailab.com/CORA](https://unityailab.com/CORA) in your browser:
+1. Make sure Ollama is running (`ollama serve`)
+2. Click `[ BACKEND TERMINAL ]` to check model status
+3. Download any missing models shown in the terminal
+4. (Optional) Run stats server for live GPU/CPU stats:
+   ```bash
+   python services/stats_server.py
+   ```
 
 ---
 

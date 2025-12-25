@@ -15,6 +15,7 @@ This workflow handles both **first-time setup** and **ongoing development** for 
 - `python src/boot_sequence.py` - Visual boot with TTS
 - `python src/gui_launcher.py` - GUI mode
 - `python src/cora.py` - CLI mode
+- **Web Version** - [unityailab.com/CORA](https://unityailab.com/CORA) (requires local Ollama)
 
 ---
 
@@ -97,11 +98,11 @@ curl http://localhost:11434/api/tags
 
 ### 2.3 Required AI Models
 ```bash
-ollama pull llama3.2        # Chat model (2.0 GB)
-ollama pull llava           # Vision model (4.7 GB)
+ollama pull dolphin-mistral:7b  # CORA's brain - main chat (~4.1 GB)
+ollama pull llava               # Vision model (~4.7 GB)
+ollama pull qwen2.5-coder:7b    # Coding assistance (~4.4 GB)
 # Optional:
-ollama pull dolphin-mistral # Uncensored chat (4.1 GB)
-ollama pull qwen2.5-coder   # Code model (4.4 GB)
+ollama pull llama3.2            # Alternative chat (smaller)
 ```
 
 ### Validation Gate 2

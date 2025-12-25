@@ -245,15 +245,44 @@ startProactiveInterjections()                 // Start 45-second interval
 
 ---
 
+### Web Backend Terminal & CORA Fixes (2025-12-25 11:15)
+
+| Task | Status | Files Modified |
+|------|--------|----------------|
+| Fix backend terminal visibility (move outside mainContainer) | DONE | `web/index.html` |
+| Add fixed BACK/SPLIT VIEW buttons in terminal panel | DONE | `web/index.html` |
+| Remove debug alert popups | DONE | `web/index.html` |
+| Fix CORA personality (explicit profanity prompts) | DONE | `web/index.html` |
+| Increase char limit from 200 to 350 for personality | DONE | `web/index.html` |
+| Change from 2 to 3 sentences allowed | DONE | `web/index.html` |
+| Trim long responses instead of falling back to raw data | DONE | `web/index.html` |
+| Fix TTS sync (text appears when audio starts) | DONE | `web/index.html` |
+
+**Details:**
+- **Backend Terminal Bug**: `setupTerminal` div was inside `mainContainer`, so hiding parent hid child. Moved to sibling element.
+- **Terminal Buttons**: Fixed position buttons (z-index 10000) stay visible when scrolling
+- **CORA Personality**: Prompts now explicitly say "edgy goth bitch", request profanity (fuck, shit, damn, bitch), temperature cranked to 1.0
+- **TTS Sync**: Log entry moved from `speak()` function to `handleAudioReady()` (Kokoro) and `utterance.onstart` (Web Speech API)
+
+**Commits:**
+- `9f39233` - "Fix backend terminal not displaying - move setupTerminal outside mainContainer"
+- `53e9a43` - "Add debug alerts and default content to setup terminal"
+- `e838c3e` - "Remove debug alerts, add fixed BACK/SPLIT VIEW buttons in terminal"
+- `fdd4063` - "Fix CORA personality being stripped - increase char limit, trim instead of fallback"
+- `9ca47ce` - "Make CORA prompts explicitly demand profanity and attitude"
+- `4f1ae04` - "Fix CORA text appearing before TTS plays - sync log with audio start"
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |
 |--------|-------|
-| Total Sessions | 6+ |
-| Tasks Completed | 75+ |
+| Total Sessions | 7+ |
+| Tasks Completed | 85+ |
 | Files Created | 10+ |
-| Files Modified | 60+ |
-| Commits | 16+ |
+| Files Modified | 65+ |
+| Commits | 22+ |
 
 ---
 
