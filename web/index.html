@@ -1454,7 +1454,10 @@ WHEN RESPONDING:
                             resolve(false);
                         }
                         else if (type === 'audioReady') {
-                            console.log(`[WORKER] Audio ready for id=${id}, buffer size=${data?.audio?.byteLength || 0}`);
+                            console.log(`[WORKER→MAIN] audioReady id=${id}, data keys=${Object.keys(data || {})}, audio=${!!data?.audio}, byteLength=${data?.audio?.byteLength || 'N/A'}`);
+                            if (!data || !data.audio) {
+                                console.error(`[WORKER→MAIN] MISSING AUDIO DATA for id=${id}!`);
+                            }
                             handleAudioReady(id, data);
                         }
                         else if (type === 'generating') {
@@ -1690,10 +1693,13 @@ WHEN RESPONDING:
                     text: displayText  // Full text with URLs for log display
                 };
 
-                // Timeout fallback - if Kokoro doesn't respond in 30s, resolve anyway
+                // Timeout fallback - scale with text length (100ms per char, min 30s, max 120s)
+                const timeoutMs = Math.min(120000, Math.max(30000, speakText.length * 100));
+                console.log(`[TTS] Setting timeout for id=${id}: ${(timeoutMs/1000).toFixed(0)}s (text length=${speakText.length})`);
+
                 const timeoutId = setTimeout(() => {
                     if (pendingCallbacks[id]) {
-                        console.warn(`[TTS] Timeout waiting for Kokoro (id ${id}), continuing...`);
+                        console.warn(`[TTS] Timeout waiting for Kokoro (id ${id}) after ${(timeoutMs/1000).toFixed(0)}s, continuing...`);
                         const { resolve, text } = pendingCallbacks[id];
                         delete pendingCallbacks[id];
                         if (text) {
@@ -1703,7 +1709,7 @@ WHEN RESPONDING:
                         stopWaveform();
                         resolve();
                     }
-                }, 30000);
+                }, timeoutMs);
 
                 // Store timeout so we can clear it when audio arrives
                 pendingCallbacks[id].timeoutId = timeoutId;
