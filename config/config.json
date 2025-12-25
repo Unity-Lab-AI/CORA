@@ -61,9 +61,15 @@
     "name": "Unity AI Lab",
     "website": "https://www.unityailab.com",
     "github": "https://github.com/Unity-Lab-AI",
+    "discord": "https://discord.gg/D33Bk6Ay",
     "email": "unityailabcontact@gmail.com",
-    "creators": ["Hackall360", "Sponge", "GFourteen"]
+    "creators": [
+      {"name": "Hackall360", "role": "Lead Code Necromancer"},
+      {"name": "Sponge", "role": "Chaos Engineer"},
+      {"name": "GFourteen", "role": "Digital Alchemist"}
+    ],
+    "copyright": "© 2025 Unity AI Lab. Creators: Hackall360, Sponge, GFourteen. All rights reserved."
   },
   "created": "2025-12-22",
-  "updated": "2025-12-23"
+  "updated": "2025-12-25"
 }

@@ -971,16 +971,20 @@ WHEN RESPONDING:
         // ============================================================
 
         const CORA_ASCII_HEADER = `
-  +=========================================+
-  :   ____  ___  ____   _                   :
-  :  / ___]/ _ \\[  _ \\ / \\                  :
-  : [ [__ [ [ ] ][ ][_][ o ]                :
-  : [ [__ [ [ ] ][ _ / /   \\                :
-  :  \\___] \\___/[_] [_]_] [_]               :
-  :                                         :
-  :  Cognitive Operations and Reasoning     :
-  :  Assistant - v1.0.0 - Unity AI Lab      :
-  +=========================================+
+  +=====================================================+
+  :   ____  ___  ____   _                               :
+  :  / ___]/ _ \\[  _ \\ / \\                              :
+  : [ [__ [ [ ] ][ ][_][ o ]                            :
+  : [ [__ [ [ ] ][ _ / /   \\                            :
+  :  \\___] \\___/[_] [_]_] [_]                           :
+  :                                                     :
+  :  C.O.R.A - Cognitive Operations & Reasoning Assistant
+  :  Version 1.0.0 | Unity AI Lab | 2025                :
+  :                                                     :
+  :  Creators: Hackall360, Sponge, GFourteen            :
+  :  www.unityailab.com | discord.gg/D33Bk6Ay           :
+  :  unityailabcontact@gmail.com                        :
+  +=====================================================+
 `;
 
         // Setup terminal state
@@ -3442,12 +3446,32 @@ WHEN RESPONDING:
             updateProgress(6, 'Loading identity...');
             log('═══════════════════════════════════════════════', 'system');
             log('    C.O.R.A - Cognitive Operations & Reasoning Assistant', 'system');
+            log('    Version 1.0.0 | Unity AI Lab | 2025', 'system');
             log('═══════════════════════════════════════════════', 'system');
-            log('Version: 1.0.0', 'info');
-            log('Created by: Unity AI Lab', 'info');
-            log('Developers: Hackall360, Sponge, GFourteen', 'info');
-            log('Website: https://www.unityailab.com', 'info');
-            log('GitHub: https://github.com/Unity-Lab-AI', 'info');
+            log('', 'info');
+            log('Developers:', 'info');
+            log('  Hackall360 - Lead Code Necromancer', 'info');
+            log('  Sponge - Chaos Engineer', 'info');
+            log('  GFourteen - Digital Alchemist', 'info');
+            log('', 'info');
+            log('Links:', 'info');
+            log('  Website: https://www.unityailab.com', 'info');
+            log('  GitHub: https://github.com/Unity-Lab-AI', 'info');
+            log('  Discord: https://discord.gg/D33Bk6Ay', 'info');
+            log('  Email: unityailabcontact@gmail.com', 'info');
+            log('', 'info');
+            log('© 2025 Unity AI Lab. All rights reserved.', 'info');
+            log('═══════════════════════════════════════════════', 'system');
+
+            // CORA introduces herself with full personality
+            const aboutText = await coraRespond(
+                'about',
+                'Introduce yourself in 2-3 sentences. You are CORA version 1.0.0, created by Unity AI Lab. Your creators are Hackall360, Sponge, and GFourteen. Website is unityailab.com. You are their edgy goth AI assistant with a dark attitude. Be sassy about it.',
+                'ok',
+                'quick'
+            );
+            await speakAndWait(aboutText);
+
             setPhase('about', 'ok');
             await sleep(200);
 
