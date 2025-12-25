@@ -1505,22 +1505,10 @@ WHEN RESPONDING:
                 }
 
                 // Convert ArrayBuffer back to Float32Array
-                const float32Audio = data && data.audio ? new Float32Array(data.audio) : new Float32Array(0);
-                const sampleRate = data?.sampleRate || 24000;
+                const float32Audio = new Float32Array(data.audio);
+                const sampleRate = data.sampleRate || 24000;
                 const duration = float32Audio.length / sampleRate;
                 console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${duration.toFixed(1)}s duration`);
-
-                // Check for empty or near-empty audio (less than 0.05 seconds = basically silence)
-                if (float32Audio.length < sampleRate * 0.05) {
-                    console.warn(`[TTS] Audio too short (${float32Audio.length} samples), showing text only`);
-                    if (text) {
-                        document.getElementById('speechText').textContent = `"${text}"`;
-                        log(`CORA: "${text}"`, 'cora');
-                    }
-                    stopWaveform();
-                    resolve();
-                    return;
-                }
 
                 // Create audio buffer and play it
                 const audioBuffer = audioContext.createBuffer(1, float32Audio.length, sampleRate);
