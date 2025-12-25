@@ -1111,28 +1111,51 @@
         let cachedCoords = null;
 
         async function requestLocationPermission() {
-            // Show a modal asking user to allow location
+            // Request location with generous timeout
             return new Promise((resolve) => {
                 log('Requesting location permission...', 'info');
                 log('Please click "Allow" when browser asks for location', 'system');
 
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        cachedCoords = pos.coords;
-                        resolve(pos.coords);
-                    },
-                    (err) => {
-                        if (err.code === 1) {
-                            log('Location permission denied by user', 'warn');
-                        } else if (err.code === 2) {
-                            log('Location unavailable', 'warn');
-                        } else if (err.code === 3) {
-                            log('Location request timed out', 'warn');
+                // Try up to 2 times
+                let attempts = 0;
+                const maxAttempts = 2;
+
+                function tryGetLocation() {
+                    attempts++;
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            cachedCoords = pos.coords;
+                            log(`Location acquired on attempt ${attempts}`, 'ok');
+                            resolve(pos.coords);
+                        },
+                        (err) => {
+                            if (err.code === 1) {
+                                log('Location permission denied by user', 'warn');
+                                resolve(null);  // User denied, don't retry
+                            } else if (err.code === 2) {
+                                log('Location unavailable', 'warn');
+                                resolve(null);
+                            } else if (err.code === 3) {
+                                if (attempts < maxAttempts) {
+                                    log(`Location timed out, retrying (${attempts}/${maxAttempts})...`, 'warn');
+                                    setTimeout(tryGetLocation, 1000);
+                                } else {
+                                    log('Location request timed out after retries', 'warn');
+                                    resolve(null);
+                                }
+                            } else {
+                                resolve(null);
+                            }
+                        },
+                        {
+                            timeout: 60000,           // 60 sec timeout
+                            enableHighAccuracy: false,
+                            maximumAge: 300000        // Accept cached location up to 5 min old
                         }
-                        resolve(null);
-                    },
-                    { timeout: 30000, enableHighAccuracy: false }  // 30 sec timeout to let user decide
-                );
+                    );
+                }
+
+                tryGetLocation();
             });
         }
 
@@ -1142,7 +1165,31 @@
                 if (!coords) {
                     coords = await requestLocationPermission();
                 }
-                if (!coords) return null;
+
+                // If browser geolocation failed, try IP-based fallback
+                if (!coords) {
+                    log('Trying IP-based location fallback...', 'info');
+                    try {
+                        const ipRes = await fetch('https://ipapi.co/json/');
+                        if (ipRes.ok) {
+                            const ipData = await ipRes.json();
+                            if (ipData.latitude && ipData.longitude) {
+                                log('Got location from IP', 'ok');
+                                cachedCoords = { latitude: ipData.latitude, longitude: ipData.longitude };
+                                return {
+                                    city: ipData.city || '',
+                                    state: ipData.region || '',
+                                    country: ipData.country_name || '',
+                                    lat: ipData.latitude,
+                                    lon: ipData.longitude
+                                };
+                            }
+                        }
+                    } catch (ipErr) {
+                        log('IP location fallback failed', 'warn');
+                    }
+                    return null;
+                }
 
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`);
                 if (res.ok) {
@@ -1193,6 +1240,92 @@
                 }
             } catch {}
             return [];
+        }
+
+        // ============================================================
+        // Wake Word Detection - "Hey CORA" using Web Speech API
+        // ============================================================
+
+        let wakeWordRecognition = null;
+        let wakeWordActive = false;
+
+        function initWakeWord() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+
+            wakeWordRecognition = new SpeechRecognition();
+            wakeWordRecognition.continuous = true;
+            wakeWordRecognition.interimResults = true;
+            wakeWordRecognition.lang = 'en-US';
+
+            wakeWordRecognition.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript.toLowerCase().trim();
+
+                    // Check for wake words
+                    if (transcript.includes('hey cora') ||
+                        transcript.includes('hey kora') ||
+                        transcript.includes('hey corra') ||
+                        transcript.includes('okay cora') ||
+                        (transcript.includes('cora') && transcript.length < 15)) {
+
+                        if (event.results[i].isFinal) {
+                            onWakeWordDetected();
+                        }
+                    }
+                }
+            };
+
+            wakeWordRecognition.onerror = (event) => {
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    console.log('Wake word error:', event.error);
+                }
+                // Restart on error (except if manually stopped)
+                if (wakeWordActive) {
+                    setTimeout(() => startWakeWordListening(), 1000);
+                }
+            };
+
+            wakeWordRecognition.onend = () => {
+                // Auto-restart when it ends (continuous listening)
+                if (wakeWordActive) {
+                    setTimeout(() => startWakeWordListening(), 100);
+                }
+            };
+
+            startWakeWordListening();
+        }
+
+        function startWakeWordListening() {
+            if (wakeWordRecognition && !wakeWordActive) {
+                try {
+                    wakeWordActive = true;
+                    wakeWordRecognition.start();
+                } catch (e) {
+                    // Already started
+                }
+            }
+        }
+
+        function stopWakeWordListening() {
+            wakeWordActive = false;
+            if (wakeWordRecognition) {
+                try {
+                    wakeWordRecognition.stop();
+                } catch (e) {}
+            }
+        }
+
+        function onWakeWordDetected() {
+            log('Wake word detected! Listening...', 'ok');
+            speakAndWait("Yes? I'm listening.").then(() => {
+                // Focus the chat input so user can type or speak
+                const chatInput = document.getElementById('chatInput');
+                if (chatInput) {
+                    chatInput.focus();
+                    chatInput.placeholder = "I'm listening... type or speak";
+                }
+            });
         }
 
         // ============================================================
@@ -1416,9 +1549,14 @@
             const hasSpeechRecog = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
             log('Speech Recognition - ' + (hasSpeechRecog ? 'Available' : 'Not supported'), hasSpeechRecog ? 'ok' : 'warn');
             log('Echo Filter - N/A (web mode)', 'info');
-            log('Wake Word - Desktop only', 'info');
+            if (hasSpeechRecog) {
+                log('Wake Word - Available (say "Hey CORA")', 'ok');
+                initWakeWord();  // Start listening for wake word
+            } else {
+                log('Wake Word - Not supported in this browser', 'warn');
+            }
             setPhase('voice_sys', 'ok');
-            await speakAndWait("Voice systems online. Wake word detection available on desktop only.");
+            await speakAndWait("Voice systems online." + (hasSpeechRecog ? " Say hey CORA to activate me." : ""));
 
             // ================================================================
             // PHASE 6.0: EXTERNAL APIs (Location)
