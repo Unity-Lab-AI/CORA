@@ -110,6 +110,8 @@ class AudioWaveform(tk.Canvas):
         self.smoothing = 0.3  # Smoothing factor for animation
         self.sample_rate = 24000  # Kokoro TTS sample rate
         self.samples_per_frame = self.sample_rate // 30  # ~30 FPS
+        self.phase_offset = 0.8  # Phase offset for wave-like motion
+        self.frame_count = 0  # Frame counter for phase animation
 
         # Colors - goth/cyberpunk gradient
         self.color_low = (50, 0, 80)      # Dark purple
@@ -191,6 +193,7 @@ class AudioWaveform(tk.Canvas):
         if not self.is_playing:
             return
 
+        self.frame_count += 1
         center_y = self.height // 2
         max_height = (self.height // 2) - 5
 
@@ -249,10 +252,15 @@ class AudioWaveform(tk.Canvas):
             for i in range(self.num_bars):
                 self.target_heights[i] = 0.02  # Nearly flat when not speaking
 
-        # Smooth animation towards target
+        # Smooth animation towards target with phase wave effect
         for i, bar in enumerate(self.bars):
-            # Smooth interpolation
-            self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * self.smoothing
+            # Add phase offset to create wave-like motion across bars
+            phase = (self.frame_count * 0.15 + i * self.phase_offset) % (2 * math.pi)
+            wave_mod = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))  # 0.3 to 1.0
+
+            # Smooth interpolation with wave modulation
+            target = self.target_heights[i] * wave_mod
+            self.current_heights[i] += (target - self.current_heights[i]) * self.smoothing
 
             height = int(self.current_heights[i] * max_height)
             height = max(2, height)
