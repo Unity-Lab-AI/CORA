@@ -44,7 +44,7 @@ ollama pull llava
 ### Step 5: Install mpv (Optional - for YouTube)
 Download from: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
 
-Extract to `CORA/tools/` - CORA will find mpv.exe automatically.
+Extract to `./tools/` folder - CORA auto-detects mpv.exe (any subfolder works).
 
 ### Step 6: Run CORA
 ```bash
@@ -201,11 +201,7 @@ python src/boot_sequence.py
 
 ### GUI Mode
 ```bash
-python gui_launcher.py
-```
-or
-```bash
-python ui/app.py
+python src/gui_launcher.py
 ```
 
 ### CLI Mode
@@ -327,7 +323,8 @@ After installation:
 C.O.R.A/
 ├── src/
 │   ├── boot_sequence.py     # Main boot with visual display
-│   └── cora.py              # CLI application
+│   ├── cora.py              # CLI application
+│   └── gui_launcher.py      # GUI launcher
 ├── ui/
 │   ├── boot_display.py      # Visual boot display
 │   ├── app.py               # Main GUI
@@ -339,7 +336,8 @@ C.O.R.A/
 ├── ai/
 │   ├── ollama.py            # Ollama client
 │   └── context.py           # Context management
-├── tools/                   # 17+ tool modules
+├── cora_tools/              # Python tool modules (20+)
+├── tools/                   # Downloaded binaries (mpv, ffmpeg)
 ├── services/                # Weather, location, etc.
 ├── config/
 │   └── settings.json        # Configuration
@@ -348,6 +346,8 @@ C.O.R.A/
 │   └── camera/              # Camera captures
 └── requirements.txt         # Python dependencies
 ```
+
+**Note:** `cora_tools/` = Python code, `tools/` = binaries only
 
 ---
 

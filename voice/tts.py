@@ -46,7 +46,6 @@ except ImportError:
 _boot_display = None
 
 # Pending speech text updates (thread-safe queue for UI updates)
-import queue
 _speech_queue = queue.Queue()
 
 def set_boot_display(display):

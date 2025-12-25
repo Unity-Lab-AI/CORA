@@ -38,7 +38,7 @@ This shows the cool cyberpunk visual boot display!
 
 ### GUI Mode:
 ```
-python gui_launcher.py
+python src/gui_launcher.py
 ```
 
 ### Quick Boot (No TTS):
@@ -155,7 +155,7 @@ python src/boot_sequence.py --quick
 | `play lofi music` | Searches YouTube and plays |
 | `play https://youtube.com/...` | Plays a YouTube URL |
 
-**Note:** YouTube playback requires mpv. Download from https://sourceforge.net/projects/mpv-player-windows/files/64bit/ and extract to CORA/tools/
+**Note:** YouTube needs mpv. Download from https://sourceforge.net/projects/mpv-player-windows/files/64bit/ and extract to `./tools/` folder.
 
 ### Other Cool Stuff
 
@@ -215,20 +215,29 @@ Images are saved to `data/images/` folder.
 ## If Something Goes Wrong
 
 ### CORA won't start?
-1. Make sure Ollama is running (the AI brain)
-2. Open a terminal and type: `ollama serve`
+1. Make sure Ollama is running: `ollama serve`
+2. Check Python 3.10+ installed: `python --version`
+3. Install dependencies: `pip install -r requirements.txt`
 
 ### CORA can't hear you?
-1. Check your microphone is plugged in
-2. Make sure it's not muted
+1. Check microphone is plugged in and not muted
+2. Windows: Settings > Privacy > Microphone > Allow apps
 
 ### CORA won't talk?
-1. Check your speakers are on
-2. Check volume isn't zero
+1. Check speakers on and volume up
+2. Try: `pip install kokoro sounddevice`
 
 ### No images generating?
-1. Check your internet connection
-2. Images use Pollinations AI (needs internet)
+1. Check internet connection (uses Pollinations AI)
+
+### YouTube not working?
+1. Download mpv from link above
+2. Extract to `./tools/` folder
+3. Restart CORA
+
+### Camera not working?
+1. Check webcam connected
+2. Windows: Settings > Privacy > Camera > Allow apps
 
 ---
 
@@ -241,7 +250,11 @@ TASKS:
   done <number>   = Finish a task
   delete <number> = Remove a task
   pri <id> <1-10> = Set priority
-  due <id> <date> = Set due date
+  due <id> <date> = Set due date (2024-12-31 or +3d)
+  show <id>       = See task details
+  search <query>  = Find tasks
+  note <id> <txt> = Add note to task
+  undo            = Restore last deleted
 
 CHAT:
   chat <message>  = Talk to CORA
@@ -261,11 +274,17 @@ MEDIA:
 INFO:
   time            = Get the time
   weather         = Get the weather
+  stats           = System stats
   help            = See all commands
 
 MEMORY:
-  learn <fact>    = Teach CORA something
-  recall          = Ask CORA to remember
+  learn <fact> #tag  = Teach CORA (with tag)
+  recall #tag        = Recall by tag
+  recall             = See all memories
+
+SYSTEM:
+  screenshot      = Capture screen
+  backup          = Backup data
 ```
 
 ---

@@ -46,11 +46,7 @@ python src/boot_sequence.py
 
 ### GUI Mode
 ```batch
-python gui_launcher.py
-```
-or
-```batch
-python ui/app.py
+python src/gui_launcher.py
 ```
 
 ### CLI Mode
@@ -188,12 +184,12 @@ ollama pull llava
 ```
 
 ### mpv Setup (Optional - for YouTube)
-mpv is required for YouTube video/audio playback. CORA will prompt you if it's missing.
+mpv is optional - only needed for YouTube playback. CORA prompts you if missing.
 
-**Option 1: Download and Extract**
-1. Download from: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
-2. Extract the .7z or .zip file to `CORA/tools/`
-3. CORA will auto-detect mpv.exe (any subfolder structure works)
+**Download and Extract:**
+1. Download: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
+2. Extract .7z/.zip to `./tools/` folder
+3. CORA auto-detects mpv.exe (any subfolder works)
 
 **Option 2: Package Manager**
 ```bash
@@ -211,28 +207,36 @@ scoop install mpv
 ```
 C.O.R.A/
 ├── src/
-│   ├── boot_sequence.py     # Main boot with TTS (1350+ lines)
-│   └── cora.py              # CLI application
+│   ├── boot_sequence.py     # Main boot with TTS
+│   ├── cora.py              # CLI application
+│   └── gui_launcher.py      # GUI launcher
 ├── ui/
 │   ├── boot_display.py      # Visual boot display with waveform
 │   ├── app.py               # Main GUI application
+│   ├── camera_feed.py       # Live webcam window
 │   └── panels.py            # Task/Settings/Knowledge panels
 ├── voice/
-│   ├── tts.py               # Kokoro TTS engine
+│   ├── tts.py               # Kokoro TTS engine (af_bella)
 │   ├── stt.py               # Speech recognition
+│   ├── commands.py          # Voice command processing
 │   └── wake_word.py         # Wake word detection
 ├── ai/
 │   ├── ollama.py            # Ollama API client
 │   └── context.py           # Context management
-├── tools/
+├── cora_tools/              # CORA's Python tool modules
 │   ├── image_gen.py         # Pollinations AI image gen
 │   ├── screenshots.py       # Screen/window capture
 │   ├── tasks.py             # Task management
-│   └── memory.py            # Working memory
+│   ├── memory.py            # Working memory
+│   ├── calendar.py          # Calendar & events
+│   ├── media.py             # YouTube & media control
+│   └── ...                  # 20+ tool modules
+├── tools/                   # Downloaded binaries ONLY
+│   └── mpv/                 # mpv player (extract here)
 ├── services/
-│   ├── weather.py           # Weather API
+│   ├── weather.py           # Weather API (wttr.in)
 │   ├── location.py          # IP geolocation
-│   └── notifications.py     # System notifications
+│   └── presence.py          # Webcam presence detection
 ├── config/
 │   └── settings.json        # Configuration
 ├── data/
@@ -242,6 +246,8 @@ C.O.R.A/
     ├── UserGuide.md         # User documentation
     └── NerdReadme.md        # Developer documentation
 ```
+
+**Note:** `cora_tools/` = Python source code. `tools/` = downloaded binaries only (mpv, ffmpeg).
 
 ---
 
@@ -306,5 +312,5 @@ Unity AI Lab - 2025
 ---
 
 *C.O.R.A v2.4.0 - Cognitive Operations & Reasoning Assistant*
-*Last Updated: 2025-12-23*
+*Last Updated: 2025-12-25*
 *Built by Unity AI Lab*

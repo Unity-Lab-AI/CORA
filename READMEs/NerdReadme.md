@@ -82,36 +82,33 @@ Version 2.4.0
 
 ### Dynamic AI Responses (src/boot_sequence.py)
 
-**Function:** `cora_respond(phase, data, style)`
+**Function:** `cora_respond(context, result, status, mode)`
 
 Generates unique AI responses for each boot phase using Ollama.
 
 ```python
-def cora_respond(phase: str, data: dict, style: str = "cora") -> str:
+def cora_respond(context: str, result: str, status: str = "ok", mode: str = "quick") -> str:
     """
-    Generate dynamic CORA response via Ollama.
+    CORA generates a unique response for each boot phase.
 
     Args:
-        phase: Boot phase name (e.g., "voice_synthesis")
-        data: Phase-specific data dict
-        style: Response style ("cora", "technical", "playful")
+        context: What phase this is (e.g., "AI Engine", "Camera")
+        result: The data/result to announce
+        status: "ok", "warn", or "fail"
+        mode: "quick" for short readouts, "full" for longer content
 
     Returns:
-        AI-generated response string
+        AI-generated response string (1-2 sentences)
     """
 ```
 
-**Phase Data Examples:**
+**Example Usage:**
+```python
+response = cora_respond("Hardware", "CPU 15%, RAM 45%, GPU RTX 4070 Ti", "ok", "quick")
+# Returns: "Running cool at fifteen percent CPU. Got the RTX 4070 Ti ready to go."
+```
 
-| Phase | Data Keys |
-|-------|-----------|
-| hardware | cpu_percent, ram_percent, gpu_name, vram_used, vram_total |
-| voice_synthesis | engine, voice, status |
-| external_services | weather, location, temperature |
-| news | headlines (list of dicts) |
-| image_generation | path, prompt, success |
-
-### Image Generation (tools/image_gen.py)
+### Image Generation (cora_tools/image_gen.py)
 
 **API:** Pollinations Flux model
 
@@ -542,4 +539,4 @@ C.O.R.A/
 ---
 
 *Unity AI Lab - C.O.R.A v2.4.0 Technical Documentation*
-*Last Updated: 2025-12-23*
+*Last Updated: 2025-12-25*

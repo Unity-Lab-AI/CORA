@@ -299,7 +299,7 @@ def get_greeting_context() -> str:
 
 
 def get_calendar_context() -> Dict[str, Any]:
-    """Get calendar context from tools/calendar.py.
+    """Get calendar context from cora_tools/calendar.py.
 
     Returns:
         Dict with today_events, upcoming_events, next_event
@@ -341,13 +341,14 @@ def get_location_context() -> Dict[str, Any]:
         import sys
         sys.path.insert(0, str(PROJECT_DIR))
         from services.location import get_location
-        from services.weather import get_current_weather
+        from services.weather import get_weather
 
         location = get_location()
         weather = None
 
-        if location and 'lat' in location and 'lon' in location:
-            weather = get_current_weather(location['lat'], location['lon'])
+        if location:
+            city = location.get('city', '')
+            weather = get_weather(city) if city else get_weather()
 
         return {
             'location': location,
