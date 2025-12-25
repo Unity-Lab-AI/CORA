@@ -703,13 +703,13 @@
             <div class="log-header">[ BOOT CONSOLE ]</div>
             <div class="log-container" id="logContainer"></div>
         </div>
+    </div>
 
-        <!-- Setup Terminal Panel (like CORA.bat output) - DYNAMIC -->
-        <div class="setup-terminal" id="setupTerminal" style="display: none;">
-            <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ BACKEND TERMINAL ] - System Setup & Checks</div>
-            <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto;">
-                <!-- Content populated dynamically by initSetupTerminal() -->
-            </div>
+    <!-- Setup Terminal Panel (like CORA.bat output) - OUTSIDE mainContainer so it shows when container is hidden -->
+    <div class="setup-terminal" id="setupTerminal" style="display: none;">
+        <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ BACKEND TERMINAL ] - System Setup & Checks</div>
+        <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto;">
+            <!-- Content populated dynamically by initSetupTerminal() -->
         </div>
     </div>
 
@@ -1037,16 +1037,22 @@ WHEN RESPONDING:
             container.innerHTML = '';  // Clear any old content
 
             // Immediate feedback - show something right away
+            console.log('[SETUP] Adding ASCII header...');
+            console.log('[SETUP] CORA_ASCII_HEADER defined:', typeof CORA_ASCII_HEADER !== 'undefined');
+
             const headerDiv = document.createElement('pre');
-            headerDiv.style.cssText = 'color: #ff00ff; margin: 0; font-family: Consolas, monospace;';
-            headerDiv.textContent = CORA_ASCII_HEADER;
+            headerDiv.style.cssText = 'color: #ff00ff; margin: 0; font-family: Consolas, monospace; white-space: pre;';
+            headerDiv.textContent = CORA_ASCII_HEADER || 'CORA BACKEND TERMINAL';
             container.appendChild(headerDiv);
+            console.log('[SETUP] Header added to container');
 
             const isFirstRun = !localStorage.getItem('cora_setup_complete');
+            console.log('[SETUP] isFirstRun:', isFirstRun);
 
             // Show loading message while checks run
             setupLog('', '#ffffff');
             setupLog('Initializing backend checks...', '#00ffff');
+            console.log('[SETUP] Initial messages added');
             setupLog('', '#ffffff');
 
             if (isFirstRun) {
@@ -4549,12 +4555,16 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
             const setupTerminal = document.getElementById('setupTerminal');
             const btn = document.getElementById('toggleBtn');
 
+            console.log('[VIEW] toggleView called, current mode:', viewMode);
+
             if (viewMode === 'split') {
                 // Show setup terminal (like CORA.bat output)
                 viewMode = 'setup';
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
                 btn.textContent = '[ SETUP TERMINAL ]';
+                console.log('[VIEW] Setup terminal visible:', setupTerminal.style.display);
+                console.log('[VIEW] Setup terminal dimensions:', setupTerminal.offsetWidth, 'x', setupTerminal.offsetHeight);
                 // Initialize the setup terminal with real checks (force refresh)
                 try {
                     await initSetupTerminal(true);
