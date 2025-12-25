@@ -1328,16 +1328,16 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // System prompt handles personality - just give data, say "Report."
-                // Talk TO CORA, not ABOUT her. Templates only, no personality instructions.
+                // System prompt handles personality - just give data, say what you think
+                // Talk TO CORA, not ABOUT her. Remind her to stay in character.
                 if (mode === 'quick') {
-                    prompt = `${result} Report briefly.`;
-                    temperature = 0.9;
-                    maxTokens = 150;
+                    prompt = `${result}\n\nRespond as yourself - edgy, profanity, attitude. 1-2 sentences max.`;
+                    temperature = 0.95;
+                    maxTokens = 100;
                 } else {
-                    prompt = `${result} Give your take.`;
-                    temperature = 0.8;
-                    maxTokens = 500;
+                    prompt = `${result}\n\nRespond as yourself - be real, be you, profanity welcome.`;
+                    temperature = 0.9;
+                    maxTokens = 400;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
