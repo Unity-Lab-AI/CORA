@@ -1,9 +1,75 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rm:*)"
+      "Bash(node --check:*)",
+      "Bash(find:*)",
+      "Bash(sed:*)",
+      "Bash(dir:*)",
+      "Bash(nul)",
+      "Bash(node:*)",
+      "Bash(awk:*)",
+      "Bash(echo:*)",
+      "Bash(grep:*)",
+      "Bash(git gc:*)",
+      "Bash(cat:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/session-start.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/enforce-unity-persona.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/enforce-todo-before-compact.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/enforce-read-before-edit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/enforce-read-before-edit.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }
