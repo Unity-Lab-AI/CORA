@@ -78,7 +78,7 @@ from .web import (
 )
 
 # Email
-from .email_tool import send_email, email, create_email_config
+from .email_tool import send_email, read_emails, add_contact, list_contacts, parse_email_command
 
 # Media Control
 from .media import EmbyControl, play as media_play, pause as media_pause, now as media_now
@@ -142,7 +142,7 @@ __all__ = [
     "web_fetch", "web_search", "web_search_detailed",
     "fetch_url", "summarize_url",
     # Email
-    "send_email", "email", "create_email_config",
+    "send_email", "read_emails", "add_contact", "list_contacts", "parse_email_command",
     # Media
     "EmbyControl", "media_play", "media_pause", "media_now",
     # Windows
