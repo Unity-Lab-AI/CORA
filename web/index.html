@@ -3868,9 +3868,13 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                         }
                         await speakAndWait(camResponse);
 
-                        // Restore modal after TTS - user can close when ready
+                        // During boot: auto-close camera after 3 seconds so boot continues cleanly
+                        // Camera can be reopened on command later
                         cameraTestModal.restore();
-                        log('Camera stays live - close window when done', 'info');
+                        log('Camera test passed - closing in 3s...', 'info');
+                        await sleep(3000);
+                        cameraTestModal.close();
+                        log('Camera closed - can be reopened on command', 'info');
 
                     } catch (e) {
                         log('Live camera not available: ' + e.message, 'warn');
