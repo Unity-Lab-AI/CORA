@@ -5,7 +5,6 @@
 # API keys, tokens, credentials - NEVER COMMIT
 *.key
 *.pem
-*.env
 .env
 .env.*
 secrets.json
