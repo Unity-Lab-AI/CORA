@@ -122,7 +122,7 @@ def generate_image(
         with open(output_path, 'wb') as f:
             f.write(response.content)
 
-        return {
+        result = {
             "success": True,
             "path": str(output_path),
             "prompt": prompt,
@@ -134,6 +134,15 @@ def generate_image(
             "inference_time": inference_time,
             "size_bytes": len(response.content)
         }
+
+        # Show image in modal window (non-blocking)
+        try:
+            from ui.modals import show_image_modal, show_modal_threadsafe
+            show_modal_threadsafe(show_image_modal, str(output_path), "Generated Image", prompt)
+        except Exception as e:
+            print(f"[DEBUG] Modal display skipped: {e}")
+
+        return result
 
     except Exception as e:
         return {

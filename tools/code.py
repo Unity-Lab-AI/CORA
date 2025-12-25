@@ -682,27 +682,83 @@ def get_code_assistant(model: str = "codellama") -> CodeAssistant:
 # Convenience functions (per ARCHITECTURE.md spec)
 def explain_code(code: str, detail_level: str = "medium") -> str:
     """Explain what code does."""
-    return get_code_assistant().explain_code(code, detail_level)
+    result = get_code_assistant().explain_code(code, detail_level)
+
+    # Show in modal
+    try:
+        from ui.modals import show_code_modal, show_modal_threadsafe
+        lang = get_code_assistant().detect_language(code)
+        show_modal_threadsafe(show_code_modal, code, "", lang, f"Code Explanation ({lang})")
+    except Exception:
+        pass
+
+    return result
 
 
 def write_code(description: str, language: str = "python") -> str:
     """Generate code from description."""
-    return get_code_assistant().write_code(description, language)
+    result = get_code_assistant().write_code(description, language)
+
+    # Show generated code in modal
+    try:
+        from ui.modals import show_code_modal, show_modal_threadsafe
+        show_modal_threadsafe(show_code_modal, result, "", language, f"Generated Code ({language})")
+    except Exception:
+        pass
+
+    return result
 
 
 def fix_code(code: str, error: Optional[str] = None) -> str:
     """Fix errors in code."""
-    return get_code_assistant().fix_code(code, error)
+    result = get_code_assistant().fix_code(code, error)
+
+    # Show fixed code in modal
+    try:
+        from ui.modals import show_code_modal, show_modal_threadsafe
+        lang = get_code_assistant().detect_language(code)
+        show_modal_threadsafe(show_code_modal, result, "", lang, f"Fixed Code ({lang})")
+    except Exception:
+        pass
+
+    return result
 
 
 def run_code(code: str, language: Optional[str] = None, safe_mode: bool = True) -> CodeResult:
     """Execute code and return results."""
-    return get_code_assistant().run_code(code, language, safe_mode=safe_mode)
+    result = get_code_assistant().run_code(code, language, safe_mode=safe_mode)
+
+    # Show output in terminal modal
+    try:
+        from ui.modals import show_terminal_modal, show_modal_threadsafe
+        output = result.output if result.output else result.error
+        status = "Success" if result.success else "Failed"
+        show_modal_threadsafe(show_terminal_modal, output, f"[{result.language}] {status}", "Code Execution")
+    except Exception:
+        pass
+
+    return result
 
 
 def analyze_code(code: str) -> CodeAnalysis:
     """Analyze code for issues and suggestions."""
-    return get_code_assistant().analyze_code(code)
+    result = get_code_assistant().analyze_code(code)
+
+    # Show analysis in modal
+    try:
+        from ui.modals import show_code_modal, show_modal_threadsafe
+        analysis_text = f"# Code Analysis\n\n"
+        analysis_text += f"## Summary\n{result.summary}\n\n"
+        analysis_text += f"## Explanation\n{result.explanation}\n\n"
+        if result.issues:
+            analysis_text += f"## Issues\n" + "\n".join(f"- {i}" for i in result.issues) + "\n\n"
+        if result.suggestions:
+            analysis_text += f"## Suggestions\n" + "\n".join(f"- {s}" for s in result.suggestions)
+        show_modal_threadsafe(show_code_modal, analysis_text, "", "markdown", f"Code Analysis ({result.language})")
+    except Exception:
+        pass
+
+    return result
 
 
 def detect_language(code: str) -> str:

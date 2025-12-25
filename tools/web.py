@@ -197,12 +197,24 @@ def web_search(query: str, num_results: int = 5) -> Dict[str, Any]:
                 'snippet': snippet.strip()
             })
 
-        return {
+        result = {
             'success': True,
             'query': query,
             'results': results,
             'count': len(results)
         }
+
+        # Show results in modal window
+        try:
+            from ui.modals import show_web_modal, show_modal_threadsafe
+            content = f"Search: {query}\n\n"
+            for i, r in enumerate(results, 1):
+                content += f"{i}. {r['title']}\n   {r['url']}\n   {r.get('snippet', '')}\n\n"
+            show_modal_threadsafe(show_web_modal, content, "", f"Search: {query}")
+        except Exception:
+            pass
+
+        return result
 
     except requests.Timeout:
         return {
@@ -273,7 +285,7 @@ def fetch_url(url: str, timeout: int = 15) -> Dict[str, Any]:
 
         content_type = response.headers.get('Content-Type', 'text/html')
 
-        return {
+        result = {
             'success': True,
             'url': url,
             'content': response.text,
@@ -281,6 +293,18 @@ def fetch_url(url: str, timeout: int = 15) -> Dict[str, Any]:
             'status_code': response.status_code,
             'length': len(response.text)
         }
+
+        # Show content in modal window
+        try:
+            from ui.modals import show_web_modal, show_modal_threadsafe
+            text_content = extract_text_from_html(response.text)
+            if len(text_content) > 5000:
+                text_content = text_content[:5000] + "\n\n[Content truncated...]"
+            show_modal_threadsafe(show_web_modal, text_content, url, f"Fetched: {urlparse(url).netloc}")
+        except Exception:
+            pass
+
+        return result
 
     except requests.Timeout:
         return {
