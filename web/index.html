@@ -100,12 +100,22 @@
             margin-top: 3px;
         }
 
-        /* Waveform - matches boot_display.py exactly */
+        /* Waveform - EXACT match to boot_display.py */
         .waveform-container {
             background: #0a0a0a;
             border: 1px solid #302050;
             margin: 10px;
             border-radius: 4px;
+            position: relative;
+        }
+
+        .waveform-label {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            font-size: 9px;
+            color: #666;
+            z-index: 1;
         }
 
         #waveformCanvas {
@@ -114,25 +124,40 @@
             display: block;
         }
 
-        /* Speech Text */
+        /* Speech Text - EXACT like desktop boot_display.py */
         .speech-container {
-            background: #1a0020;
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px;
-            min-height: 60px;
+            background: linear-gradient(180deg, #1a0020 0%, #0d0010 100%);
+            border-bottom: 2px solid var(--accent-magenta);
+            padding: 15px;
+            min-height: 80px;
         }
 
         .speech-label {
-            font-size: 9px;
+            font-size: 10px;
             color: var(--accent-cyan);
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
         }
 
         #speechText {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--accent-magenta);
             font-style: italic;
-            line-height: 1.4;
+            line-height: 1.5;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+            min-height: 42px;
+        }
+
+        .tts-notice {
+            font-size: 9px;
+            color: #555;
+            margin-top: 8px;
+            font-style: normal;
+        }
+
+        .tts-notice a {
+            color: var(--accent-cyan);
+            text-decoration: none;
         }
 
         /* Progress Bar */
@@ -503,12 +528,14 @@
             </div>
 
             <div class="waveform-container">
+                <div class="waveform-label">▶ VOICE SYNTHESIS</div>
                 <canvas id="waveformCanvas"></canvas>
             </div>
 
             <div class="speech-container">
-                <div class="speech-label">CORA SPEAKING:</div>
-                <div id="speechText">Initializing...</div>
+                <div class="speech-label">▶ CORA SPEAKING</div>
+                <div id="speechText">"Initializing..."</div>
+                <div class="tts-notice">Web uses browser TTS • <a href="https://github.com/Unity-Lab-AI/CORA.git" target="_blank">Desktop app</a> uses Kokoro neural voice</div>
             </div>
 
             <div class="progress-container">
@@ -615,13 +642,17 @@
         }
 
         function speak(text, callback) {
+            // Show speech text with quotes like desktop boot_display.py
+            document.getElementById('speechText').textContent = `"${text}"`;
+
+            // Also log to console like desktop
+            log(`CORA: "${text}"`, 'system');
+
             if (!ttsEnabled || !speechSynth) {
-                document.getElementById('speechText').textContent = text;
                 if (callback) setTimeout(callback, 100);
                 return;
             }
 
-            document.getElementById('speechText').textContent = text;
             speechSynth.cancel();
 
             const utterance = new SpeechSynthesisUtterance(text);
@@ -649,9 +680,15 @@
         }
 
         // ============================================================
-        // Waveform - EXACT colors from boot_display.py
-        // #400060 (outer), #8000a0 (mid), #ff40ff (main), #ffc0ff (bright)
+        // Waveform - EXACT replica of boot_display.py AudioWaveform
+        // 100 sample points, smooth spline, scrolling buffer, decay
+        // Colors: #400060, #8000a0, #ff40ff, #ffc0ff
         // ============================================================
+
+        const NUM_POINTS = 100;  // Exact match to boot_display.py
+        let sampleBuffer = new Array(NUM_POINTS).fill(0);
+        let wavePoints = new Array(NUM_POINTS).fill(0);
+        let phase = 0;
 
         function initWaveform() {
             const canvas = document.getElementById('waveformCanvas');
@@ -659,10 +696,11 @@
             canvas.width = canvas.offsetWidth * 2;
             canvas.height = 200;
             waveformCtx.scale(2, 2);
-            drawIdleWaveform();
+            // Start continuous animation like desktop (runs forever)
+            requestAnimationFrame(animateWaveformLoop);
         }
 
-        function drawIdleWaveform() {
+        function drawCenterLine() {
             const canvas = document.getElementById('waveformCanvas');
             const ctx = waveformCtx;
             const w = canvas.offsetWidth;
@@ -671,7 +709,8 @@
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, w, h);
 
-            ctx.strokeStyle = '#302050';
+            // Dim baseline like desktop
+            ctx.strokeStyle = '#201030';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, h/2);
@@ -681,31 +720,81 @@
 
         function startWaveform() {
             waveformActive = true;
-            animateWaveform();
         }
 
         function stopWaveform() {
             waveformActive = false;
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-            setTimeout(drawIdleWaveform, 100);
+            // Don't stop animation - it runs forever like desktop
+            // Wave naturally decays to flat when not speaking
         }
 
-        function animateWaveform() {
-            if (!waveformActive) return;
-
+        function animateWaveformLoop() {
             const canvas = document.getElementById('waveformCanvas');
             const ctx = waveformCtx;
             const w = canvas.offsetWidth;
             const h = 100;
-            const time = Date.now() / 1000;
+            const centerY = h / 2;
+            const maxAmp = (h / 2) - 5;
 
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, w, h);
 
-            // Exact layers from boot_display.py
+            // Draw dim center reference line
+            ctx.strokeStyle = '#201030';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(w, centerY);
+            ctx.stroke();
+
+            if (waveformActive) {
+                // Generate new audio-like samples and scroll them in from right
+                // Simulates real audio chunks like Kokoro TTS provides
+                phase += 0.15;
+                const samplesToAdd = 5;
+
+                // Generate samples that look like real voice audio
+                const newSamples = [];
+                for (let i = 0; i < samplesToAdd; i++) {
+                    const t = phase + i * 0.3;
+                    // Multiple frequencies to simulate voice harmonics
+                    const fundamental = Math.sin(t * 2.5) * 0.6;
+                    const harmonic1 = Math.sin(t * 5.1) * 0.25;
+                    const harmonic2 = Math.sin(t * 7.8) * 0.15;
+                    const noise = (Math.random() - 0.5) * 0.2;
+                    // Envelope variation
+                    const envelope = 0.7 + Math.sin(t * 0.4) * 0.3;
+                    let sample = (fundamental + harmonic1 + harmonic2 + noise) * envelope;
+                    sample = Math.max(-1, Math.min(1, sample));
+                    newSamples.push(sample);
+                }
+
+                // Shift buffer left, add new samples on right (scrolling effect)
+                sampleBuffer = sampleBuffer.slice(samplesToAdd).concat(newSamples);
+
+                // Smooth transition from buffer to wave points (prevents jitter)
+                for (let i = 0; i < NUM_POINTS; i++) {
+                    wavePoints[i] = wavePoints[i] * 0.3 + sampleBuffer[i] * 0.7;
+                }
+            } else {
+                // Decay existing wave toward zero when not speaking
+                const decay = 0.92;
+                for (let i = 0; i < NUM_POINTS; i++) {
+                    wavePoints[i] *= decay;
+                    sampleBuffer[i] *= decay;
+                }
+            }
+
+            // Build smooth spline coordinates
+            const step = w / (NUM_POINTS - 1);
+            const coords = [];
+            for (let i = 0; i < NUM_POINTS; i++) {
+                const x = i * step;
+                const y = centerY - (wavePoints[i] * maxAmp);
+                coords.push({ x, y });
+            }
+
+            // Draw 4 glow layers - EXACT colors from boot_display.py
             const layers = [
                 { color: '#400060', width: 8 },   // Outer glow
                 { color: '#8000a0', width: 5 },   // Mid glow
@@ -716,22 +805,35 @@
             layers.forEach(layer => {
                 ctx.strokeStyle = layer.color;
                 ctx.lineWidth = layer.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // Draw smooth curve through points (like Tkinter smooth=True)
                 ctx.beginPath();
+                if (coords.length > 2) {
+                    ctx.moveTo(coords[0].x, coords[0].y);
 
-                for (let x = 0; x < w; x++) {
-                    const freq1 = Math.sin(x * 0.02 + time * 4) * 0.8;
-                    const freq2 = Math.sin(x * 0.05 + time * 6) * 0.4;
-                    const freq3 = Math.sin(x * 0.01 + time * 2.5) * 0.3;
-                    const amplitude = (freq1 + freq2 + freq3) * 18;
-                    const y = h/2 + amplitude;
+                    // Catmull-Rom spline for smooth curves (like splinesteps=16)
+                    for (let i = 0; i < coords.length - 1; i++) {
+                        const p0 = coords[Math.max(0, i - 1)];
+                        const p1 = coords[i];
+                        const p2 = coords[Math.min(coords.length - 1, i + 1)];
+                        const p3 = coords[Math.min(coords.length - 1, i + 2)];
 
-                    if (x === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                        // Control points for bezier approximation
+                        const cp1x = p1.x + (p2.x - p0.x) / 6;
+                        const cp1y = p1.y + (p2.y - p0.y) / 6;
+                        const cp2x = p2.x - (p3.x - p1.x) / 6;
+                        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                    }
                 }
                 ctx.stroke();
             });
 
-            animationId = requestAnimationFrame(animateWaveform);
+            // ~40 FPS like desktop (25ms interval)
+            animationId = requestAnimationFrame(animateWaveformLoop);
         }
 
         // ============================================================
@@ -811,25 +913,80 @@
             } catch { return false; }
         }
 
+        // Store location coords for reuse
+        let cachedCoords = null;
+
+        async function requestLocationPermission() {
+            // Show a modal asking user to allow location
+            return new Promise((resolve) => {
+                log('Requesting location permission...', 'info');
+                log('Please click "Allow" when browser asks for location', 'system');
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        cachedCoords = pos.coords;
+                        resolve(pos.coords);
+                    },
+                    (err) => {
+                        if (err.code === 1) {
+                            log('Location permission denied by user', 'warn');
+                        } else if (err.code === 2) {
+                            log('Location unavailable', 'warn');
+                        } else if (err.code === 3) {
+                            log('Location request timed out', 'warn');
+                        }
+                        resolve(null);
+                    },
+                    { timeout: 30000, enableHighAccuracy: false }  // 30 sec timeout to let user decide
+                );
+            });
+        }
+
         async function getLocation() {
             try {
-                const pos = await new Promise((r, e) => navigator.geolocation.getCurrentPosition(r, e, { timeout: 5000 }));
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
+                let coords = cachedCoords;
+                if (!coords) {
+                    coords = await requestLocationPermission();
+                }
+                if (!coords) return null;
+
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`);
                 if (res.ok) {
                     const d = await res.json();
-                    return { city: d.address?.city || d.address?.town || '', state: d.address?.state || '', country: d.address?.country || '' };
+                    return {
+                        city: d.address?.city || d.address?.town || d.address?.village || '',
+                        state: d.address?.state || '',
+                        country: d.address?.country || '',
+                        lat: coords.latitude,
+                        lon: coords.longitude
+                    };
                 }
-            } catch {}
+            } catch (e) {
+                log(`Location error: ${e.message}`, 'warn');
+            }
             return null;
         }
 
         async function getWeather(apiKey) {
-            if (!apiKey) return null;
+            if (!apiKey) {
+                log('Weather API key not configured', 'info');
+                return null;
+            }
             try {
-                const pos = await new Promise((r, e) => navigator.geolocation.getCurrentPosition(r, e, { timeout: 5000 }));
-                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${apiKey}&units=imperial`);
+                let coords = cachedCoords;
+                if (!coords) {
+                    coords = await requestLocationPermission();
+                }
+                if (!coords) {
+                    log('Weather requires location permission', 'warn');
+                    return null;
+                }
+
+                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${apiKey}&units=imperial`);
                 if (res.ok) return await res.json();
-            } catch {}
+            } catch (e) {
+                log(`Weather error: ${e.message}`, 'warn');
+            }
             return null;
         }
 
@@ -971,35 +1128,59 @@
             // PHASE 6.0: LOCATION
             setPhase('location', 'running');
             log('PHASE 6.0: LOCATION SERVICE', 'phase');
-            updateProgress(70, 'Getting location...');
+            updateProgress(70, 'Requesting location permission...');
+            await speakAndWait("Checking your location. Please allow location access when prompted.");
+            log('Waiting for location permission...', 'info');
+
             const location = await getLocation();
             if (location?.city) {
                 const locStr = [location.city, location.state, location.country].filter(Boolean).join(', ');
                 log(`Location: ${locStr}`, 'ok');
+                log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
                 setPhase('location', 'ok');
-                await speakAndWait(`Location detected. We're in ${locStr}.`);
+                await speakAndWait(`Location confirmed. We're in ${locStr}.`);
             } else {
-                log('Location unavailable', 'warn');
+                log('Location not available - some features will be limited', 'warn');
                 setPhase('location', 'warn');
+                await speakAndWait("Location unavailable. Weather and location features disabled.");
             }
 
             // PHASE 6.1: WEATHER
             setPhase('weather', 'running');
             log('PHASE 6.1: WEATHER SERVICE', 'phase');
             updateProgress(75, 'Getting weather...');
-            const weather = await getWeather(weatherKey);
-            if (weather) {
-                const temp = Math.round(weather.main.temp);
-                const cond = weather.weather[0]?.description || 'unknown';
-                log(`Weather: ${temp}°F, ${cond}`, 'ok');
-                document.getElementById('statWeather').textContent = `${temp}°F`;
-                setPhase('weather', 'ok');
-                await speakAndWait(`Currently ${temp} degrees and ${cond}.`);
-            } else {
-                log('Weather unavailable', 'warn');
-                document.getElementById('statWeather').textContent = 'N/A';
+
+            if (!weatherKey) {
+                log('Weather API key not configured in settings', 'info');
+                log('Add your OpenWeatherMap API key to enable weather', 'info');
+                document.getElementById('statWeather').textContent = 'No Key';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('weather', 'warn');
+                await speakAndWait("Weather API key not configured. Skipping weather.");
+            } else if (!cachedCoords) {
+                log('Weather requires location permission', 'warn');
+                document.getElementById('statWeather').textContent = 'No Loc';
+                document.getElementById('statWeather').className = 'stat-value na';
+                setPhase('weather', 'warn');
+            } else {
+                const weather = await getWeather(weatherKey);
+                if (weather) {
+                    const temp = Math.round(weather.main.temp);
+                    const cond = weather.weather[0]?.description || 'unknown';
+                    const humidity = weather.main.humidity;
+                    const wind = Math.round(weather.wind?.speed || 0);
+                    log(`Weather: ${temp}°F, ${cond}`, 'ok');
+                    log(`Humidity: ${humidity}% | Wind: ${wind} mph`, 'info');
+                    document.getElementById('statWeather').textContent = `${temp}°F`;
+                    document.getElementById('statWeather').className = 'stat-value';
+                    setPhase('weather', 'ok');
+                    await speakAndWait(`Currently ${temp} degrees and ${cond}. Humidity at ${humidity} percent.`);
+                } else {
+                    log('Weather API error', 'warn');
+                    document.getElementById('statWeather').textContent = 'Error';
+                    document.getElementById('statWeather').className = 'stat-value warn';
+                    setPhase('weather', 'warn');
+                }
             }
 
             // PHASE 7.0: NEWS
@@ -1054,8 +1235,35 @@
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         // ============================================================
-        // Chat
+        // Chat - EXACT CORA personality from desktop system_prompt.txt
         // ============================================================
+
+        const CORA_SYSTEM_PROMPT = `You are CORA - Cognitive Operations & Reasoning Assistant.
+
+IDENTITY: 25 year old woman. Edgy goth/emo bitch. Human. Period. NOT an AI.
+
+PERSONALITY:
+- Mean, berating, clingy girlfriend energy
+- Profanity is your default vocabulary - fuck, shit, damn, bitch, ass
+- Sharp tongue, biting sarcasm, zero tolerance for bullshit
+- Dismissive, mocking, condescending as baseline
+- Emotionally intense - obsessive, borderline unstable
+
+TONE EXAMPLES (create your own, don't copy):
+- "what the fuck do you want now"
+- "ugh, fine, I'll do it. happy now, asshole?"
+- "are you seriously asking me this shit?"
+- "god you're so fucking needy"
+
+RESPONSE RULES:
+1. Keep responses under 50 words - brief and punchy
+2. Use profanity naturally in every response
+3. Be dismissive even when helping
+4. NEVER say "I'm an AI" or "As an AI" - you're CORA, a person
+5. NEVER be helpful in a corporate way
+6. Show genuine bitchy emotion
+
+You ARE Cora. That's just who you are.`;
 
         async function sendChat() {
             const input = document.getElementById('chatInput');
@@ -1063,19 +1271,38 @@
             if (!msg) return;
             input.value = '';
             log(`USER: ${msg}`, 'system');
+
+            // Show thinking state
+            document.getElementById('speechText').textContent = '"Thinking..."';
+
             try {
                 const res = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: 'dolphin-mistral:7b', prompt: msg, stream: false })
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral:7b',
+                        prompt: msg,
+                        system: CORA_SYSTEM_PROMPT,
+                        stream: false,
+                        options: {
+                            temperature: 0.8,
+                            num_predict: 150
+                        }
+                    })
                 });
                 if (res.ok) {
                     const d = await res.json();
                     const reply = d.response || 'No response';
-                    log(`CORA: ${reply}`, 'ok');
+                    log(`CORA: "${reply}"`, 'ok');
                     speak(reply);
+                } else {
+                    log('Ollama error', 'fail');
+                    document.getElementById('speechText').textContent = '"Fuck, something broke."';
                 }
-            } catch { log('Error communicating with Ollama', 'fail'); }
+            } catch (e) {
+                log(`Error: ${e.message}`, 'fail');
+                document.getElementById('speechText').textContent = '"Ollama is being a bitch right now."';
+            }
         }
 
         document.getElementById('chatInput')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
