@@ -1326,14 +1326,12 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // System prompt handles personality - just give data, say what you think
-                // Talk TO CORA, not ABOUT her. Remind her to stay in character.
+                // JUST DATA. System prompt IS the personality. No instructions.
+                prompt = result;
                 if (mode === 'quick') {
-                    prompt = `${result}\n\nRespond as yourself - edgy, profanity, attitude. 1-2 sentences max.`;
                     temperature = 0.95;
                     maxTokens = 100;
                 } else {
-                    prompt = `${result}\n\nRespond as yourself - be real, be you, profanity welcome.`;
                     temperature = 0.9;
                     maxTokens = 400;
                 }

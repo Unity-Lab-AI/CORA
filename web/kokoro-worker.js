@@ -189,18 +189,11 @@ async function doGenerate(id, data) {
             const chunk = chunks[i];
             console.log(`[WORKER] Generating chunk ${i + 1}/${chunks.length}: ${chunk.length} chars`);
 
-            // Add timeout to prevent infinite hang (30s per chunk)
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`Chunk ${i + 1} timeout (30s)`)), 30000);
+            // NO TIMEOUT - let Kokoro take as long as needed
+            const audio = await tts.generate(chunk, {
+                voice: voice || DEFAULT_VOICE,
+                speed: speed || 1.0
             });
-
-            const audio = await Promise.race([
-                tts.generate(chunk, {
-                    voice: voice || DEFAULT_VOICE,
-                    speed: speed || 1.0
-                }),
-                timeoutPromise
-            ]);
 
             if (audio && audio.audio) {
                 audioChunks.push(new Float32Array(audio.audio));
