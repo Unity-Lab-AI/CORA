@@ -1484,7 +1484,11 @@ WHEN RESPONDING:
         }
 
         async function handleAudioReady(id, data) {
-            if (!pendingCallbacks[id]) return;
+            console.log(`[TTS] handleAudioReady called, id=${id}, pendingCallbacks[id]=${!!pendingCallbacks[id]}`);
+            if (!pendingCallbacks[id]) {
+                console.warn(`[TTS] No pending callback for id=${id}, returning`);
+                return;
+            }
 
             const { resolve, startTime, text, timeoutId } = pendingCallbacks[id];
             delete pendingCallbacks[id];
@@ -1494,6 +1498,7 @@ WHEN RESPONDING:
 
             try {
                 // Resume audio context if suspended (browser requires user interaction)
+                console.log(`[TTS] AudioContext state: ${audioContext.state}`);
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                     console.log('[TTS] AudioContext resumed');
@@ -1603,9 +1608,12 @@ WHEN RESPONDING:
             const displayText = text;  // Full text for log
             const speakText = stripUrlsForSpeech(text);  // Clean text for TTS
 
+            console.log(`[TTS] speak() called: kokoroReady=${kokoroReady}, useFallback=${useFallbackTTS}, text="${speakText.substring(0,50)}..."`);
+
             if (kokoroReady && !useFallbackTTS) {
                 // Use Kokoro neural TTS - speakText for TTS, displayText for log
                 const id = ++messageId;
+                console.log(`[TTS] Using Kokoro, id=${id}`);
                 pendingCallbacks[id] = {
                     resolve: callback || (() => {}),
                     startTime: Date.now(),
@@ -1631,6 +1639,7 @@ WHEN RESPONDING:
                 pendingCallbacks[id].timeoutId = timeoutId;
 
                 // Send CLEAN text (no URLs) to TTS
+                console.log(`[TTS] Posting to worker, id=${id}`);
                 kokoroWorker.postMessage({
                     type: 'generate',
                     id,
