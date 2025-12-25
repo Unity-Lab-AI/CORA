@@ -365,6 +365,7 @@
         .log-fail { color: var(--fail-color); }
         .log-info { color: var(--text-dim); }
         .log-system { color: var(--accent-cyan); }
+        .log-cora { color: #ff69b4; font-weight: bold; }  /* Hot pink for CORA speech */
 
         /* Chat */
         .chat-section {
@@ -801,8 +802,8 @@
             // Show speech text with quotes like desktop boot_display.py
             document.getElementById('speechText').textContent = `"${text}"`;
 
-            // Also log to console like desktop
-            log(`CORA: "${text}"`, 'system');
+            // Log CORA speech in hot pink to stand out
+            log(`CORA: "${text}"`, 'cora');
 
             if (kokoroReady && !useFallbackTTS) {
                 // Use Kokoro neural TTS
@@ -953,31 +954,9 @@
                     wave_points[i] = wave_points[i] * 0.3 + sample_buffer[i] * 0.7;
                 }
 
-            } else if (audio_is_active) {
-                // Active but no chunk yet - simulate voice-like audio
-                const t = Date.now() / 100;
-                const samples_to_add = 8;
-                const new_samples = [];
-
-                for (let i = 0; i < samples_to_add; i++) {
-                    const phase = t + i * 0.3;
-                    let sample = Math.sin(phase * 2.1) * 0.5
-                              + Math.sin(phase * 4.3) * 0.3
-                              + Math.sin(phase * 7.2) * 0.15
-                              + (Math.random() - 0.5) * 0.3;
-                    sample *= (0.5 + Math.sin(phase * 0.5) * 0.5);
-                    sample = Math.max(-1.0, Math.min(1.0, sample));
-                    new_samples.push(sample);
-                }
-
-                sample_buffer = sample_buffer.slice(samples_to_add).concat(new_samples);
-
-                for (let i = 0; i < NUM_POINTS; i++) {
-                    wave_points[i] = wave_points[i] * 0.3 + sample_buffer[i] * 0.7;
-                }
-
             } else {
-                // No audio - DECAY existing wave toward zero - lines 312-316
+                // No audio - DECAY toward zero (lines 312-316)
+                // Desktop behavior: NO fake waves, only real audio or decay
                 const decay = 0.92;
                 for (let i = 0; i < NUM_POINTS; i++) {
                     wave_points[i] *= decay;
