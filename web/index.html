@@ -747,10 +747,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include the data.]\n${result}`,
+                        prompt: `[BOOT - ${context}] ${result}`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 100 }
+                        options: { temperature: 0.9, num_predict: 150 }
                     })
                 });
                 if (res.ok) {
