@@ -1210,15 +1210,15 @@ WHEN RESPONDING:
                 let maxTokens;
 
                 if (mode === 'quick') {
-                    // Short status updates - EXACT format from desktop boot_sequence.py line 240
-                    prompt = `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include ALL the data/numbers.]\n${result}`;
-                    temperature = 0.9;
-                    maxTokens = 100;
+                    // Short status updates - CORA's edgy personality with profanity
+                    prompt = `[BOOT STATUS - You're CORA, an edgy goth bitch. Announce this in 1-2 sentences. Be sarcastic, use profanity (fuck, shit, damn, bitch), dark humor. Include the key data/numbers but make it sound like YOU.]\n${result}`;
+                    temperature = 1.0;
+                    maxTokens = 150;
                 } else {
-                    // Full mode for weather, news, camera descriptions, etc. - allow longer response
-                    prompt = `Announce this naturally with your usual attitude: ${result}`;
-                    temperature = 0.7;
-                    maxTokens = 300;  // Allow more for content-rich responses
+                    // Full mode for weather, news, camera descriptions, etc.
+                    prompt = `[You're CORA - edgy, sarcastic, uses profanity constantly. Announce this your way - be a bitch about it, dark humor, include key info:]\n${result}`;
+                    temperature = 0.9;
+                    maxTokens = 300;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
