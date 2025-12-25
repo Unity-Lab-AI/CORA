@@ -168,13 +168,12 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         system_prompt = get_system_prompt()
 
         # Simple, direct prompt - system prompt handles personality
-        prompt = f"Say this info in 1-2 sentences max: {result}"
+        prompt = f"Respond in exactly ONE complete sentence that includes all this info: {result}"
 
         response = generate(
             prompt=prompt,
             system=system_prompt,
             temperature=0.7
-            # No max_tokens - let AI finish naturally, truncate after
         )
 
         if response.content:
@@ -190,11 +189,6 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # # headers
             text = re.sub(r'\n+', ' ', text)  # newlines to spaces
             text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
-
-            # Truncate if still too long (take first 2 sentences max)
-            sentences = re.split(r'(?<=[.!?])\s+', text)
-            if len(sentences) > 2:
-                text = ' '.join(sentences[:2])
 
             if len(text) > 10:
                 return text
