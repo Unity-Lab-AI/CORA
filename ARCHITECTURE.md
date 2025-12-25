@@ -21,7 +21,7 @@
 ## Cognitive Operations & Reasoning Assistant - Windows 11 AI Application
 
 **CRITICAL: READ THIS ENTIRE FILE BEFORE DOING ANY WORK**
-**VERSION: 2.3.0 - FULL AUTONOMOUS AI ASSISTANT + VOICE/VISION + ADVANCED TOOLS**
+**VERSION: 2.4.0 - FULL AUTONOMOUS AI ASSISTANT + VOICE/VISION + WEB UI + ADVANCED TOOLS**
 
 ---
 
@@ -885,6 +885,52 @@ From BODY_TOOLS_FOR_GEE (16 files, 210KB):
 - [x] Performance: async architecture
 - [x] Documentation: README.md, ARCHITECTURE.md, TODO.md
 
+### Phase 8: Web UI & Deployment - COMPLETE (NEW)
+- [x] web/index.html - Browser-based interface
+- [x] GitHub Actions workflow for Pages deployment
+- [x] Split view (console + app)
+- [x] API key modal with validation
+- [x] localStorage key persistence
+- [x] Ollama chat integration
+- [x] Fullscreen/split toggle
+
+---
+
+## WEB UI & GITHUB PAGES (NEW - v2.4.0)
+
+### Web Interface
+Browser-based interface that mirrors the Python boot sequence.
+
+```
+web/
+└── index.html          # Full web UI (console + app split view)
+```
+
+**Features:**
+- F-100 jet style boot console (matches Python boot_sequence.py)
+- Split view: Console (left) + App (right)
+- Fullscreen toggle for each panel
+- API key modal with validation
+- localStorage persistence for keys
+- Chat interface connected to local Ollama
+
+### GitHub Pages Deployment
+Auto-deploys on push to main branch.
+
+```
+.github/
+└── workflows/
+    └── deploy.yml      # GitHub Actions workflow
+```
+
+**Deployment URL:** `https://unity-lab-ai.github.io/CORA/`
+
+### API Key Management
+| Key | Storage | Validation | Get Key Link |
+|-----|---------|------------|--------------|
+| Pollinations | `cora_pollinations_key` | Ping API on boot | pollinations.ai/dashboard |
+| GitHub | `cora_github_key` | Ping /user endpoint | github.com/settings/tokens |
+
 ---
 
 ## API INTEGRATIONS
@@ -895,6 +941,9 @@ From BODY_TOOLS_FOR_GEE (16 files, 210KB):
 | Location | ip-api.com | Geolocation from IP |
 | Calendar | Google Calendar API (optional) | Events sync |
 | Search | DuckDuckGo (if online) | Web search |
+| Pollinations | pollinations.ai | Image generation |
+| GitHub | api.github.com | Repository access, code ops |
+| Ollama | localhost:11434 | Local AI inference |
 
 ---
 
@@ -948,8 +997,9 @@ colorama>=0.4.6
 | Phase 5: Tools & Capabilities | COMPLETE | 100% |
 | Phase 6: Self-Modification | IN PROGRESS | 70% |
 | Phase 7: Polish | IN PROGRESS | 40% |
+| Phase 8: Web UI & Deployment | COMPLETE | 100% |
 
-**OVERALL: 83% COMPLETE**
+**OVERALL: 85% COMPLETE**
 
 ### Remaining Work
 - Wire voice_listener.py to GUI boot
@@ -962,5 +1012,5 @@ colorama>=0.4.6
 ---
 
 *Unity AI Lab - C.O.R.A v2.4.0 Architecture Specification*
-*UPDATED: 2025-12-24*
-*75+ Python files | 83% complete*
+*UPDATED: 2025-12-25*
+*75+ Python files | 85% complete | Web UI deployed*

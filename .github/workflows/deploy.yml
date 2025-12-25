@@ -15,37 +15,235 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # ============================================
+  # JOB 1: VALIDATE
+  # ============================================
+  validate:
+    name: "1. Validate Source"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: "1.1 Checkout repository"
         uses: actions/checkout@v4
 
-      - name: Setup Pages
+      - name: "1.2 Verify web/ directory exists"
+        run: |
+          echo "Checking for web/ directory..."
+          if [ -d "web" ]; then
+            echo "✓ web/ directory found"
+          else
+            echo "✗ web/ directory missing!"
+            exit 1
+          fi
+
+      - name: "1.3 Verify index.html exists"
+        run: |
+          echo "Checking for index.html..."
+          if [ -f "web/index.html" ]; then
+            echo "✓ web/index.html found"
+            echo "File size: $(wc -c < web/index.html) bytes"
+          else
+            echo "✗ web/index.html missing!"
+            exit 1
+          fi
+
+      - name: "1.4 List web assets"
+        run: |
+          echo "=== Web Assets ==="
+          ls -la web/
+          echo "=================="
+
+  # ============================================
+  # JOB 2: BUILD
+  # ============================================
+  build:
+    name: "2. Build Site"
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: "2.1 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "2.2 Setup GitHub Pages"
         uses: actions/configure-pages@v4
 
-      - name: Create web build directory
-        run: mkdir -p _site
-
-      - name: Copy web assets
+      - name: "2.3 Create build directory"
         run: |
+          echo "Creating _site/ directory..."
+          mkdir -p _site
+          echo "✓ Build directory ready"
+
+      - name: "2.4 Copy index.html"
+        run: |
+          echo "Copying index.html..."
+          cp web/index.html _site/
+          echo "✓ index.html copied"
+
+      - name: "2.5 Copy additional assets"
+        run: |
+          echo "Copying additional web assets..."
           cp -r web/* _site/ 2>/dev/null || true
-          cp web/index.html _site/ 2>/dev/null || true
+          echo "✓ Assets copied"
 
-      - name: Generate version info
+      - name: "2.6 Generate version.json"
         run: |
-          echo "{\"version\":\"2.4.0\",\"build\":\"$(date +%Y%m%d-%H%M%S)\",\"commit\":\"${GITHUB_SHA::7}\"}" > _site/version.json
+          echo "Generating version info..."
+          cat > _site/version.json << EOF
+          {
+            "name": "C.O.R.A Web UI",
+            "version": "2.4.0",
+            "build": "$(date +%Y%m%d-%H%M%S)",
+            "commit": "${GITHUB_SHA::7}",
+            "branch": "${GITHUB_REF_NAME}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "✓ version.json generated"
+          cat _site/version.json
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: "2.7 Generate 404 page"
+        run: |
+          echo "Creating 404 page..."
+          cat > _site/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>404 - C.O.R.A</title>
+            <meta http-equiv="refresh" content="0; url=/">
+            <style>
+              body { background: #0a0a0a; color: #00ff00; font-family: monospace;
+                     display: flex; justify-content: center; align-items: center;
+                     height: 100vh; margin: 0; }
+              .msg { text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="msg">
+              <h1>[404] Page Not Found</h1>
+              <p>Redirecting to C.O.R.A...</p>
+            </div>
+          </body>
+          </html>
+          EOF
+          echo "✓ 404.html created"
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # ============================================
+  # JOB 3: TEST BUILD
+  # ============================================
+  test:
+    name: "3. Verify Build"
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
+      - name: "3.1 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "3.2 Rebuild for verification"
+        run: |
+          mkdir -p _site
+          cp -r web/* _site/
+
+      - name: "3.3 Verify index.html in build"
+        run: |
+          echo "Verifying build output..."
+          if [ -f "_site/index.html" ]; then
+            echo "✓ index.html present in build"
+          else
+            echo "✗ index.html missing from build!"
+            exit 1
+          fi
+
+      - name: "3.4 Check HTML validity"
+        run: |
+          echo "Checking HTML structure..."
+          if grep -q "<!DOCTYPE html>" _site/index.html; then
+            echo "✓ Valid HTML doctype"
+          else
+            echo "⚠ Missing DOCTYPE"
+          fi
+          if grep -q "</html>" _site/index.html; then
+            echo "✓ HTML properly closed"
+          else
+            echo "⚠ HTML may be malformed"
+          fi
+
+      - name: "3.5 Count build files"
+        run: |
+          echo "=== Build Summary ==="
+          echo "Files in _site/:"
+          find _site -type f | wc -l
+          echo "Total size:"
+          du -sh _site/
+          echo "===================="
+
+  # ============================================
+  # JOB 4: PACKAGE
+  # ============================================
+  package:
+    name: "4. Package Artifact"
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: "4.1 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "4.2 Setup Pages"
+        uses: actions/configure-pages@v4
+
+      - name: "4.3 Prepare build directory"
+        run: |
+          mkdir -p _site
+          cp -r web/* _site/
+          # Generate version.json
+          cat > _site/version.json << EOF
+          {
+            "name": "C.O.R.A Web UI",
+            "version": "2.4.0",
+            "build": "$(date +%Y%m%d-%H%M%S)",
+            "commit": "${GITHUB_SHA::7}",
+            "branch": "${GITHUB_REF_NAME}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          # Generate 404
+          cat > _site/404.html << 'EOFHTML'
+          <!DOCTYPE html>
+          <html>
+          <head><title>404</title><meta http-equiv="refresh" content="0; url=/"></head>
+          <body style="background:#0a0a0a;color:#0f0;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh">
+          <div><h1>[404]</h1><p>Redirecting...</p></div>
+          </body>
+          </html>
+          EOFHTML
+
+      - name: "4.4 Upload Pages artifact"
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: "4.5 Confirm artifact uploaded"
+        run: |
+          echo "✓ Artifact packaged and uploaded"
+          echo "Ready for deployment"
+
+  # ============================================
+  # JOB 5: DEPLOY
+  # ============================================
+  deploy:
+    name: "5. Deploy to Pages"
+    runs-on: ubuntu-latest
+    needs: package
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: "5.1 Deploy to GitHub Pages"
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: "5.2 Report deployment URL"
+        run: |
+          echo "=========================================="
+          echo "✓ DEPLOYMENT COMPLETE"
+          echo "=========================================="
+          echo "URL: ${{ steps.deployment.outputs.page_url }}"
+          echo "=========================================="

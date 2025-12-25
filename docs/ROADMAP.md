@@ -20,7 +20,19 @@
 
 ## COMPLETED FEATURES (v2.4.0)
 
-### Visual Boot Display (NEW)
+### Web UI & GitHub Pages (NEW - 2025-12-25)
+- [x] `web/index.html` - Browser-based interface
+- [x] Split view (Console + App panels)
+- [x] F-100 jet style boot console
+- [x] API key modal with validation
+- [x] Pollinations + GitHub API integration
+- [x] localStorage key persistence
+- [x] Fullscreen/split toggle
+- [x] Ollama chat integration
+- [x] GitHub Actions auto-deploy on push
+- [x] Live at: `https://unity-lab-ai.github.io/CORA/`
+
+### Visual Boot Display
 - [x] Cyberpunk-themed boot window
 - [x] Two-column layout (Status + Log)
 - [x] Audio waveform visualization during TTS
@@ -162,7 +174,12 @@ C.O.R.A/
 ├── ai/
 │   ├── ollama.py          # Ollama client
 │   └── context.py         # Context manager
-├── tools/                 # 17+ tool modules
+├── web/                   # NEW - GitHub Pages
+│   └── index.html         # Browser-based interface
+├── .github/
+│   └── workflows/
+│       └── deploy.yml     # Auto-deploy to Pages
+├── cora_tools/            # 17+ tool modules
 ├── services/              # Weather, location, etc.
 ├── data/
 │   ├── images/            # Generated images
@@ -196,6 +213,8 @@ C.O.R.A/
 
 ## Recent Achievements (v2.4.0)
 
+- **Web UI deployed to GitHub Pages** (2025-12-25)
+- **API key management with validation** (Pollinations + GitHub)
 - Visual Boot Display with cyberpunk theme
 - Dynamic AI responses via `cora_respond()` function
 - Live system stats panel (CPU, RAM, GPU, VRAM, Disk)
@@ -221,4 +240,4 @@ C.O.R.A/
 ---
 
 *Unity AI Lab - C.O.R.A Roadmap v2.4.0*
-*Last Updated: 2025-12-23*
+*Last Updated: 2025-12-25*

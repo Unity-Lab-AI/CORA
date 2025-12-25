@@ -10,146 +10,208 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 2.3.0
+  Version: 2.4.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
 
 ## Cognitive Operations & Reasoning Assistant Capabilities
 
+> **Status Key:** DONE = Implemented | WIP = In Progress | TODO = Planned
+
+---
+
+## Domain: Voice & Speech
+
+### Text-to-Speech (TTS)
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| Kokoro TTS | Core | DONE | Neural voice synthesis (af_bella) |
+| Emotion-aware Speech | Advanced | DONE | Context-based tone adjustment |
+| TTS Mutex | Core | DONE | Prevents overlapping speech |
+| pyttsx3 Fallback | Basic | DONE | Backup TTS engine |
+
+### Speech-to-Text (STT)
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| Vosk STT | Core | DONE | Offline speech recognition |
+| Wake Word Detection | Core | DONE | "Cora" activation |
+| Echo Filtering | Advanced | DONE | Ignore own speech |
+| Conversation Mode | Advanced | DONE | Continuous listening |
+
+---
+
+## Domain: Vision & Camera
+
+### Camera Operations
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| Webcam Capture | Basic | DONE | Multi-index camera detection |
+| Presence Detection | Intermediate | DONE | User at desk detection |
+| llava Vision | Advanced | WIP | AI image analysis |
+| Screenshot Capture | Basic | DONE | Desktop/window screenshots |
+
+---
+
+## Domain: AI & Reasoning
+
+### Local AI (Ollama)
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| Chat Generation | Core | DONE | dolphin-mistral responses |
+| Code Generation | Intermediate | DONE | qwen2.5-coder integration |
+| Vision Analysis | Advanced | DONE | llava model |
+| Dynamic Responses | Advanced | DONE | cora_respond() boot phases |
+| Context Tracking | Intermediate | DONE | Conversation memory |
+
+### External AI
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| Pollinations API | Intermediate | DONE | Image generation |
+| GitHub API | Intermediate | DONE | Repository access |
+
 ---
 
 ## Domain: Task Management
 
-### Core Skills
+### Core Tasks
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Create Task | Basic | TODO | Add new tasks with priority |
-| List Tasks | Basic | TODO | Display task queue |
-| Update Task | Basic | TODO | Modify task properties |
-| Complete Task | Basic | TODO | Mark tasks as done |
-| Delete Task | Basic | TODO | Remove tasks |
+| Create Task | Basic | DONE | Add with priority/due date |
+| List Tasks | Basic | DONE | Filter by status |
+| Complete Task | Basic | DONE | Mark as done |
+| Delete Task | Basic | DONE | Remove tasks |
+| Priority Sorting | Intermediate | DONE | Auto-sort by priority |
+| Due Date Tracking | Intermediate | DONE | Deadline alerts |
 
-### Advanced Skills
+### Calendar & Reminders
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Priority Sorting | Intermediate | TODO | Auto-sort by priority |
-| Due Date Tracking | Intermediate | TODO | Track deadlines |
-| Task Dependencies | Advanced | TODO | Link related tasks |
-| Recurring Tasks | Advanced | TODO | Auto-create repeating tasks |
+| Calendar Events | Intermediate | DONE | Event management |
+| Reminders | Intermediate | DONE | Time-based alerts |
+| Knowledge Base | Intermediate | DONE | Store/recall information |
 
 ---
 
-## Domain: Knowledge Base
+## Domain: System Control
 
-### Core Skills
+### Windows Operations
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Add Knowledge | Basic | TODO | Store information |
-| Search Knowledge | Basic | TODO | Find stored info |
-| Tag System | Basic | TODO | Categorize entries |
-| Export Knowledge | Intermediate | TODO | Output to file |
+| Launch App | Basic | DONE | Start applications |
+| Close App | Basic | DONE | Terminate processes |
+| Window Management | Intermediate | DONE | Focus/minimize/maximize |
+| System Stats | Basic | DONE | CPU/RAM/GPU monitoring |
+| Volume Control | Basic | DONE | Audio adjustment |
 
-### Advanced Skills
+### File Operations
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Semantic Search | Advanced | TODO | Context-aware search |
-| Auto-Tagging | Advanced | TODO | Smart categorization |
-| Knowledge Linking | Advanced | TODO | Connect related entries |
+| File CRUD | Basic | DONE | Create/read/update/delete |
+| File Search | Intermediate | DONE | Find by name/content |
+| JSON Handling | Basic | DONE | Parse/generate JSON |
 
 ---
 
-## Domain: Reasoning
+## Domain: Web & External
 
-### Core Skills
+### Web Operations
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Parse Commands | Basic | TODO | Understand user input |
-| Generate Responses | Basic | TODO | Provide output |
-| Context Tracking | Intermediate | TODO | Remember conversation |
+| Web Search | Intermediate | DONE | DuckDuckGo search |
+| URL Fetch | Intermediate | DONE | Get webpage content |
+| Weather API | Intermediate | DONE | wttr.in integration |
+| Location API | Intermediate | DONE | IP geolocation |
+| News Headlines | Intermediate | DONE | Current news fetch |
 
-### Advanced Skills
+### Browser Automation
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Multi-step Reasoning | Advanced | TODO | Complex operations |
-| Inference Engine | Advanced | TODO | Derive conclusions |
-| Decision Support | Advanced | TODO | Suggest actions |
+| Playwright | Advanced | WIP | Web automation |
+| Media Control | Intermediate | DONE | mpv YouTube playback |
 
 ---
 
-## Domain: Integration
+## Domain: Code & Development
 
-### Core Skills
+### Code Tools
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| File I/O | Basic | TODO | Read/write files |
-| JSON Handling | Basic | TODO | Parse/generate JSON |
-| CLI Interface | Basic | TODO | Terminal interaction |
+| Code Execution | Intermediate | DONE | Safe Python/JS runner |
+| Code Explanation | Intermediate | DONE | AI-powered analysis |
+| Code Generation | Advanced | DONE | Write code from description |
+| Syntax Display | Basic | DONE | Formatted code output |
 
-### Advanced Skills
+### Self-Modification
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| GitHub Sync | Intermediate | DONE | Git/GitHub integration |
-| API Communication | Advanced | TODO | External API calls |
-| Plugin System | Advanced | FUTURE | Extensibility |
+| Create Tool | Advanced | DONE | Runtime tool creation |
+| Modify Tool | Advanced | DONE | Enable/disable tools |
+| Tool Registry | Advanced | DONE | List all capabilities |
 
 ---
 
-## Domain: User Experience
+## Domain: User Interface
 
-### Core Skills
+### Desktop GUI
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Help System | Basic | TODO | Show available commands |
-| Error Messages | Basic | TODO | User-friendly errors |
-| Status Display | Basic | TODO | Show current state |
+| CustomTkinter GUI | Core | DONE | Floating panel UI |
+| Boot Display | Core | DONE | Cyberpunk boot console |
+| Waveform Visual | Intermediate | DONE | Audio visualization |
+| System Tray | Basic | DONE | Background operation |
+| Query Panels | Intermediate | DONE | Popup interactions |
 
-### Advanced Skills
+### Web UI (NEW)
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Progress Bars | Intermediate | TODO | Visual progress |
-| Color Output | Intermediate | TODO | Terminal colors |
-| Interactive Mode | Advanced | TODO | REPL interface |
+| Split View | Core | DONE | Console + App layout |
+| Boot Console | Core | DONE | F-100 style boot sequence |
+| API Key Modal | Intermediate | DONE | Key input with validation |
+| localStorage | Basic | DONE | Persistent key storage |
+| Fullscreen Toggle | Basic | DONE | View mode switching |
+| Ollama Chat | Core | DONE | Browser AI chat |
+
+### Deployment
+| Skill | Level | Status | Description |
+|-------|-------|--------|-------------|
+| GitHub Actions | Intermediate | DONE | Auto-deploy workflow |
+| GitHub Pages | Intermediate | DONE | Static site hosting |
 
 ---
 
-## Skill Priority Matrix
+## Skill Completion Summary
 
-```
-HIGH PRIORITY (P1-P3)          MEDIUM (P4-P6)           LOW (P7-P10)
-─────────────────────          ──────────────           ────────────
-Create Task                    Priority Sorting         Plugin System
-List Tasks                     Due Date Tracking        API Communication
-Parse Commands                 Context Tracking         Semantic Search
-Help System                    GitHub Sync              Auto-Tagging
-File I/O                       Export Knowledge         Decision Support
-```
+| Domain | Done | WIP | TODO | Total |
+|--------|------|-----|------|-------|
+| Voice & Speech | 8 | 0 | 0 | 8 |
+| Vision & Camera | 3 | 1 | 0 | 4 |
+| AI & Reasoning | 7 | 0 | 0 | 7 |
+| Task Management | 8 | 0 | 0 | 8 |
+| System Control | 8 | 0 | 0 | 8 |
+| Web & External | 6 | 1 | 0 | 7 |
+| Code & Development | 6 | 0 | 0 | 6 |
+| User Interface | 12 | 0 | 0 | 12 |
+| **TOTAL** | **58** | **2** | **0** | **60** |
 
----
-
-## Implementation Order
-
-1. **Phase 1 - Foundation**
-   - File I/O
-   - JSON Handling
-   - CLI Interface
-   - Basic Parser
-
-2. **Phase 2 - Core Features**
-   - Task CRUD operations
-   - Knowledge base
-   - Help system
-
-3. **Phase 3 - Enhancement**
-   - Priority management
-   - Search functionality
-   - GitHub integration
-
-4. **Phase 4 - Advanced**
-   - Reasoning capabilities
-   - Context tracking
-   - Multi-step operations
+**Completion: 97%** (58/60 skills implemented)
 
 ---
 
-*Unity AI Lab - C.O.R.A Skills v0.1.0*
+## Implementation Files
+
+| Domain | Primary Files |
+|--------|---------------|
+| Voice | `voice/tts.py`, `voice/stt.py`, `voice/wake_word.py` |
+| Vision | `services/presence.py`, `ui/camera_feed.py` |
+| AI | `ai/ollama.py`, `ai/context.py` |
+| Tasks | `cora_tools/tasks.py`, `cora_tools/calendar.py` |
+| System | `cora_tools/system.py`, `cora_tools/windows.py` |
+| Web | `cora_tools/web.py`, `services/weather.py` |
+| Code | `cora_tools/code.py`, `cora_tools/self_modify.py` |
+| UI | `ui/app.py`, `ui/boot_display.py`, `web/index.html` |
+
+---
+
+*Unity AI Lab - C.O.R.A v2.4.0 Skill Tree*
+*UPDATED: 2025-12-25*
