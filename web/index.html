@@ -1693,23 +1693,13 @@ WHEN RESPONDING:
                     text: displayText  // Full text with URLs for log display
                 };
 
-                // Timeout fallback - scale with text length (100ms per char, min 30s, max 120s)
-                const timeoutMs = Math.min(120000, Math.max(30000, speakText.length * 100));
-                console.log(`[TTS] Setting timeout for id=${id}: ${(timeoutMs/1000).toFixed(0)}s (text length=${speakText.length})`);
+                // NO TIMEOUT - let audio generation complete no matter how long
+                // Kokoro is slow but it WILL complete. Don't give up and lose audio.
+                // The boot sequence will wait via speakAndWait() which is correct behavior.
+                console.log(`[TTS] Waiting for Kokoro id=${id} (text length=${speakText.length}) - no timeout, will wait for completion`);
 
-                const timeoutId = setTimeout(() => {
-                    if (pendingCallbacks[id]) {
-                        console.warn(`[TTS] Timeout waiting for Kokoro (id ${id}) after ${(timeoutMs/1000).toFixed(0)}s, continuing...`);
-                        const { resolve, text } = pendingCallbacks[id];
-                        delete pendingCallbacks[id];
-                        if (text) {
-                            document.getElementById('speechText').textContent = `"${text}"`;
-                            log(`CORA: "${text}"`, 'cora');
-                        }
-                        stopWaveform();
-                        resolve();
-                    }
-                }, timeoutMs);
+                // No timeout - we wait as long as needed
+                const timeoutId = null;
 
                 // Store timeout so we can clear it when audio arrives
                 pendingCallbacks[id].timeoutId = timeoutId;
