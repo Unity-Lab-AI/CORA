@@ -532,6 +532,30 @@
         </div>
     </div>
 
+    <!-- Stats Server Gate -->
+    <div class="gate-overlay" id="statsGateOverlay">
+        <div class="gate-box">
+            <h2>[ STATS SERVER ]</h2>
+            <p style="color: #ff00ff;">Real-time GPU/CPU/RAM monitoring</p>
+            <p style="margin: 15px 0; color: #ccc;">The stats server provides live hardware stats from your computer.</p>
+            <pre style="text-align: left; padding: 10px; background: #111; border-radius: 4px;">cd C:\path\to\CORA
+python services/stats_server.py</pre>
+            <p style="color: var(--text-dim); font-size: 12px; margin-top: 10px;">Runs on localhost:11435 (like Ollama on 11434)</p>
+            <button onclick="retryStatsServer()" style="margin-top: 15px;">Retry Connection</button>
+            <button onclick="skipStatsServer()" style="margin-top: 10px; background: #333;">Skip (No Live Stats)</button>
+            <div style="margin-top: 20px; padding: 15px; background: #330000; border-radius: 4px; text-align: left;">
+                <p style="color: #ff6666; font-weight: bold; margin-bottom: 10px;">⚠ Without Stats Server:</p>
+                <ul style="color: #999; font-size: 11px; margin-left: 15px;">
+                    <li>No real GPU usage/temperature</li>
+                    <li>No real CPU percentage</li>
+                    <li>No real RAM usage</li>
+                    <li>No real disk space</li>
+                    <li>Stats panel will show "N/A"</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- API Key Modal -->
     <div class="modal-overlay" id="apiModal">
         <div class="modal">
@@ -1320,6 +1344,45 @@
                 const r = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
                 return r.ok;
             } catch { return false; }
+        }
+
+        async function checkStatsServer() {
+            try {
+                const r = await fetch('http://localhost:11435/ping', { method: 'GET' });
+                return r.ok;
+            } catch { return false; }
+        }
+
+        let statsServerSkipped = false;
+
+        async function retryStatsServer() {
+            if (await checkStatsServer()) {
+                document.getElementById('statsGateOverlay').classList.remove('visible');
+                continueAfterStatsCheck();
+            } else {
+                alert('Stats server not responding. Make sure to run:\npython services/stats_server.py');
+            }
+        }
+
+        function skipStatsServer() {
+            statsServerSkipped = true;
+            document.getElementById('statsGateOverlay').classList.remove('visible');
+            // Set all stats to N/A
+            document.getElementById('statCpu').textContent = 'N/A';
+            document.getElementById('statMem').textContent = 'N/A';
+            document.getElementById('statDisk').textContent = 'N/A';
+            document.getElementById('statGpu').textContent = 'N/A';
+            document.getElementById('statVram').textContent = 'N/A';
+            continueAfterStatsCheck();
+        }
+
+        function continueAfterStatsCheck() {
+            // Show API modal or continue to boot
+            if (!pollinationsKey && !githubToken) {
+                document.getElementById('apiModal').classList.add('visible');
+            } else {
+                runBootSequence();
+            }
         }
 
         async function getOllamaModels() {
@@ -2354,7 +2417,12 @@ You ARE Cora. That's just who you are.`;
         async function retryOllama() {
             if (await checkOllama()) {
                 document.getElementById('gateOverlay').classList.remove('visible');
-                runBootSequence();
+                // Now check stats server
+                if (!(await checkStatsServer())) {
+                    document.getElementById('statsGateOverlay').classList.add('visible');
+                } else {
+                    continueAfterStatsCheck();
+                }
             } else {
                 alert('Ollama still not responding. Make sure "ollama serve" is running.');
             }
@@ -2376,18 +2444,20 @@ You ARE Cora. That's just who you are.`;
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
 
+            // Gate 1: Ollama (required)
             if (!(await checkOllama())) {
                 document.getElementById('gateOverlay').classList.add('visible');
                 return;
             }
 
-            // Show API modal only if Pollinations key is missing (optional but enhances image gen)
-            // Weather now uses wttr.in - free, no key needed
-            if (!pollinationsKey) {
-                document.getElementById('apiModal').classList.add('visible');
-            } else {
-                runBootSequence();
+            // Gate 2: Stats Server (optional - can skip)
+            if (!(await checkStatsServer())) {
+                document.getElementById('statsGateOverlay').classList.add('visible');
+                return;
             }
+
+            // Stats server running - continue
+            continueAfterStatsCheck();
         }
 
         if (speechSynthesis.onvoiceschanged !== undefined) {
