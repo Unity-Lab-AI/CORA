@@ -8,17 +8,17 @@
 
 | Version | Status | Description |
 |---------|--------|-------------|
-| 2.0.0 | COMPLETED | Core AI assistant foundation |
-| 2.1.0 | COMPLETED | Voice integration (TTS/STT) |
-| 2.2.0 | COMPLETED | Tool system expansion |
-| 2.3.0 | COMPLETED | Full autonomous AI assistant |
-| 2.4.0 | CURRENT | Visual boot display & dynamic AI |
-| 2.5.0 | PLANNED | Enhanced learning & context |
+| 1.0.0 | COMPLETED | Core AI assistant foundation |
+| 1.0.0 | COMPLETED | Voice integration (TTS/STT) |
+| 1.0.0 | COMPLETED | Tool system expansion |
+| 1.0.0 | COMPLETED | Full autonomous AI assistant |
+| 1.0.0 | CURRENT | Visual boot display & dynamic AI |
+| 1.0.0 | PLANNED | Enhanced learning & context |
 | 3.0.0 | FUTURE | Production release |
 
 ---
 
-## COMPLETED FEATURES (v2.4.0)
+## COMPLETED FEATURES (v1.0.0)
 
 ### Web UI & GitHub Pages (NEW - 2025-12-25)
 - [x] `web/index.html` - Browser-based interface
@@ -108,7 +108,7 @@
 
 ---
 
-## PHASE 5: Enhanced Context (v2.5.0)
+## PHASE 5: Enhanced Context (v1.0.0)
 
 ### Milestone 5.1: Learning System
 - [ ] Conversation history persistence
@@ -205,13 +205,13 @@ C.O.R.A/
 
 ## Current Focus
 
-**Active Version:** 2.4.0
-**Next Target:** 2.5.0 - Enhanced Learning
+**Active Version:** 1.0.0
+**Next Target:** 1.0.0 - Enhanced Learning
 **Priority:** Context persistence and documentation
 
 ---
 
-## Recent Achievements (v2.4.0)
+## Recent Achievements (v1.0.0)
 
 - **Web UI deployed to GitHub Pages** (2025-12-25)
 - **API key management with validation** (Pollinations + GitHub)
@@ -239,5 +239,5 @@ C.O.R.A/
 
 ---
 
-*Unity AI Lab - C.O.R.A Roadmap v2.4.0*
+*Unity AI Lab - C.O.R.A Roadmap v1.0.0*
 *Last Updated: 2025-12-25*

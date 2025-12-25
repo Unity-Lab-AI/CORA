@@ -3,7 +3,7 @@
 C.O.R.A Window Management Tools
 Control and manage application windows on the desktop.
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - minimize_window(app_name)
 - maximize_window(app_name)
 - arrange_windows(layout)

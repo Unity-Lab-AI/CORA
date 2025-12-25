@@ -3,7 +3,7 @@
 C.O.R.A Task Management Service
 Core task management functionality for CORA
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - add_task(text, priority, due_date, notes)
 - list_tasks(filter) - Returns pending/done/overdue
 - complete_task(id)

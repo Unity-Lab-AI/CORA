@@ -3,7 +3,7 @@
 C.O.R.A Audio Device Management
 Audio input/output device selection and configuration
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Set up pyaudio for microphone input
 - Handle audio device selection
 - Configure audio settings

@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 2.4.0
+  Version: 1.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -213,5 +213,5 @@
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0 Skill Tree*
+*Unity AI Lab - C.O.R.A v1.0.0 Skill Tree*
 *UPDATED: 2025-12-25*

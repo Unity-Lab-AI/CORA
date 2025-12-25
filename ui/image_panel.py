@@ -3,7 +3,7 @@
 C.O.R.A Image Panel
 Display screenshots and images in UI
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Display screenshots in UI
 - Support image carousel
 - Thumbnail previews

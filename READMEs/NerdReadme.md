@@ -2,7 +2,7 @@
 
 ## Developer/Nerd Guide
 
-Version 2.4.0
+Version 1.0.0
 
 ---
 
@@ -58,7 +58,7 @@ Version 2.4.0
 
 ---
 
-## New in v2.4.0
+## New in v1.0.0
 
 ### Visual Boot Display (ui/boot_display.py)
 
@@ -164,7 +164,7 @@ python src/boot_sequence.py --quick   # Skip TTS announcements
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  C.O.R.A v2.4.0 - Visual Boot Display                [X]   │
+│  C.O.R.A v1.0.0 - Visual Boot Display                [X]   │
 ├──────────────────────────┬──────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                        │
 │  ────────────────────    │  ────────────────────────────    │
@@ -538,5 +538,5 @@ C.O.R.A/
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0 Technical Documentation*
+*Unity AI Lab - C.O.R.A v1.0.0 Technical Documentation*
 *Last Updated: 2025-12-25*

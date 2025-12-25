@@ -2,7 +2,7 @@
 
 ## Cognitive Operations & Reasoning Assistant
 
-Version 2.4.0
+Version 1.0.0
 
 ---
 
@@ -69,7 +69,7 @@ When CORA starts with visual boot, you'll see:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  C.O.R.A v2.4.0 - Visual Boot Display                          │
+│  C.O.R.A v1.0.0 - Visual Boot Display                          │
 ├──────────────────────────┬─────────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                           │
 │                          │                                     │
@@ -444,5 +444,5 @@ backup                Save all data to backups/
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0*
+*Unity AI Lab - C.O.R.A v1.0.0*
 *Last Updated: 2025-12-25*

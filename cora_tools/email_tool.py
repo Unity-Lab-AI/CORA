@@ -8,7 +8,7 @@
 #
 # C.O.R.A Email Module
 # ================================================================
-# Version: 2.4.0
+# Version: 1.0.0
 # Unity AI Lab
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI

@@ -49,7 +49,7 @@ echo   : [ [__ [ [ ] ][ _ / /   \                :
 echo   :  \___] \___/[_] [_]_] [_]               :
 echo   :                                         :
 echo   :  Cognitive Operations and Reasoning      :
-echo   :  Assistant - v2.4.0 - Unity AI Lab      :
+echo   :  Assistant - v1.0.0 - Unity AI Lab      :
 echo   +=========================================+
 echo.
 

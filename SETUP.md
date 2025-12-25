@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 2.4.0
+  Version: 1.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -444,5 +444,5 @@ ollama pull llava
 
 ---
 
-*C.O.R.A v2.4.0 - Setup Guide*
+*C.O.R.A v1.0.0 - Setup Guide*
 *Unity AI Lab - Hackall360, Sponge, GFourteen*

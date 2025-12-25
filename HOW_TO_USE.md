@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 2.4.0
+  Version: 1.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -71,7 +71,7 @@ python src/boot_sequence.py --quick
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  C.O.R.A v2.4.0 - Visual Boot Display                          │
+│  C.O.R.A v1.0.0 - Visual Boot Display                          │
 ├──────────────────────────┬─────────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                           │
 │                          │                                     │
@@ -309,5 +309,5 @@ CORA is your helper. Just talk to her like a friend.
 
 ---
 
-*C.O.R.A v2.4.0 - Cognitive Operations & Reasoning Assistant*
+*C.O.R.A v1.0.0 - Cognitive Operations & Reasoning Assistant*
 *Unity AI Lab - Hackall360, Sponge, GFourteen*

@@ -2,7 +2,7 @@
 C.O.R.A Calendar Tools Module
 
 Event and calendar management.
-Per ARCHITECTURE.md v2.0.0: Calendar operations for scheduling.
+Per ARCHITECTURE.md v1.0.0: Calendar operations for scheduling.
 """
 
 import os

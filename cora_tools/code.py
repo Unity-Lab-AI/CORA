@@ -3,7 +3,7 @@
 C.O.R.A Code Assistance Tools
 AI-powered code explanation, writing, fixing, and execution.
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - explain_code(code)
 - write_code(description)
 - fix_code(code, error)

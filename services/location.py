@@ -2,7 +2,7 @@
 C.O.R.A Location Services Module
 
 IP geolocation and location services.
-Per ARCHITECTURE.md v2.0.0: Location detection via ip-api.com.
+Per ARCHITECTURE.md v1.0.0: Location detection via ip-api.com.
 """
 
 import json

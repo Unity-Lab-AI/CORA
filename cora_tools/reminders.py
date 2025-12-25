@@ -3,7 +3,7 @@
 C.O.R.A Reminders Service
 Time-based reminders and alerts
 
-Per ARCHITECTURE.md v2.0.0:
+Per ARCHITECTURE.md v1.0.0:
 - Add/remove reminders
 - Time-based trigger checking
 - Notification integration

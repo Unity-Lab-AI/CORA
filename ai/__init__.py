@@ -2,7 +2,7 @@
 C.O.R.A AI Module
 
 Ollama integration, context building, and model routing.
-Per ARCHITECTURE.md v2.0.0: Full AI pipeline with HTTP API.
+Per ARCHITECTURE.md v1.0.0: Full AI pipeline with HTTP API.
 """
 
 from .ollama import (

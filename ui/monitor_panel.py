@@ -3,7 +3,7 @@
 C.O.R.A Monitor Panel
 Live system monitoring panel with CPU/RAM/GPU/Disk/Network display.
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Dedicated system monitoring panel
 - Live updating metrics display
 - Integration with main UI

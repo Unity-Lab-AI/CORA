@@ -3,7 +3,7 @@
 C.O.R.A Fullscreen Image Display
 Display images in fullscreen with controls
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - show_fullscreen_image(path) - display image fullscreen
 - show_boot_image() - generate and display boot image
 - FullscreenImageWindow class for UI integration

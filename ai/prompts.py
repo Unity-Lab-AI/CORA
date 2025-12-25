@@ -3,7 +3,7 @@
 C.O.R.A Prompt Template System
 Centralized prompt management for AI interactions
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Prompt template system
 - Role-based prompt builders
 - Emotion-aware prompt engineering

@@ -3,7 +3,7 @@
 C.O.R.A Echo Filter Module
 Filters out CORA's own speech from microphone input.
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Separate module for echo filtering
 - Prevents TTS from being picked up by STT
 - Thread-safe implementation

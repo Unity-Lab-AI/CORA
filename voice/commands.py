@@ -3,7 +3,7 @@
 C.O.R.A Voice Commands
 Command handlers for voice-triggered actions
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - cmd_calendar - show today's events
 - cmd_weather - show weather
 - cmd_close - close app

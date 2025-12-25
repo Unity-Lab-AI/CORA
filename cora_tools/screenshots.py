@@ -3,7 +3,7 @@
 C.O.R.A Screenshot Tools
 Desktop and window capture for visual context
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Capture full desktop
 - Capture specific window by title
 - Return image path or base64

@@ -70,5 +70,5 @@ startProactiveInterjections() - runs every 45 seconds
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0*
+*Unity AI Lab - C.O.R.A v1.0.0*
 *Session: 2025-12-25*

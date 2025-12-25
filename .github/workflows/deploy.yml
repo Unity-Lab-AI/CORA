@@ -90,7 +90,7 @@ jobs:
           cat > _site/version.json << EOF
           {
             "name": "C.O.R.A Web UI",
-            "version": "2.4.0",
+            "version": "1.0.0",
             "build": "$(date +%Y%m%d-%H%M%S)",
             "commit": "${GITHUB_SHA::7}",
             "branch": "${GITHUB_REF_NAME}",
@@ -197,7 +197,7 @@ jobs:
           cat > _site/version.json << EOF
           {
             "name": "C.O.R.A Web UI",
-            "version": "2.4.0",
+            "version": "1.0.0",
             "build": "$(date +%Y%m%d-%H%M%S)",
             "commit": "${GITHUB_SHA::7}",
             "branch": "${GITHUB_REF_NAME}",

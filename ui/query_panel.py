@@ -3,7 +3,7 @@
 C.O.R.A Query Panel
 Tkinter popup for getting human input
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Show popup with question text
 - Image carousel (optional)
 - Clickable links (optional)

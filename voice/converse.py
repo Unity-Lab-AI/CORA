@@ -3,7 +3,7 @@
 C.O.R.A Conversation Mode
 Full conversation loop with wake word + echo filtering
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Listen for wake word
 - Filter out CORA's own speech (echo filtering)
 - Process user speech

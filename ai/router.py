@@ -3,7 +3,7 @@
 C.O.R.A Model Router
 Intelligent model selection based on task type
 
-Per ARCHITECTURE.md v2.0.0:
+Per ARCHITECTURE.md v1.0.0:
 - Route queries to appropriate models
 - Fast model for simple tasks
 - Larger models for complex reasoning

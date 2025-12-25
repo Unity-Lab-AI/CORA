@@ -358,6 +358,34 @@
             line-height: 1.6;
         }
 
+        /* Setup Terminal Panel (start.bat/CORA.bat view) */
+        .setup-terminal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .setup-terminal .log-header {
+            background: linear-gradient(90deg, #002020 0%, #001515 100%);
+            border-bottom: 2px solid #00ffff;
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .setup-terminal .log-container {
+            background: #000;
+            padding: 20px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
         .log-line { margin-bottom: 2px; }
         .log-phase { color: var(--accent-magenta); font-weight: bold; margin-top: 10px; }
         .log-ok { color: var(--ok-color); }
@@ -605,7 +633,7 @@
             <div class="header">
                 <h1>C.O.R.A</h1>
                 <div class="subtitle">Cognitive Operations & Reasoning Assistant</div>
-                <div class="version">v2.4.0 - Unity AI Lab</div>
+                <div class="version">v1.0.0 - Unity AI Lab</div>
             </div>
 
             <div class="waveform-container">
@@ -672,6 +700,47 @@
         <div class="right-panel">
             <div class="log-header">[ BOOT CONSOLE ]</div>
             <div class="log-container" id="logContainer"></div>
+        </div>
+
+        <!-- Setup Terminal Panel (like start.bat/CORA.bat output) -->
+        <div class="setup-terminal" id="setupTerminal" style="display: none;">
+            <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ SETUP TERMINAL ] - CORA.bat</div>
+            <div class="log-container" id="setupLog" style="background: #000;">
+                <div class="log-line" style="color: #00ff00;">C:\Users\gfour\Desktop\CORA> start.bat</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #00ffff;">============================================</div>
+                <div class="log-line" style="color: #00ffff;">  C.O.R.A Setup & Installation Script</div>
+                <div class="log-line" style="color: #00ffff;">  Unity AI Lab - v1.0.0</div>
+                <div class="log-line" style="color: #00ffff;">============================================</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #ffff00;">[CHECK] Checking Python installation...</div>
+                <div class="log-line" style="color: #00ff00;">[OK] Python 3.12.0 found</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #ffff00;">[CHECK] Checking Ollama installation...</div>
+                <div class="log-line" style="color: #00ff00;">[OK] Ollama found at C:\Users\gfour\AppData\Local\Programs\Ollama</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #ff00ff;">[INSTALL] Installing required models...</div>
+                <div class="log-line" style="color: #888888;">  Pulling dolphin-mistral:7b...</div>
+                <div class="log-line" style="color: #00ff00;">  [OK] dolphin-mistral:7b (4.1 GB)</div>
+                <div class="log-line" style="color: #888888;">  Pulling llava:latest...</div>
+                <div class="log-line" style="color: #00ff00;">  [OK] llava:latest (4.7 GB)</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #ff00ff;">[INSTALL] Installing Python packages...</div>
+                <div class="log-line" style="color: #888888;">  pip install pillow...</div>
+                <div class="log-line" style="color: #888888;">  pip install opencv-python...</div>
+                <div class="log-line" style="color: #888888;">  pip install pyautogui...</div>
+                <div class="log-line" style="color: #888888;">  pip install requests...</div>
+                <div class="log-line" style="color: #888888;">  pip install python-dotenv...</div>
+                <div class="log-line" style="color: #00ff00;">[OK] All packages installed</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #ffff00;">[CHECK] Verifying Ollama connection...</div>
+                <div class="log-line" style="color: #00ff00;">[OK] Ollama API responding on localhost:11434</div>
+                <div class="log-line" style="color: #ffffff;"></div>
+                <div class="log-line" style="color: #00ffff;">============================================</div>
+                <div class="log-line" style="color: #00ff00;">[READY] All systems ready!</div>
+                <div class="log-line" style="color: #ff00ff;">[START] Launching CORA...</div>
+                <div class="log-line" style="color: #00ffff;">============================================</div>
+            </div>
         </div>
     </div>
 
@@ -1100,7 +1169,7 @@
         }
 
         function _draw_wave(width, height) {
-            // Symmetric waveform - expands OUT from center, collapses TO center at silence
+            // Single continuous waveform oscillating above and below center line
             const ctx = waveformCtx;
             const center_y = height / 2;
             const max_amp = (height / 2) - 5;
@@ -1109,28 +1178,27 @@
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, width, height);
 
-            // Center reference line (dim)
-            ctx.strokeStyle = '#201030';
+            // Center reference line (visible)
+            ctx.strokeStyle = '#402060';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, center_y);
             ctx.lineTo(width, center_y);
             ctx.stroke();
 
-            // Build coordinates for top and bottom curves
-            // Amplitude expands symmetrically from center
+            // Build single wave coordinates - signed values go above/below center
             const step = width / (NUM_POINTS - 1);
-            const topCoords = [];
-            const bottomCoords = [];
+            const waveCoords = [];
 
             for (let i = 0; i < NUM_POINTS; i++) {
                 const x = i * step;
-                const amp = Math.abs(wave_points[i]) * max_amp;
-                topCoords.push([x, center_y - amp]);      // Above center
-                bottomCoords.push([x, center_y + amp]);   // Below center (mirror)
+                // wave_points contains signed values (-1 to 1)
+                // Positive goes UP (above center), negative goes DOWN (below center)
+                const y = center_y - (wave_points[i] * max_amp);
+                waveCoords.push([x, y]);
             }
 
-            if (topCoords.length >= 4) {
+            if (waveCoords.length >= 4) {
                 // 4 glow layers
                 const layers = [
                     { color: '#400060', width: 8 },   // Outer glow
@@ -1139,33 +1207,21 @@
                     { color: '#ffc0ff', width: 1 }    // Bright core
                 ];
 
-                // Draw each layer as a closed shape (top curve + bottom curve mirrored)
+                // Draw single continuous wave through all points
                 layers.forEach(layer => {
                     ctx.strokeStyle = layer.color;
                     ctx.lineWidth = layer.width;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
 
-                    // Draw top curve (above center)
                     ctx.beginPath();
-                    ctx.moveTo(topCoords[0][0], topCoords[0][1]);
-                    for (let i = 1; i < topCoords.length - 1; i++) {
-                        const xc = (topCoords[i][0] + topCoords[i + 1][0]) / 2;
-                        const yc = (topCoords[i][1] + topCoords[i + 1][1]) / 2;
-                        ctx.quadraticCurveTo(topCoords[i][0], topCoords[i][1], xc, yc);
+                    ctx.moveTo(waveCoords[0][0], waveCoords[0][1]);
+                    for (let i = 1; i < waveCoords.length - 1; i++) {
+                        const xc = (waveCoords[i][0] + waveCoords[i + 1][0]) / 2;
+                        const yc = (waveCoords[i][1] + waveCoords[i + 1][1]) / 2;
+                        ctx.quadraticCurveTo(waveCoords[i][0], waveCoords[i][1], xc, yc);
                     }
-                    ctx.lineTo(topCoords[topCoords.length - 1][0], topCoords[topCoords.length - 1][1]);
-                    ctx.stroke();
-
-                    // Draw bottom curve (below center - mirror)
-                    ctx.beginPath();
-                    ctx.moveTo(bottomCoords[0][0], bottomCoords[0][1]);
-                    for (let i = 1; i < bottomCoords.length - 1; i++) {
-                        const xc = (bottomCoords[i][0] + bottomCoords[i + 1][0]) / 2;
-                        const yc = (bottomCoords[i][1] + bottomCoords[i + 1][1]) / 2;
-                        ctx.quadraticCurveTo(bottomCoords[i][0], bottomCoords[i][1], xc, yc);
-                    }
-                    ctx.lineTo(bottomCoords[bottomCoords.length - 1][0], bottomCoords[bottomCoords.length - 1][1]);
+                    ctx.lineTo(waveCoords[waveCoords.length - 1][0], waveCoords[waveCoords.length - 1][1]);
                     ctx.stroke();
                 });
             }
@@ -1398,6 +1454,245 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // ============================================================
+        // CORA Code Browser - Real file/directory viewer with copy
+        // ============================================================
+
+        let codeBrowserCache = {};  // Cache fetched directory listings
+
+        function showCodeBrowserModal() {
+            const { overlay, modal, content, close } = createDynamicModal('CORA - Code Browser', 1100, 700);
+
+            // Custom layout for file browser
+            content.innerHTML = `
+                <div style="display: flex; height: 100%; gap: 10px;">
+                    <!-- Left: Directory Tree -->
+                    <div id="fileTree" style="
+                        width: 280px; background: #0d0d1a; border-radius: 4px;
+                        overflow-y: auto; padding: 10px; font-size: 12px;
+                    ">
+                        <div style="color: #ff00ff; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 8px;">
+                            📁 CORA Project Files
+                        </div>
+                        <div id="treeContent" style="color: #ccc;">Loading...</div>
+                    </div>
+                    <!-- Right: Code Viewer -->
+                    <div style="flex: 1; display: flex; flex-direction: column;">
+                        <!-- File Header -->
+                        <div id="fileHeader" style="
+                            background: #1a1a2a; padding: 10px 15px; border-radius: 4px 4px 0 0;
+                            display: flex; justify-content: space-between; align-items: center;
+                        ">
+                            <div>
+                                <span id="currentFileName" style="color: #00ffff; font-weight: bold;">Select a file</span>
+                                <span id="fileInfo" style="color: #666; font-size: 11px; margin-left: 15px;"></span>
+                            </div>
+                            <div>
+                                <button id="copyCodeBtn" style="
+                                    background: #ff00ff; border: none; padding: 6px 15px;
+                                    border-radius: 4px; color: white; font-size: 11px;
+                                    cursor: pointer; display: none;
+                                " onclick="copyCurrentCode()">📋 COPY</button>
+                            </div>
+                        </div>
+                        <!-- Code Content -->
+                        <pre id="codeViewer" style="
+                            flex: 1; margin: 0; padding: 15px; background: #0a0a0f;
+                            overflow: auto; font-size: 12px; line-height: 1.5;
+                            color: #e0e0e0; border-radius: 0 0 4px 4px;
+                            font-family: 'Consolas', monospace; white-space: pre-wrap;
+                        ">Click a file on the left to view its contents</pre>
+                    </div>
+                </div>
+            `;
+
+            // Store current code for copy function
+            window.currentCodeContent = '';
+
+            // Load CORA's directory structure
+            loadCoraDirectoryTree();
+
+            return { close };
+        }
+
+        async function loadCoraDirectoryTree() {
+            const treeContent = document.getElementById('treeContent');
+
+            try {
+                // Fetch CORA repo root
+                const resp = await fetch('https://api.github.com/repos/Unity-Lab-AI/CORA/contents/');
+                if (!resp.ok) throw new Error('API rate limited or repo not found');
+
+                const items = await resp.json();
+                codeBrowserCache['/'] = items;
+
+                // Render tree
+                treeContent.innerHTML = '';
+                renderDirectoryItems(items, treeContent, '/');
+
+            } catch (e) {
+                treeContent.innerHTML = `
+                    <div style="color: #ff4444;">Failed to load: ${e.message}</div>
+                    <div style="color: #666; margin-top: 10px; font-size: 11px;">
+                        GitHub API might be rate-limited.<br>
+                        Try again in a minute.
+                    </div>
+                `;
+            }
+        }
+
+        function renderDirectoryItems(items, container, parentPath) {
+            // Sort: directories first, then files
+            const sorted = [...items].sort((a, b) => {
+                if (a.type === 'dir' && b.type !== 'dir') return -1;
+                if (a.type !== 'dir' && b.type === 'dir') return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            sorted.forEach(item => {
+                const div = document.createElement('div');
+                div.style.cssText = 'padding: 4px 8px; cursor: pointer; border-radius: 3px;';
+                div.onmouseover = () => div.style.background = '#1a1a2a';
+                div.onmouseout = () => div.style.background = 'transparent';
+
+                const icon = item.type === 'dir' ? '📁' : getFileIcon(item.name);
+                const color = item.type === 'dir' ? '#ffaa00' : '#ccc';
+
+                div.innerHTML = `<span style="color: ${color};">${icon} ${item.name}</span>`;
+
+                if (item.type === 'dir') {
+                    // Directory - expandable
+                    const subContainer = document.createElement('div');
+                    subContainer.style.cssText = 'margin-left: 15px; display: none;';
+
+                    div.onclick = async (e) => {
+                        e.stopPropagation();
+                        if (subContainer.style.display === 'none') {
+                            // Expand
+                            subContainer.style.display = 'block';
+                            div.innerHTML = `<span style="color: ${color};">📂 ${item.name}</span>`;
+
+                            // Load contents if not cached
+                            const path = parentPath + item.name + '/';
+                            if (!codeBrowserCache[path]) {
+                                subContainer.innerHTML = '<div style="color: #666; padding: 5px;">Loading...</div>';
+                                try {
+                                    const resp = await fetch(item.url);
+                                    if (resp.ok) {
+                                        const subItems = await resp.json();
+                                        codeBrowserCache[path] = subItems;
+                                        subContainer.innerHTML = '';
+                                        renderDirectoryItems(subItems, subContainer, path);
+                                    }
+                                } catch (e) {
+                                    subContainer.innerHTML = `<div style="color: #ff4444; padding: 5px;">Error loading</div>`;
+                                }
+                            }
+                        } else {
+                            // Collapse
+                            subContainer.style.display = 'none';
+                            div.innerHTML = `<span style="color: ${color};">📁 ${item.name}</span>`;
+                        }
+                    };
+
+                    container.appendChild(div);
+                    container.appendChild(subContainer);
+                } else {
+                    // File - load content on click
+                    div.onclick = () => loadFileContent(item);
+                    container.appendChild(div);
+                }
+            });
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'py': '🐍', 'js': '📜', 'ts': '📘', 'html': '🌐',
+                'css': '🎨', 'json': '📋', 'md': '📝', 'txt': '📄',
+                'bat': '⚙️', 'sh': '🔧', 'yml': '⚙️', 'yaml': '⚙️',
+                'png': '🖼️', 'jpg': '🖼️', 'gif': '🖼️', 'svg': '🖼️'
+            };
+            return icons[ext] || '📄';
+        }
+
+        async function loadFileContent(item) {
+            const viewer = document.getElementById('codeViewer');
+            const fileName = document.getElementById('currentFileName');
+            const fileInfo = document.getElementById('fileInfo');
+            const copyBtn = document.getElementById('copyCodeBtn');
+
+            fileName.textContent = item.name;
+            viewer.textContent = 'Loading...';
+            copyBtn.style.display = 'none';
+
+            try {
+                const resp = await fetch(item.download_url);
+                if (!resp.ok) throw new Error('Failed to fetch');
+
+                const content = await resp.text();
+                const lines = content.split('\n').length;
+                const sizeKb = (item.size / 1024).toFixed(1);
+
+                fileInfo.textContent = `${lines} lines | ${sizeKb} KB`;
+                viewer.innerHTML = highlightCode(content, item.name);
+
+                // Store for copy
+                window.currentCodeContent = content;
+                copyBtn.style.display = 'inline-block';
+
+            } catch (e) {
+                viewer.textContent = `Error loading file: ${e.message}`;
+            }
+        }
+
+        function highlightCode(code, filename) {
+            // Simple syntax highlighting
+            const ext = filename.split('.').pop().toLowerCase();
+            let escaped = escapeHtml(code);
+
+            if (['py', 'js', 'ts'].includes(ext)) {
+                // Keywords
+                const keywords = ['def', 'class', 'import', 'from', 'return', 'if', 'else', 'elif',
+                    'for', 'while', 'try', 'except', 'finally', 'with', 'as', 'async', 'await',
+                    'function', 'const', 'let', 'var', 'export', 'async', 'true', 'false', 'None', 'True', 'False'];
+                keywords.forEach(kw => {
+                    escaped = escaped.replace(new RegExp(`\\b${kw}\\b`, 'g'),
+                        `<span style="color: #ff79c6;">${kw}</span>`);
+                });
+
+                // Strings (simple - single and double quotes)
+                escaped = escaped.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g,
+                    '<span style="color: #f1fa8c;">$&</span>');
+
+                // Comments
+                escaped = escaped.replace(/(#.*)$/gm,
+                    '<span style="color: #6272a4;">$1</span>');
+                escaped = escaped.replace(/(\/\/.*)$/gm,
+                    '<span style="color: #6272a4;">$1</span>');
+            }
+
+            return escaped;
+        }
+
+        function copyCurrentCode() {
+            if (!window.currentCodeContent) return;
+
+            navigator.clipboard.writeText(window.currentCodeContent).then(() => {
+                const btn = document.getElementById('copyCodeBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ COPIED!';
+                btn.style.background = '#00ff88';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#ff00ff';
+                }, 2000);
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                alert('Copy failed - browser might have blocked clipboard access');
+            });
         }
 
         // ============================================================
@@ -2354,7 +2649,7 @@
             log('═══════════════════════════════════════════════', 'system');
             log('    C.O.R.A - Cognitive Operations & Reasoning Assistant', 'system');
             log('═══════════════════════════════════════════════', 'system');
-            log('Version: 2.4.0', 'info');
+            log('Version: 1.0.0', 'info');
             log('Created by: Unity AI Lab', 'info');
             log('Developers: Hackall360, Sponge, GFourteen', 'info');
             log('Website: https://www.unityailab.com', 'info');
@@ -2386,7 +2681,7 @@
                 ttsEnabled = true;
                 updateProgress(15, 'Neural voice online');
                 await speakAndWait("Voice synthesis online. Kokoro TTS loaded and ready.");
-                await speakAndWait("Hey, I'm CORA. That stands for Cognitive Operations and Reasoning Assistant. Version 2.4.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. I've got voice, vision, and plenty of attitude. Let's get this boot going.");
+                await speakAndWait("Hey, I'm CORA. That stands for Cognitive Operations and Reasoning Assistant. Version 1.0.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. I've got voice, vision, and plenty of attitude. Let's get this boot going.");
             } else {
                 log('Kokoro failed - using browser TTS', 'warn');
                 document.getElementById('ttsNotice').textContent = 'Browser TTS (fallback mode)';
@@ -2644,53 +2939,41 @@
             await speakAndWait(toolsResponse);
 
             // ================================================================
-            // PHASE 4.1: CODE IMPORT - Actually fetch from GitHub!
+            // PHASE 4.1: CODE BROWSER - CORA's own codebase viewer
             // ================================================================
             setPhase('code_import', 'running');
-            log('PHASE 4.1: CODE IMPORT FROM GITHUB', 'phase');
-            updateProgress(45, 'Fetching code from GitHub...');
+            log('PHASE 4.1: CODE BROWSER - CORA CODEBASE', 'phase');
+            updateProgress(45, 'Loading CORA code browser...');
 
             try {
-                // Fetch a real Python file from a public repo
-                const codeRepos = [
-                    { url: 'https://api.github.com/repos/TheAlgorithms/Python/contents/maths', name: 'TheAlgorithms' },
-                    { url: 'https://api.github.com/repos/geekcomputers/Python/contents', name: 'geekcomputers' }
-                ];
-                const repo = codeRepos[Math.floor(Math.random() * codeRepos.length)];
-                log(`Fetching from ${repo.name}...`, 'info');
+                // Test GitHub API access first
+                log('Connecting to Unity-Lab-AI/CORA repository...', 'info');
+                const testResp = await fetch('https://api.github.com/repos/Unity-Lab-AI/CORA/contents/');
 
-                const listResp = await fetch(repo.url);
-                if (listResp.ok) {
-                    const files = await listResp.json();
-                    const pyFiles = files.filter(f => f.name.endsWith('.py') && f.size < 30000);
-                    if (pyFiles.length > 0) {
-                        const randomFile = pyFiles[Math.floor(Math.random() * pyFiles.length)];
-                        log(`Selected: ${randomFile.name}`, 'ok');
+                if (testResp.ok) {
+                    const files = await testResp.json();
+                    const fileCount = files.length;
+                    const pyFiles = files.filter(f => f.name.endsWith('.py')).length;
+                    log(`Repository loaded: ${fileCount} items at root, ${pyFiles} Python files`, 'ok');
 
-                        const codeResp = await fetch(randomFile.download_url);
-                        if (codeResp.ok) {
-                            const code = await codeResp.text();
-                            const lines = code.split('\n').length;
-                            log(`Fetched ${lines} lines of Python code`, 'ok');
+                    // Show the full code browser modal
+                    const modal = showCodeBrowserModal();
+                    log('Code browser opened - browse CORA source!', 'ok');
 
-                            // Show in modal like desktop does
-                            const modal = showCodeModal(code.substring(0, 5000), `${randomFile.name} (from ${repo.name})`);
-                            log('Displaying code in modal...', 'info');
+                    setPhase('code_import', 'ok');
+                    const codeResponse = await coraRespond('Code Browser', `My codebase is now viewable. ${fileCount} items loaded. Browse away.`, 'ok');
+                    await speakAndWait(codeResponse);
 
-                            setPhase('code_import', 'ok');
-                            // EXACT format from desktop line 1368-1370
-                            const codeResponse = await coraRespond('Code Import', `Pulled ${lines} lines of ${randomFile.name} from GitHub.`, 'ok');
-                            await speakAndWait(codeResponse);
-
-                            // Auto-close after speaking
-                            setTimeout(() => modal.close(), 2000);
-                        } else throw new Error('Failed to fetch file content');
-                    } else throw new Error('No Python files found');
-                } else throw new Error('Failed to list repo');
+                    // Keep modal open for user to browse (don't auto-close)
+                    // User can close it manually with X button
+                    await sleep(5000);  // Give time to see it before boot continues
+                } else {
+                    throw new Error(`GitHub API returned ${testResp.status}`);
+                }
             } catch (e) {
-                log(`GitHub fetch: ${e.message}`, 'warn');
+                log(`Code browser: ${e.message}`, 'warn');
                 setPhase('code_import', 'warn');
-                const codeWarn = await coraRespond('Code Import', 'GitHub fetch failed. Might be rate-limited.', 'warn');
+                const codeWarn = await coraRespond('Code Browser', 'GitHub API shit the bed. Rate-limited probably.', 'warn');
                 await speakAndWait(codeWarn);
             }
 
@@ -3344,26 +3627,38 @@
         document.getElementById('chatInput')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
 
         // ============================================================
-        // View Toggle - Split / Console / Status (like desktop)
+        // View Toggle - Split / Setup Terminal / Console / Status
         // ============================================================
 
-        let viewMode = 'split';  // 'split', 'console', 'status'
+        let viewMode = 'split';  // 'split', 'setup', 'console', 'status'
 
         function toggleView() {
             const container = document.getElementById('mainContainer');
+            const setupTerminal = document.getElementById('setupTerminal');
             const btn = document.getElementById('toggleBtn');
 
             if (viewMode === 'split') {
+                // Show setup terminal (like CORA.bat output)
+                viewMode = 'setup';
+                setupTerminal.style.display = 'flex';
+                container.style.display = 'none';
+                btn.textContent = '[ SETUP TERMINAL ]';
+            } else if (viewMode === 'setup') {
+                // Console only
                 viewMode = 'console';
+                setupTerminal.style.display = 'none';
+                container.style.display = 'grid';
                 container.classList.remove('fullscreen-status');
                 container.classList.add('fullscreen-console');
                 btn.textContent = '[ CONSOLE ONLY ]';
             } else if (viewMode === 'console') {
+                // Status only
                 viewMode = 'status';
                 container.classList.remove('fullscreen-console');
                 container.classList.add('fullscreen-status');
                 btn.textContent = '[ STATUS ONLY ]';
             } else {
+                // Back to split
                 viewMode = 'split';
                 container.classList.remove('fullscreen-console', 'fullscreen-status');
                 btn.textContent = '[ SPLIT VIEW ]';

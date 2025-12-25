@@ -8,7 +8,7 @@
 #
 # C.O.R.A Media Control Module
 # ================================================================
-# Version: 2.5.0
+# Version: 1.0.0
 # Unity AI Lab
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI
@@ -881,7 +881,7 @@ def now() -> str:
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  C.O.R.A Media Module v2.5.0")
+    print("  C.O.R.A Media Module v1.0.0")
     print("  Unity AI Lab")
     print("=" * 50)
     print()

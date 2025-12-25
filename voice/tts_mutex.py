@@ -3,7 +3,7 @@
 C.O.R.A TTS Mutex System
 Lock-based speech coordination to prevent overlapping TTS
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Prevents multiple bots/instances from talking over each other
 - Lock file in CLAUDE_MUTEX_DIR env var, or temp dir, or local data dir
 - Acquires lock before speaking, releases after audio complete

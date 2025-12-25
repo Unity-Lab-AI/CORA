@@ -3,7 +3,7 @@
 C.O.R.A System Tray Integration
 System tray icon with quick access menu
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - System tray icon using pystray
 - Quick access to common actions
 - Show/hide main window

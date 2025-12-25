@@ -3,7 +3,7 @@
 C.O.R.A Context Builder
 Constructs context for AI prompts including time, tasks, and conversation history
 
-Per ARCHITECTURE.md v2.0.0:
+Per ARCHITECTURE.md v1.0.0:
 - Build system context with personality
 - Include relevant task context
 - Time-of-day awareness

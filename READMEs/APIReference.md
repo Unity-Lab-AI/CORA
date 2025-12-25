@@ -2,7 +2,7 @@
 
 ## Module & Function Reference
 
-Version 2.2.0
+Version 1.0.0
 
 ---
 
@@ -1091,5 +1091,5 @@ class KnowledgePanel(BasePanel):
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.2.0 API Reference*
+*Unity AI Lab - C.O.R.A v1.0.0 API Reference*
 *Last Updated: 2025-12-23*

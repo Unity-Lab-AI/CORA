@@ -9,7 +9,7 @@
 #
 # C.O.R.A - Cognitive Operations & Reasoning Assistant
 # ================================================================
-# Version: 2.3.0
+# Version: 1.0.0
 # Unity AI Lab
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI
@@ -74,7 +74,7 @@ Examples:
 """
 
 # Canonical version constant - import this everywhere
-VERSION = "2.3.0"
+VERSION = "1.0.0"
 
 import argparse
 import asyncio
@@ -198,7 +198,7 @@ SYSTEM_PROMPT_FILE = CONFIG_DIR / 'system_prompt.txt'
 
 
 def load_system_prompt():
-    """Load system prompt from file (per ARCHITECTURE.md v2.0.0)."""
+    """Load system prompt from file (per ARCHITECTURE.md v1.0.0)."""
     if SYSTEM_PROMPT_FILE.exists():
         try:
             with open(SYSTEM_PROMPT_FILE, 'r', encoding='utf-8') as f:
@@ -241,7 +241,7 @@ def load_personality():
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             pass
-    # Require personality.json per ARCHITECTURE.md v2.0.0
+    # Require personality.json per ARCHITECTURE.md v1.0.0
     logger.warning("personality.json not found or invalid - creating default")
     default_personality = {
         'name': 'C.O.R.A',
@@ -294,7 +294,7 @@ Generate a single greeting (under 15 words) that sounds like CORA - mean, sarcas
 def check_ollama():
     """Check if ollama is installed and running via HTTP API.
 
-    Per ARCHITECTURE.md v2.0.0: Use HTTP API instead of subprocess.
+    Per ARCHITECTURE.md v1.0.0: Use HTTP API instead of subprocess.
     """
     import urllib.request
     import urllib.error
@@ -380,7 +380,7 @@ def auto_pull_model(model_name):
 def progress_spinner(message, duration=0.5):
     """Display a spinning progress indicator (non-blocking version).
 
-    Per ARCHITECTURE.md v2.0.0: Non-blocking UI updates.
+    Per ARCHITECTURE.md v1.0.0: Non-blocking UI updates.
     Uses generator pattern for async compatibility.
     """
     import sys
@@ -392,7 +392,7 @@ def progress_spinner(message, duration=0.5):
 async def async_progress(message, task_coro):
     """Async progress indicator wrapper.
 
-    Per ARCHITECTURE.md v2.0.0: Replace blocking spinners with async.
+    Per ARCHITECTURE.md v1.0.0: Replace blocking spinners with async.
 
     Args:
         message: Status message to display
@@ -483,7 +483,7 @@ def boot_sequence():
     print("   \\____| \\___/ |_| \\_\\/_/   \\_\\")
     print("")
     print("  C.O.R.A - ADVANCED SYSTEM DIAGNOSTICS")
-    print("  Cognitive Operations & Reasoning Assistant v2.3.0")
+    print("  Cognitive Operations & Reasoning Assistant v1.0.0")
     print("  ================================================================")
     print("  Unity AI Lab | unityailab.com")
     print("  ================================================================")
@@ -1624,7 +1624,7 @@ def fallback_response(user_message, tasks):
 def cmd_chat(args, tasks):
     """Chat with AI using Ollama with task context and conversation memory. Usage: chat <message>
 
-    Per ARCHITECTURE.md v2.2.0: Uses ThreadPoolExecutor for non-blocking Ollama calls.
+    Per ARCHITECTURE.md v1.0.0: Uses ThreadPoolExecutor for non-blocking Ollama calls.
     This fixes the async/sync mismatch when GUI calls this function.
     """
     global CONFIG

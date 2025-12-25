@@ -257,5 +257,5 @@ startProactiveInterjections()                 // Start 45-second interval
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0*
+*Unity AI Lab - C.O.R.A v1.0.0*
 *Archive Started: 2025-12-25*

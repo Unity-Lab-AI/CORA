@@ -3,7 +3,7 @@
 C.O.R.A Presence Detection Service
 Webcam + AI vision to detect if user is present
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Quick check: Is anyone at the desk?
 - Full analysis: Emotion, activity, posture, holding
 - Uses Ollama llava model for vision

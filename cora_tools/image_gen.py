@@ -3,7 +3,7 @@
 C.O.R.A Image Generation
 Generate images using Pollinations.AI API (PolliLibPy)
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - generate_boot_image(prompt) - returns image path, 1920x1080
 - show_fullscreen_image(path) - tkinter Toplevel with X button
 - Save to CORA data/images directory

@@ -3,7 +3,7 @@
 C.O.R.A Boot Console
 ASCII-style boot sequence with checkmarks and TTS narration
 
-Per ARCHITECTURE.md v2.0.0:
+Per ARCHITECTURE.md v1.0.0:
 - Display console log showing ALL startup checks
 - CORA speaks SUMMARIZED version of each check via TTS
 - Adjust tone based on time of day

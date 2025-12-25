@@ -626,17 +626,17 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("═══════════════════════════════════════════════", "system")
     display_log("    C.O.R.A - Cognitive Operations & Reasoning Assistant", "system")
     display_log("═══════════════════════════════════════════════", "system")
-    display_log("Version: 2.4.0", "info")
+    display_log("Version: 1.0.0", "info")
     display_log("Created by: Unity AI Lab", "info")
     display_log("Developers: Hackall360, Sponge, GFourteen", "info")
     display_log("Website: https://www.unityailab.com", "info")
     display_log("GitHub: https://github.com/Unity-Lab-AI", "info")
 
     print("  C.O.R.A - Cognitive Operations & Reasoning Assistant")
-    print("  Version: 2.4.0")
+    print("  Version: 1.0.0")
     print("  Unity AI Lab - Hackall360, Sponge, GFourteen")
 
-    BOOT_STATUS['version'] = '2.4.0'
+    BOOT_STATUS['version'] = '1.0.0'
     BOOT_STATUS['creators'] = 'Hackall360, Sponge, GFourteen'
     display_phase("0.9 About CORA", "ok")
 
@@ -666,7 +666,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     about_data = {
         'name': 'CORA',
         'full_name': 'Cognitive Operations and Reasoning Assistant',
-        'version': '2.4.0',
+        'version': '1.0.0',
         'creator': 'Unity AI Lab',
         'developers': 'Hackall360, Sponge, and GFourteen'
     }

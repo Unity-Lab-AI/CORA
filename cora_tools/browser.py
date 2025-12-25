@@ -8,7 +8,7 @@
 #
 # C.O.R.A Browser Control Module
 # ================================================================
-# Version: 2.3.0
+# Version: 1.0.0
 # Unity AI Lab
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI

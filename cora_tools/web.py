@@ -1,6 +1,6 @@
 """
 C.O.R.A Web Tools Module
-Version: 2.3.0
+Version: 1.0.0
 Unity AI Lab
 
 Web search, URL fetching, and content summarization.
@@ -97,7 +97,7 @@ def instant_answer(query: str) -> Dict[str, Any]:
         _rate_limiter.wait()
 
         url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_html=1"
-        headers = {'User-Agent': 'CORA/2.3.0'}
+        headers = {'User-Agent': 'CORA/1.0.0'}
 
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()

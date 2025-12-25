@@ -3,7 +3,7 @@
 C.O.R.A Ollama HTTP API Wrapper
 Direct HTTP communication with Ollama (replaces subprocess.run)
 
-Per ARCHITECTURE.md v2.0.0:
+Per ARCHITECTURE.md v1.0.0:
 - HTTP API at localhost:11434
 - Streaming responses
 - Model management
@@ -451,7 +451,7 @@ def create_model(
 
 
 # ============ VISION (Image Analysis) ============
-# Per ARCHITECTURE.md v2.4.0 - Vision analysis using llava
+# Per ARCHITECTURE.md v1.0.0 - Vision analysis using llava
 
 VISION_MODEL = "llava"  # Multimodal vision model
 
@@ -595,7 +595,7 @@ def summarize(text: str, model: str = DEFAULT_MODEL) -> str:
 
 
 # ============ THINK (Quick Local AI) ============
-# Per ARCHITECTURE.md v2.2.0 - Fast local AI for internal decisions
+# Per ARCHITECTURE.md v1.0.0 - Fast local AI for internal decisions
 
 THINK_MODEL = "dolphin-mistral:7b"  # Small, fast, uncensored model
 

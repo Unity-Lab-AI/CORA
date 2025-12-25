@@ -3,7 +3,7 @@
 C.O.R.A Global Hotkeys
 System-wide keyboard shortcuts
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Global hotkeys for quick actions
 - Push-to-talk (Ctrl+Space)
 - Quick query (Alt+C)

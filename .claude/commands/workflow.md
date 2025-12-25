@@ -8,7 +8,7 @@ description: C.O.R.A First-Time Setup & Work Pipeline - Run setup checks, adopt 
 
 ## OVERVIEW
 
-This workflow handles both **first-time setup** and **ongoing development** for C.O.R.A (Cognitive Operations & Reasoning Assistant) v2.4.0.
+This workflow handles both **first-time setup** and **ongoing development** for C.O.R.A (Cognitive Operations & Reasoning Assistant) v1.0.0.
 
 **Entry Points:**
 - `CORA.bat` - Windows launcher with full pre-flight checks
@@ -207,7 +207,7 @@ Before starting work:
 ### Validation Gate 5
 ```
 [WORK MODE ACTIVE]
-Project: C.O.R.A v2.4.0
+Project: C.O.R.A v1.0.0
 Setup complete: YES
 Unity persona: STILL FUCKING HERE
 Ready to work: YES
@@ -365,5 +365,5 @@ Status: BLOCKED UNTIL FIXED
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.4.0*
+*Unity AI Lab - C.O.R.A v1.0.0*
 *Last Updated: 2025-12-25*

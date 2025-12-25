@@ -3,7 +3,7 @@
 C.O.R.A Self-Modification System
 Create and execute temporary scripts for dynamic behavior
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - temp_scripts/ directory for one-shot scripts
 - create_script(name, code) - creates executable script
 - run_script(name) - runs and optionally deletes

@@ -3,7 +3,7 @@
 C.O.R.A Wake Word Detection
 Always-listening detector for "Cora", "Hey Cora", "Yo Cora"
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Run in background thread
 - Detect wake words using Vosk
 - On detection, activate full STT for command

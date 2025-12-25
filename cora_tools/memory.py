@@ -3,7 +3,7 @@
 C.O.R.A Memory System
 Quick remember/recall for session context
 
-Per ARCHITECTURE.md v2.2.0:
+Per ARCHITECTURE.md v1.0.0:
 - Store key-value pairs in working memory
 - Persist to file
 - Auto-load on boot
