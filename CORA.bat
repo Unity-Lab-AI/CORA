@@ -288,8 +288,15 @@ echo.
 echo [LAUNCH] Starting C.O.R.A Boot Sequence...
 echo.
 
-:: Launch boot sequence with dependency status
-python src\boot_sequence.py --mpv-missing=%MPV_MISSING%
+:: Create logs directory if needed
+if not exist "logs" mkdir logs
+
+:: Launch boot sequence - output to both terminal AND log file
+echo [LOG] Saving to logs\boot.log
+echo.
+
+:: Use PowerShell to tee output to both console and file
+powershell -Command "& {python src\boot_sequence.py --mpv-missing=%MPV_MISSING% 2>&1 | Tee-Object -FilePath 'logs\boot.log'}"
 
 if errorlevel 1 (
     echo.
