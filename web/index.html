@@ -1256,17 +1256,19 @@ WHEN RESPONDING:
                     text = text.replace(/\s+/g, ' ').trim();        // clean whitespace
 
                     // For quick mode, enforce length limit - if AI went crazy, use raw result
-                    // Increased to 200 chars to allow CORA's personality through
-                    if (mode === 'quick' && text.length > 200) {
-                        console.log(`[WARN] AI response too long (${text.length} chars), using raw result`);
-                        return result;
+                    // 350 chars allows CORA's full personality with profanity and attitude
+                    if (mode === 'quick' && text.length > 350) {
+                        console.log(`[WARN] AI response too long (${text.length} chars), trimming`);
+                        // Instead of falling back to boring data, just trim to 3 sentences
+                        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+                        text = sentences.slice(0, 3).join(' ').trim();
                     }
 
-                    // Take only first 2 sentences if too many (quick mode)
+                    // Take only first 3 sentences if too many (quick mode)
                     if (mode === 'quick') {
                         const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-                        if (sentences.length > 2) {
-                            text = sentences.slice(0, 2).join(' ').trim();
+                        if (sentences.length > 3) {
+                            text = sentences.slice(0, 3).join(' ').trim();
                         }
                     }
 
