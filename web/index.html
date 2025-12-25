@@ -734,36 +734,64 @@
         // Flag to track if AI is ready for CORA responses
         let aiReady = false;
 
-        // CORA generates her own responses using AI (like desktop cora_respond)
-        async function coraRespond(context, result, status = 'ok') {
+        // CORA generates her own responses using AI (EXACT match to desktop cora_respond)
+        async function coraRespond(context, result, status = 'ok', mode = 'quick') {
             if (!aiReady || !CORA_SYSTEM_PROMPT) {
                 // Fallback - AI not ready yet
                 return result;
             }
 
             try {
+                let prompt;
+                let temperature;
+
+                if (mode === 'quick') {
+                    // EXACT format from desktop boot_sequence.py line 240
+                    prompt = `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include ALL the data/numbers.]\n${result}`;
+                    temperature = 0.9;
+                } else {
+                    // Full mode - news, weather, descriptions
+                    prompt = `Announce this naturally in 1-2 sentences: ${result}`;
+                    temperature = 0.7;
+                }
+
                 const res = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: `[BOOT - ${context}] ${result}`,
+                        prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 150 }
+                        options: { temperature: temperature, num_predict: 150 }
                     })
                 });
+
                 if (res.ok) {
                     const d = await res.json();
-                    let text = d.response?.trim() || result;
-                    // Clean up response
+                    let text = d.response?.trim().replace(/^["']|["']$/g, '') || result;
+
+                    // Clean up - EXACT match to desktop lines 263-272
                     if (text.toLowerCase().startsWith('cora:')) text = text.slice(5).trim();
-                    text = text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
-                    text = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
-                    // Limit length for boot phases
-                    if (text.length > 150) {
+                    text = text.replace(/\*\*([^*]+)\*\*/g, '$1');  // **bold** -> bold
+                    text = text.replace(/\*([^*]+)\*/g, '$1');      // *italic* -> italic
+                    text = text.replace(/__([^_]+)__/g, '$1');      // __bold__ -> bold
+                    text = text.replace(/_([^_]+)_/g, '$1');        // _italic_ -> italic
+                    text = text.replace(/^#+\s*/gm, '');            // # headers
+                    text = text.replace(/\n+/g, ' ');               // newlines to spaces
+                    text = text.replace(/\s+/g, ' ').trim();        // clean whitespace
+
+                    // For quick mode, enforce length limit - if AI went crazy, use raw result
+                    if (mode === 'quick' && text.length > 100) {
+                        console.log(`[WARN] AI response too long (${text.length} chars), using raw result`);
+                        return result;
+                    }
+
+                    // Take only first sentence if multiple (quick mode)
+                    if (mode === 'quick' && text.includes('. ')) {
                         text = text.split('. ')[0] + '.';
                     }
+
                     return text.length > 10 ? text : result;
                 }
             } catch (e) {
@@ -2407,7 +2435,8 @@
                 // AI is now ready for CORA responses!
                 aiReady = true;
                 log('CORA AI responses enabled', 'ok');
-                const modelsResponse = await coraRespond('AI Models', `${models.length} AI models loaded and ready.`);
+                // EXACT format from desktop line 777
+                const modelsResponse = await coraRespond('AI Models check', `${models.length} models loaded. All good.`, 'ok');
                 await speakAndWait(modelsResponse);
             } else {
                 log('No models found - need to pull some', 'warn');
@@ -2446,8 +2475,14 @@
                 // Start polling for live updates
                 startStatsPolling();
 
-                const gpuMsg = stats.gpu?.available ? `GPU at ${stats.gpu.utilization}%` : 'no GPU detected';
-                const hwResponse = await coraRespond('Hardware', `Hardware check complete. CPU at ${Math.round(stats.cpu.percent)}%, ${gpuMsg}.`);
+                // Hardware summary - EXACT format from desktop line 866-870
+                let hw_data = `CPU ${Math.round(stats.cpu.percent)}%, RAM ${Math.round(stats.memory.percent)}%, Disk ${Math.round(stats.disk.percent)}%`;
+                if (stats.gpu && stats.gpu.available) {
+                    hw_data += `, GPU ${stats.gpu.name} at ${stats.gpu.utilization}%`;
+                } else {
+                    hw_data += `, no GPU`;
+                }
+                const hwResponse = await coraRespond('PC Hardware scan', hw_data, 'ok');
                 await speakAndWait(hwResponse);
             } else {
                 // Stats server not running - fallback to basic info
@@ -2503,12 +2538,25 @@
                         log('Showing live feed for 3 seconds...', 'info');
                         await sleep(3000);
 
-                        // Take snapshot
+                        // Take snapshot for AI analysis
                         const canvas = document.createElement('canvas');
                         canvas.width = video.videoWidth || 640;
                         canvas.height = video.videoHeight || 480;
                         canvas.getContext('2d').drawImage(video, 0, 0);
                         log(`Snapshot captured: ${canvas.width}x${canvas.height}`, 'ok');
+
+                        // Send to llava for REAL vision analysis like desktop
+                        log('Analyzing snapshot with llava...', 'info');
+                        const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                        let camera_desc = null;
+                        try {
+                            camera_desc = await analyzImageWithLlava(base64Image, 'Describe what you see briefly. Is the user visible? What are they doing?');
+                            if (camera_desc) {
+                                log(`Vision: ${camera_desc.substring(0, 80)}...`, 'ok');
+                            }
+                        } catch (e) {
+                            log('Vision analysis skipped', 'warn');
+                        }
 
                         // Stop camera
                         stream.getTracks().forEach(t => t.stop());
@@ -2517,7 +2565,13 @@
                         liveCameraWorking = true;
                         setPhase('camera', 'ok');
 
-                        const camResponse = await coraRespond('Live Camera', 'Camera online and working.');
+                        // EXACT format from desktop line 938 - CORA describes what she sees!
+                        let camResponse;
+                        if (camera_desc && camera_desc.length > 10) {
+                            camResponse = await coraRespond('Live Camera', `Camera online. I see: ${camera_desc.substring(0, 80)}`, 'ok');
+                        } else {
+                            camResponse = await coraRespond('Live Camera', 'Camera online.', 'ok');
+                        }
                         await speakAndWait(camResponse);
 
                         // Close modal after speaking
@@ -2559,7 +2613,10 @@
                 if (t.ok) toolsOk++;
             });
             setPhase('tools', 'ok');
-            const toolsResponse = await coraRespond('Tools', `${toolsOk} of ${webTools.length} web tools loaded and ready.`);
+            // EXACT format from desktop line 1129-1131
+            const tools_result = `${toolsOk} of ${webTools.length} tools loaded.`;
+            const tools_status = toolsOk >= webTools.length - 2 ? 'ok' : (toolsOk >= webTools.length / 2 ? 'warn' : 'fail');
+            const toolsResponse = await coraRespond('Core Tools check', tools_result, tools_status);
             await speakAndWait(toolsResponse);
 
             // ================================================================
@@ -2597,7 +2654,8 @@
                             log('Displaying code in modal...', 'info');
 
                             setPhase('code_import', 'ok');
-                            const codeResponse = await coraRespond('Code Import', `Pulled ${lines} lines of code from GitHub. Check out ${randomFile.name}.`);
+                            // EXACT format from desktop line 1368-1370
+                            const codeResponse = await coraRespond('Code Import', `Pulled ${lines} lines of ${randomFile.name} from GitHub.`, 'ok');
                             await speakAndWait(codeResponse);
 
                             // Auto-close after speaking
@@ -2636,7 +2694,8 @@
             log('Video playing in modal', 'ok');
 
             setPhase('youtube', 'ok');
-            const ytResponse = await coraRespond('YouTube', `Playing ${video.title}. YouTube embed working.`);
+            // EXACT format from desktop line 1549
+            const ytResponse = await coraRespond('YouTube Test', `Found: ${video.title}. Playing sample.`, 'ok');
             await speakAndWait(ytResponse);
 
             // Auto-close after 5 seconds
@@ -2665,7 +2724,8 @@
             log('Modal displayed successfully', 'ok');
 
             setPhase('modals', 'ok');
-            const modalResponse = await coraRespond('Modals', 'Modal windows working. Showing you a little inspiration.');
+            // EXACT format from desktop line 1667
+            const modalResponse = await coraRespond('Modal Windows', 'Modal windows working.', 'ok');
             await speakAndWait(modalResponse);
 
             // Auto-close after speaking
@@ -2688,7 +2748,9 @@
                 log('Wake Word - Not supported in this browser', 'warn');
             }
             setPhase('voice_sys', 'ok');
-            const voiceResponse = await coraRespond('Voice Systems', 'Voice systems online.' + (hasSpeechRecog ? ' Wake word detection active.' : ''));
+            // EXACT format from desktop line 1727-1728
+            const voice_result = 'Voice systems online.' + (hasSpeechRecog ? ' Wake word active.' : '');
+            const voiceResponse = await coraRespond('Voice Systems check', voice_result, 'ok');
             await speakAndWait(voiceResponse);
 
             // ================================================================
@@ -2717,11 +2779,12 @@
                 const locStr = [location.city, location.state, location.country].filter(Boolean).join(', ');
                 log(`Location: ${locStr}`, 'ok');
                 log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
-                const locResponse = await coraRespond('Location', `Location confirmed. We're in ${locStr}.`);
+                // EXACT format from desktop line 1762
+                const locResponse = await coraRespond('Location check', `Location: ${locStr}`, 'ok');
                 await speakAndWait(locResponse);
             } else {
                 log('Location not available or denied', 'warn');
-                const locWarn = await coraRespond('Location', 'Location unavailable. Some features limited.', 'warn');
+                const locWarn = await coraRespond('Location check', 'Location unavailable.', 'warn');
                 await speakAndWait(locWarn);
             }
             setPhase('external', 'ok');
@@ -2764,20 +2827,27 @@
 
                 setPhase('audio', 'ok');
 
-                // Build speech with forecast
-                const tempSpoken = weather.temp.replace('°F', ' degrees Fahrenheit').replace('+', '');
-                let weatherData = `Audio systems online. That was a ${audioResult.played || 'synth test'}. Current weather is ${tempSpoken} and ${weather.conditions.toLowerCase()}.`;
+                // Build weather report - EXACT format from desktop line 1880-1891
+                const tempSpoken = weather.temp.replace('°F', ' degrees').replace('+', '');
+                let weather_report = `Current conditions: ${tempSpoken}, ${weather.conditions.toLowerCase()}. `;
                 if (forecastData.success && forecastData.forecast.length >= 2) {
-                    const tomorrow = forecastData.forecast[1];
-                    weatherData += ` Tomorrow: high ${tomorrow.high}, low ${tomorrow.low}, ${tomorrow.conditions.toLowerCase()}.`;
+                    forecastData.forecast.slice(1, 3).forEach(day => {
+                        if (day.conditions) {
+                            weather_report += `${day.day} will be ${day.conditions.toLowerCase()} with a high of ${day.high} and a low of ${day.low}. `;
+                        } else {
+                            weather_report += `${day.day} the high will be ${day.high} and the low will be ${day.low}. `;
+                        }
+                    });
                 }
-                const weatherResponse = await coraRespond('Audio/Weather', weatherData);
+                // mode='full' for weather like desktop line 1891
+                const weatherResponse = await coraRespond('Location and Weather', weather_report, 'ok', 'full');
                 await speakAndWait(weatherResponse);
             } else {
                 document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('audio', 'ok');
-                const audioOnlyResponse = await coraRespond('Audio', `Audio systems online. That was a ${audioResult.played || 'synth test'}. Weather unavailable.`);
+                // EXACT format from desktop line 1962
+                const audioOnlyResponse = await coraRespond('Audio Playback', `Audio working. Playing ${audioResult.played || 'synth test'}. Weather unavailable.`, 'ok');
                 await speakAndWait(audioOnlyResponse);
             }
 
@@ -2794,19 +2864,28 @@
                 log('Top 3 Headlines:', 'ok');
                 headlines.slice(0, 3).forEach((h, i) => log(`  ${i+1}. ${h}`, 'info'));
                 setPhase('news', 'ok');
-                // Clean headline for speech (remove source)
-                const firstHeadline = headlines[0]?.split(' - ')[0] || headlines[0] || '';
-                const newsResponse = await coraRespond('News', `Got ${headlines.length} headlines. Top story: ${firstHeadline.substring(0, 80)}`);
+                // EXACT format from desktop line 2055-2057 - clean headlines, mode='full'
+                const clean_headlines = headlines.slice(0, 3).map(hl => {
+                    let clean = hl.split(' - ')[0] || hl;
+                    if (clean.length > 100) clean = clean.substring(0, 97) + '...';
+                    return clean;
+                });
+                const news_data = 'Top headlines: ' + clean_headlines.join('. ');
+                const newsResponse = await coraRespond('News Headlines', news_data, 'ok', 'full');
                 await speakAndWait(newsResponse);
             } else {
                 log('News unavailable', 'warn');
                 setPhase('news', 'warn');
-                const newsWarn = await coraRespond('News', 'News fetch failed. Moving on.', 'warn');
+                // EXACT format from desktop line 2061
+                const newsWarn = await coraRespond('News Headlines', 'No headlines found.', 'warn');
                 await speakAndWait(newsWarn);
             }
 
             // ================================================================
-            // PHASE 8.0: VISION TEST - Screenshot + Camera (like desktop)
+            // PHASE 8.0: VISION TEST - Screenshot + Camera (EXACT match to desktop)
+            // Desktop: Takes screenshot, analyzes with llava, SPEAKS the description
+            // Then takes camera frame, analyzes with llava, SPEAKS the description
+            // Finally gives summary via cora_respond
             // ================================================================
             setPhase('vision', 'running');
             log('PHASE 8.0: VISION TEST', 'phase');
@@ -2814,17 +2893,55 @@
 
             let screenshotOk = false;
             let visionCameraOk = false;
+            let screen_description = null;
+            let camera_description = null;
 
-            // Test Screenshot capability
+            // TEST 1: Screenshot capture + llava analysis
             const hasScreenCapture = 'getDisplayMedia' in navigator.mediaDevices;
             log('Screen Capture API - ' + (hasScreenCapture ? 'Available' : 'Unavailable'), hasScreenCapture ? 'ok' : 'warn');
+
             if (hasScreenCapture) {
-                log('Screenshot capture ready', 'ok');
-                screenshotOk = true;
+                log('Requesting screen capture permission...', 'info');
+                try {
+                    const ssStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                    const ssVideo = document.createElement('video');
+                    ssVideo.srcObject = ssStream;
+                    ssVideo.autoplay = true;
+                    await new Promise(r => ssVideo.onloadedmetadata = r);
+                    await sleep(500);
+
+                    const ssCanvas = document.createElement('canvas');
+                    ssCanvas.width = ssVideo.videoWidth || 1920;
+                    ssCanvas.height = ssVideo.videoHeight || 1080;
+                    ssCanvas.getContext('2d').drawImage(ssVideo, 0, 0);
+                    ssStream.getTracks().forEach(t => t.stop());
+
+                    log(`Screenshot captured: ${ssCanvas.width}x${ssCanvas.height}`, 'ok');
+                    screenshotOk = true;
+
+                    // Analyze with llava - CORA describes what she sees
+                    log('Analyzing screenshot with llava...', 'info');
+                    const ssBase64 = ssCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+                    try {
+                        screen_description = await analyzImageWithLlava(ssBase64, 'Describe what you see on this screen. What application or website is open? What is the user working on?');
+                        if (screen_description) {
+                            // Clean markdown like desktop
+                            screen_description = screen_description.replace(/\*\*([^*]+)\*\*/g, '$1');
+                            screen_description = screen_description.replace(/\*([^*]+)\*/g, '$1');
+                            screen_description = screen_description.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                            log(`Vision: ${screen_description.substring(0, 80)}...`, 'ok');
+                            // SPEAK the actual description like desktop line 2158
+                            await speakAndWait(screen_description);
+                        }
+                    } catch (e) {
+                        log('Screenshot vision analysis skipped', 'warn');
+                    }
+                } catch (e) {
+                    log('Screenshot: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message), 'warn');
+                }
             }
 
-            // Test Camera for vision (separate from Phase 3.1 live feed test)
-            // Show permission prompt first
+            // TEST 2: Camera vision test + llava analysis
             log('Vision camera permission required...', 'info');
             const visionPermResult = await showPermissionPrompt(
                 'Vision Camera Permission',
@@ -2866,6 +2983,24 @@
                     stream.getTracks().forEach(t => t.stop());
                     visionCameraOk = true;
 
+                    // Analyze with llava - CORA describes what she sees
+                    log('Analyzing camera with llava...', 'info');
+                    const camBase64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                    try {
+                        camera_description = await analyzImageWithLlava(camBase64, 'Describe what you see. Is the user visible? What are they doing? What is in the background?');
+                        if (camera_description) {
+                            // Clean markdown like desktop
+                            camera_description = camera_description.replace(/\*\*([^*]+)\*\*/g, '$1');
+                            camera_description = camera_description.replace(/\*([^*]+)\*/g, '$1');
+                            camera_description = camera_description.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                            log(`Vision: ${camera_description.substring(0, 80)}...`, 'ok');
+                            // SPEAK the actual description like desktop line 2278
+                            await speakAndWait(camera_description);
+                        }
+                    } catch (e) {
+                        log('Camera vision analysis skipped', 'warn');
+                    }
+
                     // Close modal
                     setTimeout(() => visionModal.close(), 1000);
                 } catch (e) {
@@ -2873,24 +3008,20 @@
                 }
             }
 
-            // Vision summary - like desktop
+            // Vision summary - EXACT format from desktop line 2313-2321
+            let vision_result;
             if (screenshotOk && visionCameraOk) {
-                setPhase('vision', 'ok');
-                const visionResponse = await coraRespond('Vision Systems', 'Screenshot and camera both online.');
-                await speakAndWait(visionResponse);
+                vision_result = "Screenshot and camera both online.";
             } else if (screenshotOk) {
-                setPhase('vision', 'ok');
-                const visionResponse = await coraRespond('Vision Systems', 'Screenshot working, no camera.');
-                await speakAndWait(visionResponse);
+                vision_result = "Screenshot working, no camera.";
             } else if (visionCameraOk) {
-                setPhase('vision', 'ok');
-                const visionResponse = await coraRespond('Vision Systems', 'Camera working, screenshot unavailable.');
-                await speakAndWait(visionResponse);
+                vision_result = "Camera working, screenshot failed.";
             } else {
-                setPhase('vision', 'warn');
-                const visionWarn = await coraRespond('Vision Systems', 'Vision systems limited.', 'warn');
-                await speakAndWait(visionWarn);
+                vision_result = "Vision systems failed.";
             }
+            setPhase('vision', (screenshotOk || visionCameraOk) ? 'ok' : 'warn');
+            const visionResponse = await coraRespond('Vision Systems summary', vision_result, 'ok');
+            await speakAndWait(visionResponse);
 
             // ================================================================
             // PHASE 9.0: IMAGE GENERATION - Pollinations test + generate image
@@ -2926,33 +3057,71 @@
 
                 log(`Prompt: ${prompt}`, 'info');
                 log('Generating via Pollinations Flux...', 'info');
+                const genStart = Date.now();
 
                 const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=768&seed=${seed}&nologo=true`;
 
                 // Show image in modal while it loads
                 const imgModal = showImageModal(imageUrl, 'CORA - Generated Image');
 
-                // Wait for image to load
-                const img = new Image();
-                img.onload = () => {
-                    log('Image generated successfully!', 'ok');
-                    setPhase('imagegen', 'ok');
-                };
-                img.onerror = () => {
-                    log('Image generation failed', 'warn');
-                    setPhase('imagegen', 'warn');
-                };
-                img.src = imageUrl;
+                // Wait for image to load and get base64 for llava analysis
+                let imageLoaded = false;
+                let image_description = null;
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = imageUrl;
+                    });
+                    imageLoaded = true;
+                    const genTime = ((Date.now() - genStart) / 1000).toFixed(1);
+                    log(`Image generated in ${genTime}s`, 'ok');
 
-                const imgResponse = await coraRespond('Image Gen', `Generating something dark and twisted. Check out this ${prompt.split(',')[0]}.`);
-                await speakAndWait(imgResponse);
+                    // Convert to base64 and analyze with llava - EXACT like desktop line 2440-2461
+                    log('Analyzing generated image with llava...', 'info');
+                    const imgCanvas = document.createElement('canvas');
+                    imgCanvas.width = img.width;
+                    imgCanvas.height = img.height;
+                    imgCanvas.getContext('2d').drawImage(img, 0, 0);
+                    const imgBase64 = imgCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+                    try {
+                        image_description = await analyzImageWithLlava(imgBase64, 'Describe this image in detail. What do you see? Be specific about the scene, objects, colors, mood, and style.');
+                        if (image_description) {
+                            // Clean markdown like desktop
+                            image_description = image_description.replace(/\*\*([^*]+)\*\*/g, '$1');
+                            image_description = image_description.replace(/\*([^*]+)\*/g, '$1');
+                            image_description = image_description.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                            log(`Vision: ${image_description.substring(0, 80)}...`, 'ok');
+                        }
+                    } catch (e) {
+                        log('Image vision analysis skipped', 'warn');
+                    }
+
+                    setPhase('imagegen', 'ok');
+
+                    // SPEAK the actual description like desktop line 2461
+                    if (image_description && image_description.length > 10) {
+                        await speakAndWait(image_description);
+                    } else {
+                        const imgResponse = await coraRespond('Image Generation', `Image generated in ${genTime}s. Vision failed.`, 'warn');
+                        await speakAndWait(imgResponse);
+                    }
+                } catch (e) {
+                    log('Image generation failed: ' + e.message, 'warn');
+                    setPhase('imagegen', 'warn');
+                    const imgFail = await coraRespond('Image Generation', `Image gen failed: ${e.message.substring(0, 50)}`, 'fail');
+                    await speakAndWait(imgFail);
+                }
 
                 // Auto-close after viewing
                 setTimeout(() => imgModal.close(), 5000);
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
-                const imgWarn = await coraRespond('Image Gen', 'Image generation unavailable. Pollinations API down.', 'warn');
+                const imgWarn = await coraRespond('Image Generation', 'Image generation unavailable. Pollinations API down.', 'warn');
                 await speakAndWait(imgWarn);
             }
 
