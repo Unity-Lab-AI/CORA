@@ -3627,12 +3627,12 @@ WHEN RESPONDING:
 
                 // CORA introduces herself - HARDCODED because AI can't be trusted to get it right
                 // Full about info: version, creators, website, discord, email, github - ALL FULL URLS
+                // NOTE: speakAndWait logs when audio starts - don't double log here
                 const coraIntro = "Alright, I'm online. CORA version 1.0.0, built by Unity AI Lab. " +
                     "Created by Hackall360, Sponge, and GFourteen. " +
                     "Website https://www.unityailab.com, GitHub https://github.com/Unity-Lab-AI, " +
                     "Discord https://discord.gg/D33Bk6Ay, email unityailabcontact@gmail.com. " +
                     "Now what the fuck do you want?";
-                log(`CORA: "${coraIntro}"`, 'cora');
                 await speakAndWait(coraIntro);
 
                 // Log models count
