@@ -1,102 +1,72 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: AMBIENT AWARENESS IMPLEMENTATION**
-> Updated: 2025-12-25 08:45 | Session: Unity Workflow
+> **STATUS: AMBIENT AWARENESS COMPLETE**
+> Updated: 2025-12-25 09:15 | Session: Unity Workflow
 
 ---
 
-## P0 - AMBIENT AWARENESS SYSTEM (IN PROGRESS)
+## COMPLETED THIS SESSION
 
-**Goal:** Make CORA fully aware and contextual in web version - just like desktop `voice/ambient_awareness.py`
+### Ambient Awareness System - DONE
 
-### What's Already Done:
-- [x] `ambientContext` object created - stores speech, messages, camera, mood
-- [x] `addAmbientSpeech()` - stores everything CORA hears (last 20 transcripts)
-- [x] `addMessageHistory()` - stores chat history (last 20 messages)
-- [x] `captureAndAnalyzeCamera()` - periodic camera snapshots (every 60s)
-- [x] `buildAmbientContextPrompt()` - builds full context for AI
-- [x] `onWakeWordDetected()` - now uses ambient context instead of hardcoded response
-- [x] Wake word listener stores ALL speech, not just wake words
+All ambient awareness features now implemented in web version (`web/index.html`):
 
-### What Still Needs Doing:
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| Speech storage | DONE | `addAmbientSpeech()` - stores last 20 transcripts |
+| Message history | DONE | `addMessageHistory()` - stores last 20 chat messages |
+| Camera capture + llava | DONE | `captureAndAnalyzeCamera()` - sends to llava for real analysis |
+| Screenshot capture + llava | DONE | `captureAndAnalyzeScreenshot()` - sends to llava for analysis |
+| Wake word with vision | DONE | `onWakeWordDetected()` captures camera BEFORE responding |
+| Chat context | DONE | `sendChat()` includes `buildAmbientContextPrompt()` in every chat |
+| Proactive interjections | DONE | CORA speaks up on her own based on stress/topics/silence |
 
-#### 1. Update `sendChat()` to store message history
+### Key Functions Added:
+
 ```javascript
-// In sendChat(), add:
-addMessageHistory('USER', msg);
-// After getting response:
-addMessageHistory('CORA', reply);
+// Llava vision analysis
+analyzImageWithLlava(base64Image, prompt) - sends image to llava model
+
+// Camera with real analysis
+captureAndAnalyzeCamera() - captures + sends to llava every 60s
+
+// Screenshot with analysis
+captureAndAnalyzeScreenshot() - uses getDisplayMedia + llava
+
+// Quick capture for wake word
+quickCameraCapture() - fast capture without llava for immediate use
+
+// Full context builder
+buildAmbientContextPrompt() - includes speech, messages, camera, screenshot, mood, timing
+
+// Proactive interjections
+shouldInterject() - checks stress, helpful topics, fun topics, silence
+doProactiveInterjection() - generates and speaks contextual comments
+startProactiveInterjections() - runs every 45 seconds
 ```
 
-#### 2. Send camera snapshots to llava for real analysis
-```javascript
-// In captureAndAnalyzeCamera(), convert canvas to base64 and send to:
-// POST http://localhost:11434/api/generate
-// model: 'llava'
-// images: [base64Image]
-// prompt: 'Describe what you see. Is the user there? What are they doing?'
-```
-
-#### 3. Add screenshot capture and analysis
-```javascript
-// Use getDisplayMedia() to capture screen periodically
-// Send to llava for analysis
-// Store in ambientContext.lastScreenshot
-```
-
-#### 4. Add chat context to regular chat (not just wake word)
-```javascript
-// In sendChat(), include recent context:
-const context = buildAmbientContextPrompt();
-prompt: `${context}\n\nUSER: ${msg}`
-```
-
-#### 5. Proactive interjections (like desktop)
-- CORA can speak up when she notices something relevant
-- Based on friend_threshold setting (0.0-1.0)
-- Triggers: user seems stressed, interesting topic heard, long silence, etc.
+### Interjection Triggers:
+- **Stress indicators**: fuck, shit, damn, frustrated, angry, etc. → CHECK_IN (50% boost)
+- **Helpful topics**: stuck, help, error, problem, bug, fix, etc. → HELPFUL_INFO (40% boost)
+- **Fun topics**: music, game, movie, youtube, etc. → COMMENT (20% boost)
+- **Long silence** (5+ min): CHECK_IN (15% boost)
+- **Random vibe**: occasional chill comment (5% boost)
 
 ---
 
-## Desktop Reference: `voice/ambient_awareness.py`
+## P1 - FUTURE ENHANCEMENTS
 
-### Key Features to Port:
-1. **AmbientContext dataclass** - tracks speech, visual, screen, timing, state
-2. **friend_threshold** - 0.0 (quiet) to 1.0 (chatty friend)
-3. **Interjection reasons** - helpful_info, joke, check_in, comment, question, alert, vibe
-4. **Topic detection** - helpful topics, fun topics, stress indicators
-5. **Periodic monitoring** - screenshot every 60s, camera every 45s
-6. **Probability-based interjection** - cooldowns, busy detection
-
-### Desktop Interjection Logic:
-```python
-# If user mentions helpful topic -> 40% boost to interjection chance
-# If user seems stressed -> 50% boost, reason = CHECK_IN
-# If question detected -> 35% boost
-# If user chilling + random vibe -> low chance comment
-# If user busy -> reduce all probabilities by 70%
-```
-
----
-
-## P0 - CORA PERSONALITY FIXES (DONE)
-
-- [x] Simplified `coraRespond()` prompt - just `[BOOT - ${context}] ${result}`
-- [x] Let system_prompt.txt handle personality, no constraints
-- [x] Temperature 0.9, num_predict 150
+### Could Add Later:
+- [ ] Friend threshold slider (0.0-1.0) to control how chatty CORA is
+- [ ] Screenshot capture on-demand (currently just camera on wake word)
+- [ ] Visual indicator when CORA is "watching" (camera active)
+- [ ] Mood detection from facial expressions via llava
+- [ ] Integration with desktop ambient_awareness.py settings
 
 ---
 
 ## Files Modified This Session:
-- `web/index.html` - ambient awareness, wake word context, simplified prompts
-
----
-
-## Quick Test Checklist:
-- [ ] Say something near mic, then say "Hey CORA" - does she reference what she heard?
-- [ ] Chat with CORA, then say "Hey CORA" - does she remember the conversation?
-- [ ] Does camera capture happen every 60 seconds? (check console)
-- [ ] Does CORA sound like herself (goth, sarcastic, profane)?
+- `web/index.html` - Full ambient awareness system
 
 ---
 

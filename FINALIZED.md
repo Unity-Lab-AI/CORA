@@ -204,15 +204,56 @@
 
 ---
 
+### Full Ambient Awareness System (2025-12-25 09:15)
+
+| Task | Status | Files Modified |
+|------|--------|----------------|
+| Add `analyzImageWithLlava()` for real vision analysis | DONE | `web/index.html` |
+| Update `captureAndAnalyzeCamera()` to use llava | DONE | `web/index.html` |
+| Add `captureAndAnalyzeScreenshot()` with llava | DONE | `web/index.html` |
+| Add `quickCameraCapture()` for immediate use | DONE | `web/index.html` |
+| Update `onWakeWordDetected()` to capture camera FIRST | DONE | `web/index.html` |
+| Update `sendChat()` with `addMessageHistory()` | DONE | `web/index.html` |
+| Update `sendChat()` to include ambient context | DONE | `web/index.html` |
+| Update `buildAmbientContextPrompt()` for full context | DONE | `web/index.html` |
+| Add proactive interjection system | DONE | `web/index.html` |
+| Add `shouldInterject()` with topic detection | DONE | `web/index.html` |
+| Add `doProactiveInterjection()` AI response | DONE | `web/index.html` |
+| Add `startProactiveInterjections()` interval | DONE | `web/index.html` |
+
+**Details:**
+- **Wake word now captures camera BEFORE responding** - uses `quickCameraCapture()` then `analyzImageWithLlava()` to see user before generating response
+- **llava integration** - all camera/screenshot captures now sent to llava model for real AI analysis
+- **Full context in chat** - `sendChat()` includes speech history, message history, camera analysis, screenshot analysis, user mood, timing
+- **Proactive interjections** - CORA speaks up on her own every 45 seconds when triggered by:
+  - Stress indicators (fuck, shit, damn, etc.) → 50% chance CHECK_IN
+  - Helpful topics (stuck, help, error, bug, etc.) → 40% chance HELPFUL_INFO
+  - Fun topics (music, game, movie, youtube, etc.) → 20% chance COMMENT
+  - Long silence (5+ min) → 15% chance CHECK_IN
+  - Random vibe → 5% chance casual comment
+- **Cooldown system** - minimum 2 minutes between proactive interjections
+
+**Key Functions Added:**
+```javascript
+analyzImageWithLlava(base64Image, prompt)    // Send image to llava for analysis
+captureAndAnalyzeScreenshot()                 // Screenshot + llava analysis
+quickCameraCapture()                          // Fast camera capture (no llava)
+shouldInterject()                             // Check if CORA should speak up
+doProactiveInterjection(trigger)              // Generate and speak proactive comment
+startProactiveInterjections()                 // Start 45-second interval
+```
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |
 |--------|-------|
-| Total Sessions | 5+ |
-| Tasks Completed | 60+ |
+| Total Sessions | 6+ |
+| Tasks Completed | 75+ |
 | Files Created | 10+ |
-| Files Modified | 58+ |
-| Commits | 15+ |
+| Files Modified | 60+ |
+| Commits | 16+ |
 
 ---
 
