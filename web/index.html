@@ -556,11 +556,8 @@
         </div>
     </div>
 
-    <!-- Toggle Buttons -->
-    <div style="position: fixed; top: 10px; right: 10px; z-index: 100; display: flex; gap: 8px;">
-        <button class="toggle-btn" onclick="openPopupConsole()">[ POP OUT CONSOLE ]</button>
-        <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
-    </div>
+    <!-- Toggle Button -->
+    <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
 
     <!-- Main Container -->
     <div class="container" id="mainContainer">
@@ -2159,115 +2156,6 @@ You ARE Cora. That's just who you are.`;
                 }
             }
         });
-
-        // ============================================================
-        // POPUP CONSOLE - Open console in separate window
-        // ============================================================
-
-        let popupConsole = null;
-
-        function openPopupConsole() {
-            // Check if popup already open
-            if (popupConsole && !popupConsole.closed) {
-                popupConsole.focus();
-                return;
-            }
-
-            // Warn user about popup
-            const proceed = confirm('CORA wants to open the boot console in a separate window.\n\nThis allows you to see both the main display and the full console log side by side.\n\nClick OK to allow the popup.');
-            if (!proceed) return;
-
-            // Open popup window
-            popupConsole = window.open('', 'CORA_Console', 'width=800,height=900,menubar=no,toolbar=no,location=no,status=no');
-
-            if (!popupConsole) {
-                alert('Popup blocked! Please allow popups for this site and try again.');
-                return;
-            }
-
-            // Build the popup HTML
-            popupConsole.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>C.O.R.A - Boot Console</title>
-                    <style>
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        body {
-                            font-family: 'Consolas', 'Monaco', monospace;
-                            background: #0a0a0a;
-                            color: #e0e0e0;
-                            height: 100vh;
-                            overflow: hidden;
-                        }
-                        .header {
-                            background: linear-gradient(135deg, #1a0020 0%, #0d0015 100%);
-                            border-bottom: 2px solid #ff00ff;
-                            padding: 15px 20px;
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                        }
-                        .header h1 {
-                            color: #ff00ff;
-                            font-size: 18px;
-                            text-shadow: 0 0 10px #ff00ff;
-                        }
-                        .header .status {
-                            color: #00ff88;
-                            font-size: 12px;
-                        }
-                        .log-container {
-                            height: calc(100vh - 60px);
-                            overflow-y: auto;
-                            padding: 15px;
-                            font-size: 12px;
-                            line-height: 1.8;
-                        }
-                        .log-line { margin-bottom: 2px; }
-                        .log-phase { color: #ff00ff; font-weight: bold; margin-top: 15px; }
-                        .log-ok { color: #00ff88; }
-                        .log-warn { color: #ffaa00; }
-                        .log-fail { color: #ff4444; }
-                        .log-info { color: #888; }
-                        .log-system { color: #00ffff; }
-                        .log-cora { color: #ff69b4; font-weight: bold; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>[ BOOT CONSOLE ]</h1>
-                        <span class="status" id="status">● LIVE</span>
-                    </div>
-                    <div class="log-container" id="popupLog"></div>
-                    <script>
-                        // Receive messages from main window
-                        window.addEventListener('message', (e) => {
-                            if (e.data.type === 'log') {
-                                const container = document.getElementById('popupLog');
-                                container.innerHTML += e.data.html;
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        });
-                    </script>
-                </body>
-                </html>
-            `);
-            popupConsole.document.close();
-
-            // Copy existing logs to popup
-            setTimeout(() => {
-                const existingLogs = document.getElementById('logContainer');
-                if (existingLogs && popupConsole && !popupConsole.closed) {
-                    popupConsole.postMessage({
-                        type: 'log',
-                        html: existingLogs.innerHTML
-                    }, '*');
-                }
-            }, 500);
-
-            log('Console opened in popup window', 'ok');
-        }
 
         // ============================================================
         // MODAL SYSTEM - Like desktop's create_popup(), create_code_window(), etc.
