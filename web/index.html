@@ -1745,18 +1745,21 @@ Info: ${result}`;
                             A browser popup will appear asking for permission.<br>
                             Click <strong>"Allow"</strong> to continue the boot sequence.
                         </div>
-                        <button id="permissionProceedBtn" style="
-                            background: linear-gradient(135deg, #ff00ff, #aa00aa);
-                            border: none; padding: 15px 40px; border-radius: 6px;
-                            color: white; font-size: 16px; font-weight: bold;
-                            cursor: pointer; text-transform: uppercase;
-                        ">Grant Permission</button>
-                        <button id="permissionSkipBtn" style="
-                            background: #333; border: 1px solid #666;
-                            padding: 10px 25px; border-radius: 4px;
-                            color: #888; font-size: 12px; cursor: pointer;
-                            margin-left: 15px;
-                        ">Skip</button>
+                        <div style="display: flex; gap: 15px; justify-content: center; align-items: center;">
+                            <button id="permissionProceedBtn" style="
+                                display: inline-block;
+                                background: linear-gradient(135deg, #ff00ff, #aa00aa);
+                                border: none; padding: 15px 40px; border-radius: 6px;
+                                color: white; font-size: 16px; font-weight: bold;
+                                cursor: pointer; text-transform: uppercase;
+                            ">Grant Permission</button>
+                            <button id="permissionSkipBtn" style="
+                                display: inline-block;
+                                background: #333; border: 1px solid #666;
+                                padding: 10px 25px; border-radius: 4px;
+                                color: #888; font-size: 12px; cursor: pointer;
+                            ">Skip</button>
+                        </div>
                     </div>
                 `;
 
