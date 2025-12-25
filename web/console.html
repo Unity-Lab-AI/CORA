@@ -28,8 +28,27 @@
             letter-spacing: 4px;
         }
         .header .status {
-            color: #00ff88;
+            color: #ffaa00;
             font-size: 12px;
+        }
+        .header .status.live {
+            color: #00ff88;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            background: #333;
+            border: 1px solid #666;
+            color: #ccc;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .controls button:hover {
+            background: #444;
         }
         .log-container {
             height: calc(100vh - 60px);
@@ -49,14 +68,22 @@
         .log-info { color: #888; }
         .log-system { color: #00ffff; }
         .log-cora { color: #ff69b4; font-weight: bold; }
+        .welcome { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>[ BOOT CONSOLE ]</h1>
-        <span class="status" id="status">● LISTENING</span>
+        <div class="controls">
+            <button onclick="requestHistory()">Refresh Logs</button>
+            <button onclick="clearLogs()">Clear</button>
+            <span class="status" id="status">● WAITING</span>
+        </div>
     </div>
-    <div class="log-container" id="logContainer"></div>
+    <div class="log-container" id="logContainer">
+        <div class="log-line welcome">[Console] Waiting for connection to main CORA window...</div>
+        <div class="log-line welcome">[Console] If boot already ran, click "Refresh Logs" to load history.</div>
+    </div>
 
     <script>
         const logContainer = document.getElementById('logContainer');
@@ -65,38 +92,78 @@
         // Listen for log messages from main window via BroadcastChannel
         const channel = new BroadcastChannel('cora_console');
 
+        function addLog(text, logType) {
+            const line = document.createElement('div');
+            line.className = `log-line log-${logType}`;
+            line.textContent = text;
+            if (logType === 'phase') {
+                line.style.marginTop = '10px';
+            }
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
         channel.onmessage = (e) => {
             if (e.data.type === 'log') {
-                const line = document.createElement('div');
-                line.className = `log-line log-${e.data.logType}`;
-                line.textContent = e.data.text;
-                if (e.data.logType === 'phase') {
-                    line.style.marginTop = '10px';
-                }
-                logContainer.appendChild(line);
-                logContainer.scrollTop = logContainer.scrollHeight;
+                addLog(e.data.text, e.data.logType);
                 status.textContent = '● LIVE';
-                status.style.color = '#00ff88';
+                status.className = 'status live';
             } else if (e.data.type === 'clear') {
                 logContainer.innerHTML = '';
+            } else if (e.data.type === 'history') {
+                // Received log history
+                logContainer.innerHTML = '';
+                if (e.data.logs && e.data.logs.length > 0) {
+                    e.data.logs.forEach(log => addLog(log.text, log.logType));
+                    status.textContent = '● SYNCED';
+                    status.className = 'status live';
+                } else {
+                    addLog('[Console] No log history available. Start a new boot to see logs.', 'info');
+                }
+            } else if (e.data.type === 'pong') {
+                status.textContent = '● CONNECTED';
+                status.className = 'status live';
             }
         };
+
+        function requestHistory() {
+            channel.postMessage({ type: 'requestHistory' });
+            status.textContent = '● REQUESTING...';
+        }
+
+        function clearLogs() {
+            logContainer.innerHTML = '';
+            addLog('[Console] Logs cleared locally.', 'info');
+        }
 
         // Also listen via localStorage for fallback
         window.addEventListener('storage', (e) => {
             if (e.key === 'cora_console_log') {
                 const data = JSON.parse(e.newValue);
                 if (data) {
-                    const line = document.createElement('div');
-                    line.className = `log-line log-${data.logType}`;
-                    line.textContent = data.text;
-                    if (data.logType === 'phase') {
-                        line.style.marginTop = '10px';
-                    }
-                    logContainer.appendChild(line);
-                    logContainer.scrollTop = logContainer.scrollHeight;
+                    addLog(data.text, data.logType);
+                    status.textContent = '● LIVE';
+                    status.className = 'status live';
                 }
             }
+        });
+
+        // Try to load history from localStorage on start
+        window.addEventListener('load', () => {
+            const savedLogs = localStorage.getItem('cora_log_history');
+            if (savedLogs) {
+                try {
+                    const logs = JSON.parse(savedLogs);
+                    if (logs.length > 0) {
+                        logContainer.innerHTML = '';
+                        logs.forEach(log => addLog(log.text, log.logType));
+                        status.textContent = '● LOADED FROM HISTORY';
+                        status.className = 'status live';
+                    }
+                } catch (e) {}
+            }
+            // Ping main window
+            channel.postMessage({ type: 'ping' });
         });
 
         console.log('Console window ready - waiting for logs from main window');
