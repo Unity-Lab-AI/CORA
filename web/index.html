@@ -1036,10 +1036,17 @@ WHEN RESPONDING:
             console.log('[SETUP] Container found, clearing and populating...');
             container.innerHTML = '';  // Clear any old content
 
+            // Immediate feedback - show something right away
+            const headerDiv = document.createElement('pre');
+            headerDiv.style.cssText = 'color: #ff00ff; margin: 0; font-family: Consolas, monospace;';
+            headerDiv.textContent = CORA_ASCII_HEADER;
+            container.appendChild(headerDiv);
+
             const isFirstRun = !localStorage.getItem('cora_setup_complete');
 
-            // CORA ASCII Header
-            setupLog(CORA_ASCII_HEADER, '#ff00ff');
+            // Show loading message while checks run
+            setupLog('', '#ffffff');
+            setupLog('Initializing backend checks...', '#00ffff');
             setupLog('', '#ffffff');
 
             if (isFirstRun) {
@@ -4537,7 +4544,7 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
 
         let viewMode = 'split';  // 'split', 'setup', 'console', 'status'
 
-        function toggleView() {
+        async function toggleView() {
             const container = document.getElementById('mainContainer');
             const setupTerminal = document.getElementById('setupTerminal');
             const btn = document.getElementById('toggleBtn');
@@ -4549,7 +4556,12 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 container.style.display = 'none';
                 btn.textContent = '[ SETUP TERMINAL ]';
                 // Initialize the setup terminal with real checks (force refresh)
-                initSetupTerminal(true);
+                try {
+                    await initSetupTerminal(true);
+                } catch (e) {
+                    console.error('[SETUP] Error:', e);
+                    setupLog('ERROR: ' + e.message, '#ff0000');
+                }
             } else if (viewMode === 'setup') {
                 // Console only
                 viewMode = 'console';
