@@ -87,20 +87,10 @@ async function handleGenerate(id, data) {
 
     const { text, voice, speed } = data;
 
-    // Validate text before generating
-    if (!text || typeof text !== 'string' || text.trim().length < 2) {
-        console.warn('[KOKORO] Empty or invalid text received, skipping generation');
-        self.postMessage({ type: 'error', id, error: 'Text too short or empty' });
-        return;
-    }
-
-    const cleanText = text.trim();
-    console.log(`[KOKORO] Generating audio for: "${cleanText.substring(0, 50)}..."`);
-
     try {
         self.postMessage({ type: 'generating', id });
 
-        const audio = await tts.generate(cleanText, {
+        const audio = await tts.generate(text, {
             voice: voice || DEFAULT_VOICE,
             speed: speed || 1.0
         });

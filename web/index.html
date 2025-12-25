@@ -1611,17 +1611,6 @@ WHEN RESPONDING:
 
             console.log(`[TTS] speak() called: kokoroReady=${kokoroReady}, useFallback=${useFallbackTTS}, text="${speakText.substring(0,50)}..."`);
 
-            // If text is empty after stripping URLs, just show the original text and skip TTS
-            if (!speakText || speakText.length < 2) {
-                console.warn('[TTS] Text empty after stripping URLs, showing original text only');
-                if (displayText) {
-                    document.getElementById('speechText').textContent = `"${displayText}"`;
-                    log(`CORA: "${displayText}"`, 'cora');
-                }
-                if (callback) callback();
-                return;
-            }
-
             if (kokoroReady && !useFallbackTTS) {
                 // Use Kokoro neural TTS - speakText for TTS, displayText for log
                 const id = ++messageId;
