@@ -1056,20 +1056,32 @@
         // Logging & Phases
         // ============================================================
 
-        // BroadcastChannel to send logs to separate console window
-        const consoleChannel = new BroadcastChannel('cora_console');
-
         // Store log history for console window sync
         const logHistory = [];
+        let consoleWindow = null;
 
-        // Listen for requests from console window
-        consoleChannel.onmessage = (e) => {
-            if (e.data.type === 'ping') {
-                consoleChannel.postMessage({ type: 'pong' });
-            } else if (e.data.type === 'requestHistory') {
-                consoleChannel.postMessage({ type: 'history', logs: logHistory });
+        // Function to send logs to console window
+        function sendToConsole(data) {
+            // Save to localStorage (works for file://)
+            localStorage.setItem('cora_log_history', JSON.stringify(logHistory));
+            localStorage.setItem('cora_console_log', JSON.stringify(data));
+
+            // Also try postMessage if console window exists
+            if (consoleWindow && !consoleWindow.closed) {
+                try {
+                    consoleWindow.postMessage(data, '*');
+                } catch (e) {}
             }
-        };
+        }
+
+        // Listen for messages from console window
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'ping') {
+                e.source.postMessage({ type: 'pong' }, '*');
+            } else if (e.data.type === 'requestHistory') {
+                e.source.postMessage({ type: 'history', logs: logHistory }, '*');
+            }
+        });
 
         function log(text, type = 'info') {
             const container = document.getElementById('logContainer');
@@ -1090,13 +1102,9 @@
             container.appendChild(line);
             container.scrollTop = container.scrollHeight;
 
-            // Store in history
+            // Store in history and send to console window
             logHistory.push({ text: fullText, logType: type });
-            // Save to localStorage for console window to load
-            localStorage.setItem('cora_log_history', JSON.stringify(logHistory));
-
-            // Send to console window via BroadcastChannel
-            consoleChannel.postMessage({ type: 'log', text: fullText, logType: type });
+            sendToConsole({ type: 'log', text: fullText, logType: type });
         }
 
         function renderPhases() {
@@ -2306,8 +2314,8 @@ You ARE Cora. That's just who you are.`;
         }
 
         function openConsoleWindow() {
-            const consoleWin = window.open('console.html', 'cora_console', 'width=800,height=600,menubar=no,toolbar=no');
-            if (!consoleWin || consoleWin.closed) {
+            consoleWindow = window.open('console.html', 'cora_console', 'width=800,height=600,menubar=no,toolbar=no');
+            if (!consoleWindow || consoleWindow.closed) {
                 alert('Popup blocked! Please allow popups for this site to open the console window.');
             }
         }
@@ -2357,9 +2365,9 @@ You ARE Cora. That's just who you are.`;
         // ============================================================
 
         async function init() {
-            // Auto-open console in new tab (safe - won't break if blocked)
+            // Auto-open console in popup window (safe - won't break if blocked)
             try {
-                window.open('console.html', '_blank');
+                consoleWindow = window.open('console.html', 'cora_console', 'width=800,height=600,menubar=no,toolbar=no');
             } catch (e) {
                 console.log('Console popup blocked');
             }

@@ -89,9 +89,6 @@
         const logContainer = document.getElementById('logContainer');
         const status = document.getElementById('status');
 
-        // Listen for log messages from main window via BroadcastChannel
-        const channel = new BroadcastChannel('cora_console');
-
         function addLog(text, logType) {
             const line = document.createElement('div');
             line.className = `log-line log-${logType}`;
@@ -103,7 +100,8 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        channel.onmessage = (e) => {
+        // Listen for messages from main window via postMessage
+        window.addEventListener('message', (e) => {
             if (e.data.type === 'log') {
                 addLog(e.data.text, e.data.logType);
                 status.textContent = '● LIVE';
@@ -111,7 +109,6 @@
             } else if (e.data.type === 'clear') {
                 logContainer.innerHTML = '';
             } else if (e.data.type === 'history') {
-                // Received log history
                 logContainer.innerHTML = '';
                 if (e.data.logs && e.data.logs.length > 0) {
                     e.data.logs.forEach(log => addLog(log.text, log.logType));
@@ -124,32 +121,20 @@
                 status.textContent = '● CONNECTED';
                 status.className = 'status live';
             }
-        };
-
-        function requestHistory() {
-            channel.postMessage({ type: 'requestHistory' });
-            status.textContent = '● REQUESTING...';
-        }
-
-        function clearLogs() {
-            logContainer.innerHTML = '';
-            addLog('[Console] Logs cleared locally.', 'info');
-        }
-
-        // Also listen via localStorage for fallback
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'cora_console_log') {
-                const data = JSON.parse(e.newValue);
-                if (data) {
-                    addLog(data.text, data.logType);
-                    status.textContent = '● LIVE';
-                    status.className = 'status live';
-                }
-            }
         });
 
-        // Try to load history from localStorage on start
-        window.addEventListener('load', () => {
+        function requestHistory() {
+            // Try postMessage to opener
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'requestHistory' }, '*');
+                status.textContent = '● REQUESTING...';
+            } else {
+                // Fallback - try to load from localStorage
+                loadFromStorage();
+            }
+        }
+
+        function loadFromStorage() {
             const savedLogs = localStorage.getItem('cora_log_history');
             if (savedLogs) {
                 try {
@@ -157,13 +142,46 @@
                     if (logs.length > 0) {
                         logContainer.innerHTML = '';
                         logs.forEach(log => addLog(log.text, log.logType));
-                        status.textContent = '● LOADED FROM HISTORY';
+                        status.textContent = '● LOADED FROM STORAGE';
                         status.className = 'status live';
+                        return true;
                     }
                 } catch (e) {}
             }
-            // Ping main window
-            channel.postMessage({ type: 'ping' });
+            return false;
+        }
+
+        function clearLogs() {
+            logContainer.innerHTML = '';
+            addLog('[Console] Logs cleared locally.', 'info');
+        }
+
+        // Listen for localStorage changes (live updates fallback)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'cora_console_log') {
+                try {
+                    const data = JSON.parse(e.newValue);
+                    if (data && data.type === 'log') {
+                        addLog(data.text, data.logType);
+                        status.textContent = '● LIVE';
+                        status.className = 'status live';
+                    }
+                } catch (err) {}
+            }
+        });
+
+        // On load
+        window.addEventListener('load', () => {
+            // Try to load from localStorage first
+            if (loadFromStorage()) {
+                return;
+            }
+
+            // Try to ping opener window
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'ping' }, '*');
+                window.opener.postMessage({ type: 'requestHistory' }, '*');
+            }
         });
 
         console.log('Console window ready - waiting for logs from main window');

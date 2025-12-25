@@ -288,15 +288,14 @@ echo.
 echo [LAUNCH] Starting C.O.R.A Boot Sequence...
 echo.
 
-:: Create logs directory if needed
-if not exist "logs" mkdir logs
-
-:: Launch boot sequence - output to both terminal AND log file
-echo [LOG] Saving to logs\boot.log
+:: Open Web UI in browser (for split view - terminal + browser side by side)
+echo [WEB UI] Opening web interface in browser...
+start "" "%~dp0web\index.html"
+echo         Arrange browser and this terminal side-by-side for split view
 echo.
 
-:: Use PowerShell to tee output to both console and file
-powershell -Command "& {python src\boot_sequence.py --mpv-missing=%MPV_MISSING% 2>&1 | Tee-Object -FilePath 'logs\boot.log'}"
+:: Launch boot sequence with dependency status
+python src\boot_sequence.py --mpv-missing=%MPV_MISSING%
 
 if errorlevel 1 (
     echo.
