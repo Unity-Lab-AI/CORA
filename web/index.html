@@ -702,44 +702,11 @@
             <div class="log-container" id="logContainer"></div>
         </div>
 
-        <!-- Setup Terminal Panel (like start.bat/CORA.bat output) -->
+        <!-- Setup Terminal Panel (like CORA.bat output) - DYNAMIC -->
         <div class="setup-terminal" id="setupTerminal" style="display: none;">
-            <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ SETUP TERMINAL ] - CORA.bat</div>
-            <div class="log-container" id="setupLog" style="background: #000;">
-                <div class="log-line" style="color: #00ff00;">C:\Users\gfour\Desktop\CORA> start.bat</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #00ffff;">============================================</div>
-                <div class="log-line" style="color: #00ffff;">  C.O.R.A Setup & Installation Script</div>
-                <div class="log-line" style="color: #00ffff;">  Unity AI Lab - v1.0.0</div>
-                <div class="log-line" style="color: #00ffff;">============================================</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #ffff00;">[CHECK] Checking Python installation...</div>
-                <div class="log-line" style="color: #00ff00;">[OK] Python 3.12.0 found</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #ffff00;">[CHECK] Checking Ollama installation...</div>
-                <div class="log-line" style="color: #00ff00;">[OK] Ollama found at C:\Users\gfour\AppData\Local\Programs\Ollama</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #ff00ff;">[INSTALL] Installing required models...</div>
-                <div class="log-line" style="color: #888888;">  Pulling dolphin-mistral:7b...</div>
-                <div class="log-line" style="color: #00ff00;">  [OK] dolphin-mistral:7b (4.1 GB)</div>
-                <div class="log-line" style="color: #888888;">  Pulling llava:latest...</div>
-                <div class="log-line" style="color: #00ff00;">  [OK] llava:latest (4.7 GB)</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #ff00ff;">[INSTALL] Installing Python packages...</div>
-                <div class="log-line" style="color: #888888;">  pip install pillow...</div>
-                <div class="log-line" style="color: #888888;">  pip install opencv-python...</div>
-                <div class="log-line" style="color: #888888;">  pip install pyautogui...</div>
-                <div class="log-line" style="color: #888888;">  pip install requests...</div>
-                <div class="log-line" style="color: #888888;">  pip install python-dotenv...</div>
-                <div class="log-line" style="color: #00ff00;">[OK] All packages installed</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #ffff00;">[CHECK] Verifying Ollama connection...</div>
-                <div class="log-line" style="color: #00ff00;">[OK] Ollama API responding on localhost:11434</div>
-                <div class="log-line" style="color: #ffffff;"></div>
-                <div class="log-line" style="color: #00ffff;">============================================</div>
-                <div class="log-line" style="color: #00ff00;">[READY] All systems ready!</div>
-                <div class="log-line" style="color: #ff00ff;">[START] Launching CORA...</div>
-                <div class="log-line" style="color: #00ffff;">============================================</div>
+            <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ BACKEND TERMINAL ] - System Setup & Checks</div>
+            <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto;">
+                <!-- Content populated dynamically by initSetupTerminal() -->
             </div>
         </div>
     </div>
@@ -987,6 +954,201 @@ WHEN RESPONDING:
 * Respond in character with appropriate emotion
 
 * Keep it brief and punchy`;
+
+        // ============================================================
+        // SETUP TERMINAL - Backend console like CORA.bat
+        // Shows Ollama checks, model downloads, API gates
+        // ============================================================
+
+        const CORA_ASCII_HEADER = `
+  +=========================================+
+  :   ____  ___  ____   _                   :
+  :  / ___]/ _ \\[  _ \\ / \\                  :
+  : [ [__ [ [ ] ][ ][_][ o ]                :
+  : [ [__ [ [ ] ][ _ / /   \\                :
+  :  \\___] \\___/[_] [_]_] [_]               :
+  :                                         :
+  :  Cognitive Operations and Reasoning     :
+  :  Assistant - v1.0.0 - Unity AI Lab      :
+  +=========================================+
+`;
+
+        // Setup terminal state
+        let setupTerminalInitialized = false;
+        let ollamaStatus = { running: false, models: [] };
+
+        function setupLog(text, color = '#00ff00') {
+            const container = document.getElementById('setupLog');
+            if (!container) return;
+            const line = document.createElement('div');
+            line.style.cssText = `color: ${color}; margin: 2px 0; white-space: pre-wrap; font-family: 'Consolas', monospace;`;
+            line.textContent = text;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setupLogHTML(html) {
+            const container = document.getElementById('setupLog');
+            if (!container) return;
+            const line = document.createElement('div');
+            line.style.cssText = 'margin: 2px 0; white-space: pre-wrap;';
+            line.innerHTML = html;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function checkOllamaRunning() {
+            try {
+                const resp = await fetch('http://localhost:11434/api/tags', {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    return { running: true, models: data.models || [] };
+                }
+            } catch (e) {
+                // Ollama not running
+            }
+            return { running: false, models: [] };
+        }
+
+        function hasModel(models, name) {
+            return models.some(m => m.name && m.name.toLowerCase().includes(name.toLowerCase()));
+        }
+
+        async function initSetupTerminal() {
+            if (setupTerminalInitialized) return;
+            setupTerminalInitialized = true;
+
+            const container = document.getElementById('setupLog');
+            if (!container) return;
+            container.innerHTML = '';  // Clear any old content
+
+            const isFirstRun = !localStorage.getItem('cora_setup_complete');
+
+            // CORA ASCII Header
+            setupLog(CORA_ASCII_HEADER, '#ff00ff');
+            setupLog('', '#ffffff');
+
+            if (isFirstRun) {
+                setupLog('============================================================', '#ffaa00');
+                setupLog('  FIRST TIME SETUP - This may take a while!', '#ffaa00');
+                setupLog('  Subsequent runs will be much faster (preloaded).', '#ffaa00');
+                setupLog('============================================================', '#ffaa00');
+                setupLog('', '#ffffff');
+            }
+
+            // Check Ollama
+            setupLog('[CHECK] Ollama AI Backend...', '#ffff00');
+            ollamaStatus = await checkOllamaRunning();
+
+            if (!ollamaStatus.running) {
+                setupLog('[ERROR] Ollama is NOT running!', '#ff4444');
+                setupLog('', '#ffffff');
+                setupLog('Ollama is required for CORA to function.', '#ffffff');
+                setupLog('', '#ffffff');
+                setupLogHTML('<span style="color: #00ffff;">Download Ollama:</span> <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff; text-decoration: underline;">https://ollama.com/download</a>');
+                setupLog('', '#ffffff');
+                setupLog('After installing, run these commands in terminal:', '#ffffff');
+                setupLog('', '#ffffff');
+                setupLog('  ollama serve', '#00ff00');
+                setupLog('', '#ffffff');
+                setupLog('Then refresh this page.', '#ffff00');
+                setupLog('', '#ffffff');
+                setupLog('============================================================', '#ff4444');
+                setupLog('[BLOCKED] Cannot proceed without Ollama', '#ff4444');
+                setupLog('============================================================', '#ff4444');
+                return;
+            }
+
+            setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+            setupLog('', '#ffffff');
+
+            // Check required models
+            setupLog('[CHECK] Required AI Models...', '#ffff00');
+            setupLog('', '#ffffff');
+
+            const requiredModels = [
+                { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', size: '~4.1 GB', desc: 'Main chat model (CORA brain)' },
+                { name: 'llava', display: 'llava', size: '~4.7 GB', desc: 'Vision model (image analysis)' },
+                { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', size: '~4.4 GB', desc: 'Coding model' }
+            ];
+
+            let missingModels = [];
+
+            for (const model of requiredModels) {
+                if (hasModel(ollamaStatus.models, model.name)) {
+                    setupLog(`  [OK] ${model.display} - ${model.desc}`, '#00ff00');
+                } else {
+                    setupLog(`  [MISSING] ${model.display} - ${model.desc}`, '#ff4444');
+                    missingModels.push(model);
+                }
+            }
+
+            setupLog('', '#ffffff');
+
+            if (missingModels.length > 0) {
+                setupLog('============================================================', '#ffaa00');
+                setupLog('  MODELS NEED TO BE DOWNLOADED', '#ffaa00');
+                setupLog('  Run these commands in your terminal:', '#ffaa00');
+                setupLog('============================================================', '#ffaa00');
+                setupLog('', '#ffffff');
+
+                for (const model of missingModels) {
+                    setupLog(`  ollama pull ${model.display}    # ${model.size}`, '#00ffff');
+                }
+
+                setupLog('', '#ffffff');
+                setupLog('After downloading, refresh this page.', '#ffff00');
+                setupLog('', '#ffffff');
+                setupLog('[WARN] Some features may not work without all models', '#ffaa00');
+            } else {
+                setupLog('[OK] All required models installed!', '#00ff00');
+            }
+
+            setupLog('', '#ffffff');
+
+            // API Checks
+            setupLog('[CHECK] API Connections...', '#ffff00');
+
+            // Kokoro TTS check
+            try {
+                const kokoroResp = await fetch('http://localhost:8880/v1/audio/speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: 'kokoro', input: 'test', voice: 'af_bella' }),
+                    signal: AbortSignal.timeout(2000)
+                });
+                if (kokoroResp.ok) {
+                    setupLog('  [OK] Kokoro TTS - localhost:8880', '#00ff00');
+                } else {
+                    setupLog('  [WARN] Kokoro TTS - not responding (voice disabled)', '#ffaa00');
+                }
+            } catch (e) {
+                setupLog('  [WARN] Kokoro TTS - not running (voice disabled)', '#ffaa00');
+            }
+
+            // Weather API (just show status based on localStorage)
+            const weatherKey = localStorage.getItem('cora_weather_key');
+            if (weatherKey) {
+                setupLog('  [OK] Weather API - configured', '#00ff00');
+            } else {
+                setupLog('  [INFO] Weather API - using free tier', '#888888');
+            }
+
+            setupLog('', '#ffffff');
+            setupLog('============================================================', '#00ffff');
+            setupLog('[READY] Backend checks complete', '#00ff00');
+            setupLog('[START] Boot sequence will begin...', '#ff00ff');
+            setupLog('============================================================', '#00ffff');
+
+            // Mark setup complete for faster subsequent loads
+            localStorage.setItem('cora_setup_complete', 'true');
+        }
+
+        // Initialize setup terminal when view is toggled to setup mode
+        const originalToggleView = typeof toggleView !== 'undefined' ? toggleView : null;
 
         async function loadSystemPrompt() {
             // System prompt is now hardcoded - no need to fetch
@@ -1507,6 +1669,10 @@ WHEN RESPONDING:
             // Store in history and send to console window
             logHistory.push({ text: fullText, logType: type });
             sendToConsole({ type: 'log', text: fullText, logType: type });
+
+            // Also pipe to setup terminal (backend console) for split view
+            const setupColor = type === 'ok' ? '#00ff00' : type === 'warn' ? '#ffaa00' : type === 'fail' ? '#ff4444' : type === 'phase' ? '#ff00ff' : '#cccccc';
+            setupLog(`[BOOT] ${text}`, setupColor);
         }
 
         function renderPhases() {
@@ -4360,6 +4526,8 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
                 btn.textContent = '[ SETUP TERMINAL ]';
+                // Initialize the setup terminal with real checks
+                initSetupTerminal();
             } else if (viewMode === 'setup') {
                 // Console only
                 viewMode = 'console';
@@ -4480,6 +4648,9 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
             renderPhases();
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
+
+            // Initialize backend terminal (runs checks like CORA.bat)
+            await initSetupTerminal();
 
             // Gate 1: Ollama (required)
             if (!(await checkOllama())) {
