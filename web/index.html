@@ -3722,23 +3722,22 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 // Start polling for live updates
                 startStatsPolling();
 
-                // Hardware summary - give CORA the ACTUAL stats to report
+                // Hardware summary - give CORA the ACTUAL stats
                 let hw_data = `Hardware scan done. CPU at ${Math.round(stats.cpu.percent)}%, RAM at ${Math.round(stats.memory.percent)}%, Disk at ${Math.round(stats.disk.percent)}%`;
                 if (stats.gpu && stats.gpu.available) {
-                    hw_data += `, GPU ${stats.gpu.name} running at ${stats.gpu.utilization}% load, ${stats.gpu.temperature}°C`;
+                    hw_data += `, GPU ${stats.gpu.name} at ${stats.gpu.utilization}% load, ${stats.gpu.temperature}°C`;
                 } else {
-                    hw_data += `, no dedicated GPU detected`;
+                    hw_data += `, no dedicated GPU`;
                 }
-                hw_data += `. Report these stats.`;
-                const hwResponse = await coraRespond('PC Hardware scan', hw_data, 'ok');
+                const hwResponse = await coraRespond('Hardware', hw_data, 'ok');
                 await speakAndWait(hwResponse);
             } else {
-                // Stats server not running - fallback to basic info
+                // Stats server not running
                 log('Stats server not running (start with: python services/stats_server.py)', 'warn');
                 log('Network: ' + (navigator.onLine ? 'Connected' : 'Disconnected'), navigator.onLine ? 'ok' : 'warn');
                 document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
                 setPhase('hardware', 'warn');
-                const hwWarn = await coraRespond('Hardware', 'Hardware stats server not running. No real-time monitoring available. Report.', 'warn');
+                const hwWarn = await coraRespond('Hardware', 'Hardware stats server not running. No real-time monitoring.', 'warn');
                 await speakAndWait(hwWarn);
             }
 
@@ -3764,7 +3763,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 if (permResult === 'skip' || permResult === 'denied') {
                     log(`Camera permission ${permResult} by user`, 'warn');
                     setPhase('camera', 'warn');
-                    const camSkip = await coraRespond('Camera', `Camera permission ${permResult}. Report.`, 'warn');
+                    const camSkip = await coraRespond('Camera', `Camera permission ${permResult}.`, 'warn');
                     await speakAndWait(camSkip);
                 } else if (permResult === 'granted') {
                     log('Testing live camera feed...', 'info');
@@ -3860,9 +3859,9 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                         // Camera phase - give CORA the vision data
                         let camResponse;
                         if (camera_desc && camera_desc.length > 10) {
-                            camResponse = await coraRespond('Live Camera', `Camera test done. Vision sees: ${camera_desc.substring(0, 100)}. Report.`, 'ok');
+                            camResponse = await coraRespond('Live Camera', `Camera online. I see: ${camera_desc}`, 'ok', 'full');
                         } else {
-                            camResponse = await coraRespond('Live Camera', 'Camera online, vision test passed. Report.', 'ok');
+                            camResponse = await coraRespond('Live Camera', 'Camera online, vision test passed.', 'ok');
                         }
                         await speakAndWait(camResponse);
 
@@ -3877,14 +3876,14 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                     } catch (e) {
                         log('Live camera not available: ' + e.message, 'warn');
                         setPhase('camera', 'warn');
-                        const camWarn = await coraRespond('Live Camera', 'Camera test failed, not available. Report.', 'warn');
+                        const camWarn = await coraRespond('Camera', 'Camera test failed, not available.', 'warn');
                         await speakAndWait(camWarn);
                     }
                 }
             } else {
                 log('Camera API not available in this browser', 'warn');
                 setPhase('camera', 'warn');
-                const camWarn = await coraRespond('Camera', 'Browser camera API not available. Report.', 'warn');
+                const camWarn = await coraRespond('Camera', 'Browser camera API not available.', 'warn');
                 await speakAndWait(camWarn);
             }
 
@@ -3911,9 +3910,9 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             });
             setPhase('tools', 'ok');
             // Tools phase - give CORA the count
-            const tools_result = `Core tools check done. ${toolsOk} of ${webTools.length} browser APIs available. Report.`;
+            const tools_result = `Core tools check done. ${toolsOk} of ${webTools.length} browser APIs available.`;
             const tools_status = toolsOk >= webTools.length - 2 ? 'ok' : (toolsOk >= webTools.length / 2 ? 'warn' : 'fail');
-            const toolsResponse = await coraRespond('Core Tools check', tools_result, tools_status);
+            const toolsResponse = await coraRespond('Tools', tools_result, tools_status);
             await speakAndWait(toolsResponse);
 
             // ================================================================
@@ -3939,7 +3938,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                     log('Code browser opened - browse CORA source!', 'ok');
 
                     setPhase('code_import', 'ok');
-                    const codeResponse = await coraRespond('Code Browser', `My source code is now viewable. ${fileCount} files loaded. Respond briefly.`, 'ok');
+                    const codeResponse = await coraRespond('Code Browser', `My source code is now viewable. ${fileCount} files loaded from the CORA repo.`, 'ok');
                     await speakAndWait(codeResponse);
 
                     // Give time to browse, then close before moving on
@@ -3952,7 +3951,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             } catch (e) {
                 log(`Code browser: ${e.message}`, 'warn');
                 setPhase('code_import', 'warn');
-                const codeWarn = await coraRespond('Code Browser', 'Code browser failed, GitHub API rate limited. Report.', 'warn');
+                const codeWarn = await coraRespond('Code Browser', 'Code browser failed, GitHub API rate limited.', 'warn');
                 await speakAndWait(codeWarn);
             }
 
@@ -4005,7 +4004,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             setPhase('youtube', 'ok');
 
             // SPEAK FIRST - before showing video (no audio overlap)
-            const ytResponse = await coraRespond('YouTube Test', `YouTube working. Playing "${video.title}". Respond briefly.`, 'ok');
+            const ytResponse = await coraRespond('YouTube', `YouTube working. Playing "${video.title}".`, 'ok');
             await speakAndWait(ytResponse);
 
             // NOW show video after TTS is done
@@ -4042,7 +4041,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
 
             setPhase('modals', 'ok');
             // Modal phase - confirm working
-            const modalResponse = await coraRespond('Modal Windows', 'Modal windows test passed. Report.', 'ok');
+            const modalResponse = await coraRespond('Modals', 'Modal windows test passed.', 'ok');
             await speakAndWait(modalResponse);
 
             // Wait then close modal before moving on
@@ -4069,8 +4068,8 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             setPhase('voice_sys', 'ok');
             // Voice phase - give CORA the TTS/STT status
             const ttsType = kokoroReady ? 'Kokoro neural TTS' : 'Web Speech fallback';
-            const voice_result = `Voice systems done. Using ${ttsType}. Wake word ${hasSpeechRecog ? 'active' : 'not supported'}. Report.`;
-            const voiceResponse = await coraRespond('Voice Systems check', voice_result, 'ok');
+            const voice_result = `Voice systems done. Using ${ttsType}. Wake word ${hasSpeechRecog ? 'active' : 'not supported'}.`;
+            const voiceResponse = await coraRespond('Voice', voice_result, 'ok');
             await speakAndWait(voiceResponse);
 
             // ================================================================
@@ -4100,11 +4099,11 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 log(`Location: ${locStr}`, 'ok');
                 log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
                 // Location phase - give CORA the location
-                const locResponse = await coraRespond('Location check', `Location acquired: ${locStr}. Report.`, 'ok');
+                const locResponse = await coraRespond('Location', `Location acquired: ${locStr}.`, 'ok');
                 await speakAndWait(locResponse);
             } else {
                 log('Location not available or denied', 'warn');
-                const locWarn = await coraRespond('Location check', 'Location unavailable or denied. Report.', 'warn');
+                const locWarn = await coraRespond('Location', 'Location unavailable or denied.', 'warn');
                 await speakAndWait(locWarn);
             }
             setPhase('external', 'ok');
@@ -4122,12 +4121,12 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 await new Promise(r => setTimeout(r, 3000));
                 log('Audio test complete!', 'ok');
                 setPhase('audio', 'ok');
-                const audioResponse = await coraRespond('Audio Playback', `Audio test passed. Played ${audioResult.played || 'synth tone'}. Report.`, 'ok');
+                const audioResponse = await coraRespond('Audio', `Audio test passed. Played ${audioResult.played || 'synth tone'}.`, 'ok');
                 await speakAndWait(audioResponse);
             } else {
                 log('Audio test failed: ' + audioResult.error, 'warn');
                 setPhase('audio', 'warn');
-                const audioWarn = await coraRespond('Audio Playback', 'Audio test failed. Report.', 'warn');
+                const audioWarn = await coraRespond('Audio', 'Audio test failed.', 'warn');
                 await speakAndWait(audioWarn);
             }
 
@@ -4178,7 +4177,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('weather', 'warn');
-                const weatherWarn = await coraRespond('Weather', 'Weather service unavailable. Report.', 'warn');
+                const weatherWarn = await coraRespond('Weather', 'Weather service unavailable.', 'warn');
                 await speakAndWait(weatherWarn);
             }
 
@@ -4201,14 +4200,13 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                     if (clean.length > 80) clean = clean.substring(0, 77) + '...';
                     return clean;
                 });
-                const news_data = `News done. ${headlines.length} headlines found. Top 3: ${clean_headlines.join('. ')}. Give your take.`;
-                const newsResponse = await coraRespond('News Headlines', news_data, 'ok', 'full');
+                const news_data = `News done. ${headlines.length} headlines found. Top 3: ${clean_headlines.join('. ')}.`;
+                const newsResponse = await coraRespond('News', news_data, 'ok', 'full');
                 await speakAndWait(newsResponse);
             } else {
                 log('News unavailable', 'warn');
                 setPhase('news', 'warn');
-                // News failure
-                const newsWarn = await coraRespond('News Headlines', 'News service unavailable. Report.', 'warn');
+                const newsWarn = await coraRespond('News', 'News service unavailable.', 'warn');
                 await speakAndWait(newsWarn);
             }
 
@@ -4344,16 +4342,16 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             // Vision summary - give CORA the actual status
             let vision_result;
             if (screenshotOk && visionCameraOk) {
-                vision_result = "Vision test done. Screenshot and camera both working. Report.";
+                vision_result = "Vision test done. Screenshot and camera both working.";
             } else if (screenshotOk) {
-                vision_result = "Vision test done. Screenshot working, camera unavailable. Report.";
+                vision_result = "Vision test done. Screenshot working, camera unavailable.";
             } else if (visionCameraOk) {
-                vision_result = "Vision test done. Camera working, screenshot failed. Report.";
+                vision_result = "Vision test done. Camera working, screenshot failed.";
             } else {
-                vision_result = "Vision test failed. Both screenshot and camera unavailable. Report.";
+                vision_result = "Vision test failed. Both screenshot and camera unavailable.";
             }
             setPhase('vision', (screenshotOk || visionCameraOk) ? 'ok' : 'warn');
-            const visionResponse = await coraRespond('Vision Systems summary', vision_result, 'ok');
+            const visionResponse = await coraRespond('Vision', vision_result, (screenshotOk || visionCameraOk) ? 'ok' : 'warn', 'full');
             await speakAndWait(visionResponse);
 
             // ================================================================
@@ -4439,13 +4437,13 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                     if (image_description && image_description.length > 10) {
                         await speakAndWait(image_description);
                     } else {
-                        const imgResponse = await coraRespond('Image Generation', `Image generated in ${genTime}s but vision analysis failed. Report.`, 'warn');
+                        const imgResponse = await coraRespond('Image', `Image generated in ${genTime}s but vision analysis failed.`, 'warn');
                         await speakAndWait(imgResponse);
                     }
                 } catch (e) {
                     log('Image generation failed: ' + e.message, 'warn');
                     setPhase('imagegen', 'warn');
-                    const imgFail = await coraRespond('Image Generation', `Image generation failed: ${e.message.substring(0, 40)}. Report.`, 'fail');
+                    const imgFail = await coraRespond('Image', `Image generation failed: ${e.message.substring(0, 40)}.`, 'fail');
                     await speakAndWait(imgFail);
                 }
 
@@ -4456,7 +4454,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
-                const imgWarn = await coraRespond('Image Generation', 'Image generation unavailable, Pollinations API down. Report.', 'warn');
+                const imgWarn = await coraRespond('Image', 'Image generation unavailable, Pollinations API down.', 'warn');
                 await speakAndWait(imgWarn);
             }
 
