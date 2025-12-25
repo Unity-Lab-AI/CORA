@@ -173,8 +173,8 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         response = generate(
             prompt=prompt,
             system=system_prompt,
-            temperature=0.7,
-            max_tokens=60  # Keep it short
+            temperature=0.7
+            # No max_tokens - let AI finish naturally, truncate after
         )
 
         if response.content:
