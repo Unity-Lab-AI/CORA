@@ -1219,15 +1219,17 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // Give CORA the info, tell her to respond. System prompt handles personality.
+                // Give CORA the info with EXPLICIT in-character instruction
+                // The model needs to know this is a status update SHE is making, not a question TO her
                 if (mode === 'quick') {
-                    prompt = `${result} Respond.`;
+                    prompt = `[STATUS UPDATE - You are CORA reporting to your user]\n${result}\n\nAcknowledge this briefly. One or two sentences max. Stay completely in character as CORA - edgy, sarcastic, profanity okay. NO offers to help. NO questions back.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    prompt = `${result} Give your take.`;
+                    // Full mode for weather/news - needs more tokens for detailed commentary
+                    prompt = `[STATUS UPDATE - You are CORA reporting to your user]\n${result}\n\nGive your take on this. 3-4 sentences. Stay completely in character as CORA - edgy, sharp, real. NO offers to help. NO "let me know if you need anything" bullshit.`;
                     temperature = 0.8;
-                    maxTokens = 300;
+                    maxTokens = 400;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
@@ -1343,6 +1345,22 @@ WHEN RESPONDING:
                         else if (type === 'audioReady') {
                             handleAudioReady(id, data);
                         }
+                        else if (type === 'error') {
+                            // Audio generation failed - resolve the pending callback so boot continues
+                            console.error(`Kokoro TTS error for id ${id}:`, error);
+                            if (pendingCallbacks[id]) {
+                                const { resolve, text, timeoutId } = pendingCallbacks[id];
+                                delete pendingCallbacks[id];
+                                if (timeoutId) clearTimeout(timeoutId);
+                                // Log the text anyway so user sees it
+                                if (text) {
+                                    document.getElementById('speechText').textContent = `"${text}"`;
+                                    log(`CORA: "${text}"`, 'cora');
+                                }
+                                stopWaveform();
+                                resolve();
+                            }
+                        }
                         else if (type === 'generating') {
                             // Audio is being generated, keep waveform active
                         }
@@ -1361,8 +1379,11 @@ WHEN RESPONDING:
         function handleAudioReady(id, data) {
             if (!pendingCallbacks[id]) return;
 
-            const { resolve, startTime, text } = pendingCallbacks[id];
+            const { resolve, startTime, text, timeoutId } = pendingCallbacks[id];
             delete pendingCallbacks[id];
+
+            // Clear the timeout since audio arrived
+            if (timeoutId) clearTimeout(timeoutId);
 
             // NOW show the speech text and log - audio is about to play
             if (text) {
@@ -1456,6 +1477,24 @@ WHEN RESPONDING:
                     startTime: Date.now(),
                     text: displayText  // Full text with URLs for log display
                 };
+
+                // Timeout fallback - if Kokoro doesn't respond in 30s, resolve anyway
+                const timeoutId = setTimeout(() => {
+                    if (pendingCallbacks[id]) {
+                        console.warn(`[TTS] Timeout waiting for Kokoro (id ${id}), continuing...`);
+                        const { resolve, text } = pendingCallbacks[id];
+                        delete pendingCallbacks[id];
+                        if (text) {
+                            document.getElementById('speechText').textContent = `"${text}"`;
+                            log(`CORA: "${text}"`, 'cora');
+                        }
+                        stopWaveform();
+                        resolve();
+                    }
+                }, 30000);
+
+                // Store timeout so we can clear it when audio arrives
+                pendingCallbacks[id].timeoutId = timeoutId;
 
                 // Send CLEAN text (no URLs) to TTS
                 kokoroWorker.postMessage({
