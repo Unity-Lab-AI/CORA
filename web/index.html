@@ -1223,13 +1223,13 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // System prompt handles personality - just give data
+                // System prompt handles personality - just give data and length hint
                 if (mode === 'quick') {
                     prompt = `${result}\n\nBe brief.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    prompt = result;
+                    prompt = `${result}\n\nGive your take.`;
                     temperature = 0.8;
                     maxTokens = 500;
                 }
