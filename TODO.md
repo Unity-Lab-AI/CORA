@@ -174,6 +174,13 @@
 
 | Task | Completed | Epic/Story |
 |------|-----------|------------|
+| Rebuild web UI to match desktop boot display | 2025-12-25 | Web UI/Interface |
+| Add phase indicators (○ ◐ ●) matching desktop | 2025-12-25 | Web UI/Interface |
+| Add live system stats panel (zeros for web) | 2025-12-25 | Web UI/Stats |
+| Add web preview notice with GitHub download link | 2025-12-25 | Web UI/UX |
+| Fix Pollinations API validation (image test) | 2025-12-25 | Web UI/API Keys |
+| Add Ollama gate check with retry logic | 2025-12-25 | Web UI/Boot |
+| Expand GitHub Actions workflow to 5 jobs | 2025-12-25 | Web UI/Deployment |
 | Create GitHub Actions workflow for Pages | 2025-12-25 | Web UI/Deployment |
 | Create web/index.html split view UI | 2025-12-25 | Web UI/Interface |
 | Add API key modal with validation | 2025-12-25 | Web UI/API Keys |

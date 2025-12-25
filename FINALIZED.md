@@ -21,23 +21,36 @@
 | Task | Status | Files Modified |
 |------|--------|----------------|
 | Create GitHub Actions workflow for Pages deployment | DONE | `.github/workflows/deploy.yml` |
+| Expand workflow to 5 visual jobs with progress steps | DONE | `.github/workflows/deploy.yml` |
 | Create web UI index.html with console + app split view | DONE | `web/index.html` |
 | Add localStorage API key management | DONE | `web/index.html` |
 | Connect web UI to local Ollama | DONE | `web/index.html` |
 | Add fullscreen/split-screen toggle | DONE | `web/index.html` |
 | Add API key modal with provider hyperlinks | DONE | `web/index.html` |
-| Add API key validation (ping on startup) | DONE | `web/index.html` |
+| Add API key validation (image test for Pollinations) | DONE | `web/index.html` |
+| Rebuild web UI to match desktop boot_display.py | DONE | `web/index.html` |
+| Add phase indicators (○ ◐ ●) matching desktop | DONE | `web/index.html` |
+| Add live system stats panel (shows zeros for web) | DONE | `web/index.html` |
+| Add web preview notice with GitHub download link | DONE | `web/index.html` |
+| Add Ollama gate check with retry and step-by-step guide | DONE | `web/index.html` |
 
 **Details:**
 - Created `web/` directory for GitHub Pages deployment
-- Built F-100 jet style boot console in browser (matches Python boot_sequence.py)
-- Split view: Console (left) + App (right) with toggle buttons
+- Two-column layout matching desktop boot_display.py exactly
+- Left column: Header, waveform canvas, speech text, progress bar, phases, stats
+- Right column: Scrolling boot console log
+- Phase indicators use ○ (pending), ◐ (running), ● (complete) - same as desktop
+- Live system stats panel shows zeros (CPU, MEM, DISK, GPU, VRAM, NET)
+- Service status panel shows Ollama/Pollinations/GitHub status
+- Web preview notice: "System stats unavailable in browser" with GitHub download link
+- Waveform visualization with glow layers (#400060, #8000a0, #ff40ff, #ffc0ff)
 - API key modal for Pollinations + GitHub with "Get your key" hyperlinks
-- Keys validated by pinging APIs on startup
+- Pollinations validation uses actual image generation test (64x64 test image)
+- Ollama gate check blocks boot with 3 retries and step-by-step instructions
+- GitHub Actions workflow has 5 jobs: Validate, Build, Verify, Package, Deploy
 - localStorage persistence for `cora_pollinations_key` and `cora_github_key`
 - Chat interface connects to local Ollama (dolphin-mistral model)
-- App stays locked until boot sequence completes
-- Status bar shows Ollama/Pollinations/GitHub connection status
+- Full cyberpunk/goth theme matching desktop app
 
 **Commit:** `f800d04` - "Add web UI with GitHub Pages deployment"
 
@@ -96,10 +109,10 @@
 | Metric | Value |
 |--------|-------|
 | Total Sessions | 4+ |
-| Tasks Completed | 25+ |
+| Tasks Completed | 32+ |
 | Files Created | 10+ |
 | Files Modified | 50+ |
-| Commits | 10+ |
+| Commits | 11+ |
 
 ---
 

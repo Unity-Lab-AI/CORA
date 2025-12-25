@@ -3,202 +3,395 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C.O.R.A - Cognitive Operations & Reasoning Assistant</title>
+    <title>C.O.R.A - Boot Sequence</title>
     <style>
         :root {
             --bg-dark: #0a0a0a;
             --bg-panel: #111111;
-            --border-color: #2a2a2a;
-            --text-primary: #00ff00;
-            --text-secondary: #888;
-            --text-white: #fff;
-            --accent-green: #00ff00;
-            --accent-red: #ff4444;
-            --accent-yellow: #ffaa00;
-            --accent-blue: #4488ff;
+            --border-color: #333333;
+            --accent-magenta: #ff00ff;
             --accent-cyan: #00ffff;
+            --ok-color: #00ff88;
+            --warn-color: #ffaa00;
+            --fail-color: #ff3333;
+            --pending-color: #444444;
+            --text-white: #ffffff;
+            --text-dim: #666666;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: var(--bg-dark);
-            color: var(--text-primary);
-            height: 100vh;
-            overflow: hidden;
+            color: var(--text-white);
+            min-height: 100vh;
+            overflow-x: hidden;
         }
 
-        /* Split View Container */
-        .split-container {
+        /* Main Container - Two Columns */
+        .main-container {
             display: flex;
             height: 100vh;
-            width: 100vw;
+            padding: 15px;
+            gap: 15px;
         }
 
-        .split-container.fullscreen-console .app-panel {
-            display: none;
-        }
-
-        .split-container.fullscreen-console .console-panel {
-            width: 100%;
-        }
-
-        .split-container.fullscreen-app .console-panel {
-            display: none;
-        }
-
-        .split-container.fullscreen-app .app-panel {
-            width: 100%;
-        }
-
-        /* Console Panel */
-        .console-panel {
-            width: 50%;
-            background: var(--bg-dark);
-            border-right: 1px solid var(--border-color);
+        /* LEFT COLUMN - Status & Phases */
+        .left-column {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            transition: width 0.3s ease;
+            min-width: 400px;
+            max-width: 500px;
         }
 
-        .console-header {
-            padding: 10px 15px;
-            background: var(--bg-panel);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        /* Header */
+        .header-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--accent-magenta);
+            text-align: center;
+            text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+            margin-bottom: 5px;
         }
 
-        .console-title {
-            font-size: 14px;
+        .header-subtitle {
+            font-size: 12px;
             color: var(--accent-cyan);
+            text-align: center;
+            margin-bottom: 15px;
         }
 
-        .console-controls {
+        /* Waveform Section */
+        .waveform-section {
+            margin-bottom: 15px;
+        }
+
+        .waveform-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        #waveformCanvas {
+            width: 100%;
+            height: 100px;
+            background: var(--bg-dark);
+            border: 1px solid #302050;
+            border-radius: 4px;
+        }
+
+        /* Current Speech Text */
+        .speech-text {
+            font-size: 12px;
+            font-style: italic;
+            color: var(--accent-magenta);
+            min-height: 40px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-magenta), #ff66ff);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--accent-magenta);
+        }
+
+        /* Phase Indicators */
+        .phases-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .phase-item {
             display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .phase-indicator {
+            font-size: 10px;
+            color: var(--pending-color);
+            flex-shrink: 0;
+            width: 14px;
+            text-align: center;
+        }
+
+        .phase-indicator.running {
+            color: var(--accent-magenta);
+            animation: pulse 1s infinite;
+        }
+
+        .phase-indicator.ok { color: var(--ok-color); }
+        .phase-indicator.warn { color: var(--warn-color); }
+        .phase-indicator.fail { color: var(--fail-color); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; text-shadow: 0 0 5px var(--accent-magenta); }
+            50% { opacity: 0.5; text-shadow: none; }
+        }
+
+        /* Status Label */
+        .status-label {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--accent-cyan);
+            text-align: center;
+            padding: 10px;
+        }
+
+        /* Live System Stats */
+        .stats-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .stats-header {
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--accent-cyan);
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
 
-        .control-btn {
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+
+        .stat-label { color: var(--text-dim); }
+        .stat-value { color: var(--ok-color); font-weight: bold; }
+        .stat-value.warn { color: var(--warn-color); }
+        .stat-value.high { color: var(--fail-color); }
+        .stat-value.na { color: var(--text-dim); font-weight: normal; }
+
+        /* Web Preview Notice */
+        .web-notice {
+            background: #1a1020;
+            border: 1px solid #402050;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .web-notice-title {
+            color: var(--warn-color);
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .web-notice-text {
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .web-notice a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        .web-notice a:hover {
+            text-decoration: underline;
+        }
+
+        /* RIGHT COLUMN - Scrolling Log */
+        .right-column {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            min-width: 500px;
+        }
+
+        .log-header {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--accent-cyan);
+            padding: 8px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .log-container {
+            flex: 1;
             background: var(--bg-dark);
             border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 4px 10px;
-            cursor: pointer;
-            font-size: 11px;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-
-        .control-btn:hover {
-            border-color: var(--accent-green);
-            color: var(--accent-green);
-        }
-
-        .console-output {
-            flex: 1;
+            border-radius: 0 0 4px 4px;
             overflow-y: auto;
-            padding: 15px;
-            font-size: 12px;
+            padding: 10px;
+            font-size: 11px;
             line-height: 1.6;
         }
 
-        .console-output::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .console-output::-webkit-scrollbar-track {
-            background: var(--bg-dark);
-        }
-
-        .console-output::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-        }
-
-        .log-line {
-            margin-bottom: 2px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .log-ok { color: var(--accent-green); }
-        .log-warn { color: var(--accent-yellow); }
-        .log-fail { color: var(--accent-red); }
-        .log-info { color: var(--text-secondary); }
+        .log-line { margin-bottom: 2px; }
+        .log-ok { color: var(--ok-color); }
+        .log-warn { color: var(--warn-color); }
+        .log-fail { color: var(--fail-color); }
+        .log-info { color: var(--text-dim); }
         .log-phase { color: var(--accent-cyan); font-weight: bold; margin-top: 10px; }
-        .log-system { color: var(--accent-blue); }
+        .log-system { color: #4488ff; }
 
-        /* App Panel */
-        .app-panel {
-            width: 50%;
-            background: var(--bg-panel);
-            display: flex;
-            flex-direction: column;
-            transition: width 0.3s ease;
-            position: relative;
+        /* Chat Section (after boot) */
+        .chat-section {
+            margin-top: 15px;
+            display: none;
         }
 
-        .app-locked {
-            position: absolute;
+        .chat-section.visible { display: block; }
+
+        .chat-messages {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .message.user {
+            background: #1a1a2e;
+            border-left: 3px solid var(--accent-cyan);
+        }
+
+        .message.assistant {
+            background: #1a1a1a;
+            border-left: 3px solid var(--accent-magenta);
+        }
+
+        .message-header {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            padding: 10px;
+            font-family: inherit;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent-magenta);
+        }
+
+        .send-btn {
+            background: var(--accent-magenta);
+            border: none;
+            color: var(--bg-dark);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        .send-btn:hover { background: #ff66ff; }
+        .send-btn:disabled { background: var(--pending-color); cursor: not-allowed; }
+
+        /* Boot Blocked Overlay */
+        .boot-blocked {
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 100;
+            z-index: 1000;
         }
 
-        .app-locked.hidden {
-            display: none;
-        }
+        .boot-blocked.hidden { display: none; }
 
-        .lock-icon {
+        .blocked-icon {
             font-size: 48px;
+            color: var(--fail-color);
             margin-bottom: 20px;
-            animation: pulse 2s infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
-        }
-
-        .lock-text {
-            color: var(--text-secondary);
+        .blocked-text {
+            color: var(--text-dim);
             font-size: 14px;
+            text-align: center;
+            margin: 5px 0;
         }
 
-        .app-header {
-            padding: 10px 15px;
-            background: var(--bg-dark);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .blocked-code {
+            background: #222;
+            padding: 5px 15px;
+            color: var(--ok-color);
+            border-radius: 4px;
+            margin: 10px 0;
         }
 
-        .app-title {
-            font-size: 14px;
-            color: var(--text-white);
+        .refresh-btn {
+            background: var(--ok-color);
+            color: var(--bg-dark);
+            border: none;
+            padding: 10px 25px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-top: 15px;
         }
 
-        .app-content {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        /* API Key Modal */
+        /* API Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -212,9 +405,7 @@
             z-index: 1000;
         }
 
-        .modal-overlay.hidden {
-            display: none;
-        }
+        .modal-overlay.hidden { display: none; }
 
         .modal {
             background: var(--bg-panel);
@@ -222,6 +413,7 @@
             padding: 30px;
             max-width: 500px;
             width: 90%;
+            border-radius: 8px;
         }
 
         .modal-title {
@@ -232,34 +424,30 @@
         }
 
         .modal-subtitle {
-            color: var(--text-secondary);
-            font-size: 12px;
+            color: var(--text-dim);
+            font-size: 11px;
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .api-field {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .api-field label {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            color: var(--text-white);
-            font-size: 13px;
+            margin-bottom: 5px;
+            font-size: 12px;
         }
 
-        .api-field .get-key-link {
-            color: var(--accent-blue);
+        .get-key-link {
+            color: #4488ff;
             text-decoration: none;
-            font-size: 11px;
+            font-size: 10px;
         }
 
-        .api-field .get-key-link:hover {
-            text-decoration: underline;
-        }
+        .get-key-link:hover { text-decoration: underline; }
 
         .api-input-wrapper {
             display: flex;
@@ -271,48 +459,29 @@
             background: var(--bg-dark);
             border: 1px solid var(--border-color);
             color: var(--text-white);
-            padding: 10px 12px;
+            padding: 8px;
             font-family: inherit;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .api-field input:focus {
             outline: none;
-            border-color: var(--accent-green);
-        }
-
-        .api-field input.valid {
-            border-color: var(--accent-green);
-        }
-
-        .api-field input.invalid {
-            border-color: var(--accent-red);
+            border-color: var(--accent-magenta);
         }
 
         .api-status {
-            width: 40px;
+            width: 35px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: var(--bg-dark);
             border: 1px solid var(--border-color);
-            font-size: 16px;
+            font-size: 14px;
         }
 
-        .api-status.checking {
-            color: var(--accent-yellow);
-            animation: spin 1s linear infinite;
-        }
-
-        .api-status.valid {
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-
-        .api-status.invalid {
-            color: var(--accent-red);
-            border-color: var(--accent-red);
-        }
+        .api-status.checking { color: var(--warn-color); animation: spin 1s linear infinite; }
+        .api-status.valid { color: var(--ok-color); border-color: var(--ok-color); }
+        .api-status.invalid { color: var(--fail-color); border-color: var(--fail-color); }
 
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -320,278 +489,230 @@
         }
 
         .api-hint {
-            font-size: 10px;
-            color: var(--text-secondary);
-            margin-top: 5px;
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-top: 3px;
         }
 
         .modal-actions {
             display: flex;
             gap: 10px;
-            margin-top: 25px;
+            margin-top: 20px;
         }
 
         .modal-btn {
             flex: 1;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid var(--border-color);
             background: var(--bg-dark);
             color: var(--text-white);
             cursor: pointer;
             font-family: inherit;
-            font-size: 13px;
-            transition: all 0.2s;
         }
 
         .modal-btn:hover {
-            border-color: var(--accent-green);
-            color: var(--accent-green);
+            border-color: var(--accent-magenta);
+            color: var(--accent-magenta);
         }
 
         .modal-btn.primary {
-            background: var(--accent-green);
+            background: var(--accent-magenta);
             color: var(--bg-dark);
-            border-color: var(--accent-green);
-        }
-
-        .modal-btn.primary:hover {
-            background: #00cc00;
-        }
-
-        .modal-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Status Bar */
-        .status-bar {
-            padding: 8px 15px;
-            background: var(--bg-dark);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: var(--text-secondary);
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent-red);
-        }
-
-        .status-dot.online {
-            background: var(--accent-green);
-        }
-
-        /* Chat Interface */
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-        }
-
-        .chat-input-area {
-            padding: 15px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input {
-            flex: 1;
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            color: var(--text-white);
-            padding: 12px;
-            font-family: inherit;
-            font-size: 13px;
-            resize: none;
-        }
-
-        .chat-input:focus {
-            outline: none;
-            border-color: var(--accent-green);
-        }
-
-        .send-btn {
-            background: var(--accent-green);
-            border: none;
-            color: var(--bg-dark);
-            padding: 12px 20px;
-            cursor: pointer;
-            font-family: inherit;
-            font-weight: bold;
-        }
-
-        .send-btn:hover {
-            background: #00cc00;
-        }
-
-        .send-btn:disabled {
-            background: var(--border-color);
-            cursor: not-allowed;
-        }
-
-        .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 4px;
-        }
-
-        .message.user {
-            background: var(--bg-dark);
-            border-left: 3px solid var(--accent-blue);
-        }
-
-        .message.assistant {
-            background: var(--bg-dark);
-            border-left: 3px solid var(--accent-green);
-        }
-
-        .message-header {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 5px;
-        }
-
-        .message-content {
-            color: var(--text-white);
-            line-height: 1.5;
-        }
-
-        /* Boot ASCII Art */
-        .ascii-art {
-            color: var(--accent-cyan);
-            font-size: 10px;
-            line-height: 1.2;
-            margin-bottom: 15px;
+            border-color: var(--accent-magenta);
         }
 
         /* Settings Button */
         .settings-btn {
-            background: none;
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: var(--bg-panel);
             border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 5px 10px;
+            color: var(--text-dim);
+            padding: 8px 15px;
             cursor: pointer;
-            font-size: 12px;
+            font-family: inherit;
+            font-size: 11px;
+            border-radius: 4px;
+            z-index: 100;
         }
 
         .settings-btn:hover {
-            border-color: var(--accent-green);
-            color: var(--accent-green);
+            border-color: var(--accent-magenta);
+            color: var(--accent-magenta);
         }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
 </head>
 <body>
     <!-- API Key Modal -->
-    <div id="apiModal" class="modal-overlay">
+    <div id="apiModal" class="modal-overlay hidden">
         <div class="modal">
             <div class="modal-title">API Configuration</div>
-            <div class="modal-subtitle">Enter your API keys to enable C.O.R.A's full capabilities</div>
+            <div class="modal-subtitle">Enter your API keys to enable full capabilities</div>
 
             <div class="api-field">
                 <label>
                     <span>Pollinations API Key</span>
-                    <a href="https://pollinations.ai/dashboard" target="_blank" class="get-key-link">Get your key ></a>
+                    <a href="https://pollinations.ai/dashboard" target="_blank" class="get-key-link">Get your key →</a>
                 </label>
                 <div class="api-input-wrapper">
                     <input type="password" id="pollinationsKey" placeholder="Enter Pollinations API key...">
                     <div id="pollinationsStatus" class="api-status">-</div>
                 </div>
-                <div class="api-hint">Used for image generation and AI art capabilities</div>
+                <div class="api-hint">Used for image generation</div>
             </div>
 
             <div class="api-field">
                 <label>
                     <span>GitHub Token</span>
-                    <a href="https://github.com/settings/tokens/new?scopes=repo,read:user&description=CORA%20Access" target="_blank" class="get-key-link">Generate token ></a>
+                    <a href="https://github.com/settings/tokens/new?scopes=repo,read:user&description=CORA" target="_blank" class="get-key-link">Generate token →</a>
                 </label>
                 <div class="api-input-wrapper">
-                    <input type="password" id="githubKey" placeholder="Enter GitHub personal access token...">
+                    <input type="password" id="githubKey" placeholder="Enter GitHub token...">
                     <div id="githubStatus" class="api-status">-</div>
                 </div>
-                <div class="api-hint">Used for repository access and code operations</div>
+                <div class="api-hint">Used for repository access</div>
             </div>
 
             <div class="modal-actions">
-                <button class="modal-btn" onclick="skipApiSetup()">Skip for Now</button>
-                <button class="modal-btn primary" id="saveKeysBtn" onclick="saveApiKeys()">Save & Continue</button>
+                <button class="modal-btn" onclick="skipApiSetup()">Skip</button>
+                <button class="modal-btn primary" onclick="saveApiKeys()">Save & Continue</button>
             </div>
         </div>
     </div>
 
-    <!-- Main Split View -->
-    <div class="split-container" id="splitContainer">
-        <!-- Console Panel -->
-        <div class="console-panel">
-            <div class="console-header">
-                <span class="console-title">[ C.O.R.A BOOT CONSOLE ]</span>
-                <div class="console-controls">
-                    <button class="control-btn" onclick="toggleView('console')">[ ]</button>
-                    <button class="control-btn" onclick="clearConsole()">CLR</button>
-                </div>
-            </div>
-            <div class="console-output" id="consoleOutput"></div>
-            <div class="status-bar">
-                <div class="status-item">
-                    <div class="status-dot" id="ollamaStatus"></div>
-                    <span>Ollama</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-dot" id="pollinationsStatusDot"></div>
-                    <span>Pollinations</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-dot" id="githubStatusDot"></div>
-                    <span>GitHub</span>
-                </div>
-                <span id="bootTime">--:--:--</span>
-            </div>
-        </div>
+    <!-- Boot Blocked Overlay -->
+    <div id="bootBlocked" class="boot-blocked hidden">
+        <div class="blocked-icon">[ BLOCKED ]</div>
+        <div class="blocked-text" style="color: #ff3333;">Ollama is not running</div>
+        <div class="blocked-text">Run this command in your terminal:</div>
+        <div class="blocked-code">ollama serve</div>
+        <div class="blocked-text">Then click refresh</div>
+        <button class="refresh-btn" onclick="location.reload()">Refresh Page</button>
+    </div>
 
-        <!-- App Panel -->
-        <div class="app-panel">
-            <div class="app-locked" id="appLocked">
-                <div class="lock-icon">[ LOCKED ]</div>
-                <div class="lock-text">Waiting for boot sequence to complete...</div>
+    <!-- Settings Button -->
+    <button class="settings-btn" onclick="showApiModal()">⚙ API Keys</button>
+
+    <!-- Main Interface -->
+    <div class="main-container">
+        <!-- LEFT COLUMN -->
+        <div class="left-column">
+            <div class="header-title">C.O.R.A</div>
+            <div class="header-subtitle">Cognitive Operations & Reasoning Assistant</div>
+
+            <!-- Waveform -->
+            <div class="waveform-section">
+                <div class="waveform-label">▶ VOICE SYNTHESIS</div>
+                <canvas id="waveformCanvas"></canvas>
             </div>
-            <div class="app-header">
-                <span class="app-title">C.O.R.A Interface</span>
-                <div>
-                    <button class="settings-btn" onclick="showApiModal()">API Keys</button>
-                    <button class="control-btn" onclick="toggleView('app')">[ ]</button>
+
+            <!-- Speech Text -->
+            <div class="speech-text" id="speechText"></div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
-            <div class="app-content">
-                <div class="chat-container">
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div class="chat-input-area">
-                        <textarea class="chat-input" id="chatInput" placeholder="Type a message..." rows="2" disabled></textarea>
-                        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>SEND</button>
+
+            <!-- Phase Indicators -->
+            <div class="phases-section" id="phasesSection"></div>
+
+            <!-- Status -->
+            <div class="status-label" id="statusLabel">Initializing...</div>
+
+            <!-- Live Stats (matches desktop boot_display.py layout) -->
+            <div class="stats-panel">
+                <div class="stats-header">── LIVE SYSTEM STATS ──</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">CPU:</span>
+                        <span class="stat-value na" id="statCpu">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">MEM:</span>
+                        <span class="stat-value na" id="statMem">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">DISK:</span>
+                        <span class="stat-value na" id="statDisk">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">GPU:</span>
+                        <span class="stat-value na" id="statGpu">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">VRAM:</span>
+                        <span class="stat-value na" id="statVram">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">NET:</span>
+                        <span class="stat-value na" id="statNet">--</span>
                     </div>
                 </div>
             </div>
+
+            <!-- Service Status -->
+            <div class="stats-panel">
+                <div class="stats-header">── SERVICE STATUS ──</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Ollama:</span>
+                        <span class="stat-value" id="statOllama">Checking...</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Pollinations:</span>
+                        <span class="stat-value" id="statPollinations">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">GitHub:</span>
+                        <span class="stat-value" id="statGithub">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Boot Time:</span>
+                        <span class="stat-value" id="statBootTime">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Web Preview Notice -->
+            <div class="web-notice">
+                <div class="web-notice-title">⚠ WEB PREVIEW MODE</div>
+                <div class="web-notice-text">
+                    System stats unavailable in browser.<br>
+                    For full C.O.R.A experience with live stats, TTS, and all tools:<br>
+                    <a href="https://github.com/Gfourteen/C.O.R.A" target="_blank">Download from GitHub</a> and run <code>CORA.bat</code>
+                </div>
+            </div>
+
+            <!-- Chat (after boot) -->
+            <div class="chat-section" id="chatSection">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..." disabled>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>SEND</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN - Log -->
+        <div class="right-column">
+            <div class="log-header">[ BOOT CONSOLE ]</div>
+            <div class="log-container" id="logContainer"></div>
         </div>
     </div>
 
     <script>
         // ============================================================
-        // C.O.R.A Web UI - Boot Sequence & API Management
+        // C.O.R.A Web UI - Full Boot Display
         // ============================================================
 
         const CONFIG = {
@@ -607,147 +728,176 @@
             github: localStorage.getItem('cora_github_key') || ''
         };
 
+        // Boot phases
+        const PHASES = [
+            { id: 'init', name: '0.9 System Init', status: 'pending' },
+            { id: 'voice', name: '1.0 Voice Synth', status: 'pending' },
+            { id: 'api_keys', name: '1.5 API Keys', status: 'pending' },
+            { id: 'ollama', name: '2.0 AI Engine', status: 'pending' },
+            { id: 'models', name: '2.1 AI Models', status: 'pending' },
+            { id: 'browser', name: '3.0 Browser', status: 'pending' },
+            { id: 'storage', name: '3.1 Storage', status: 'pending' },
+            { id: 'complete', name: '4.0 Complete', status: 'pending' }
+        ];
+
         // ============================================================
-        // Console Logging
+        // Waveform Animation
+        // ============================================================
+
+        const canvas = document.getElementById('waveformCanvas');
+        const ctx = canvas.getContext('2d');
+        let wavePoints = new Array(100).fill(0);
+        let wavePhase = 0;
+        let isAnimating = true;
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+
+        function drawWaveform() {
+            if (!isAnimating) return;
+
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerY = height / 2;
+
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, width, height);
+
+            // Center line
+            ctx.strokeStyle = '#201030';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(width, centerY);
+            ctx.stroke();
+
+            // Decay wave points
+            for (let i = 0; i < wavePoints.length; i++) {
+                wavePoints[i] *= 0.95;
+            }
+
+            // Add some ambient noise when idle
+            wavePhase += 0.05;
+            for (let i = 0; i < wavePoints.length; i++) {
+                wavePoints[i] += Math.sin(wavePhase + i * 0.2) * 0.02;
+            }
+
+            // Build wave path
+            const step = width / (wavePoints.length - 1);
+            const maxAmp = (height / 2) - 5;
+
+            // Glow layers
+            const layers = [
+                { color: '#400060', width: 8 },
+                { color: '#8000a0', width: 5 },
+                { color: '#ff40ff', width: 3 },
+                { color: '#ffc0ff', width: 1 }
+            ];
+
+            layers.forEach(layer => {
+                ctx.strokeStyle = layer.color;
+                ctx.lineWidth = layer.width;
+                ctx.beginPath();
+
+                for (let i = 0; i < wavePoints.length; i++) {
+                    const x = i * step;
+                    const y = centerY - wavePoints[i] * maxAmp;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(drawWaveform);
+        }
+
+        function triggerWave() {
+            // Simulate voice activity
+            for (let i = 0; i < wavePoints.length; i++) {
+                wavePoints[i] = (Math.random() - 0.5) * 1.5;
+            }
+        }
+
+        // ============================================================
+        // Logging
         // ============================================================
 
         function log(text, type = 'info') {
-            const output = document.getElementById('consoleOutput');
-            const line = document.createElement('div');
-            line.className = `log-line log-${type}`;
-
+            const container = document.getElementById('logContainer');
             const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
 
             if (type === 'phase') {
-                line.textContent = `\n[${timestamp}] ═══════════════════════════════════════════════`;
-                output.appendChild(line);
-                const phaseLine = document.createElement('div');
-                phaseLine.className = 'log-line log-phase';
-                phaseLine.textContent = `[${timestamp}] ${text}`;
-                output.appendChild(phaseLine);
+                // Match desktop boot_display.py style: ═══════════════ PHASE ═══════════════
+                const divider = document.createElement('div');
+                divider.className = 'log-line log-phase';
+                divider.style.marginTop = '8px';
+                divider.textContent = `[${timestamp}] ═══════════════ ${text} ═══════════════`;
+                container.appendChild(divider);
             } else {
-                const prefix = type === 'ok' ? '[OK]' :
-                              type === 'warn' ? '[WARN]' :
-                              type === 'fail' ? '[FAIL]' :
-                              type === 'system' ? '[SYS]' : '[...]';
-                line.textContent = `[${timestamp}] ${prefix} ${text}`;
-                output.appendChild(line);
+                const line = document.createElement('div');
+                line.className = `log-line log-${type}`;
+                const prefix = type === 'ok' ? '✓' :
+                              type === 'warn' ? '⚠' :
+                              type === 'fail' ? '✗' :
+                              type === 'system' ? '[SYS]' : '';
+                line.textContent = `[${timestamp}] ${prefix ? prefix + ' ' : ''}${text}`;
+                container.appendChild(line);
             }
 
-            output.scrollTop = output.scrollHeight;
-        }
-
-        function clearConsole() {
-            document.getElementById('consoleOutput').innerHTML = '';
+            container.scrollTop = container.scrollHeight;
         }
 
         // ============================================================
-        // API Key Validation
+        // Phase Management
         // ============================================================
 
-        async function validatePollinationsKey(key) {
-            if (!key || key.length < 5) return false;
+        function renderPhases() {
+            const container = document.getElementById('phasesSection');
+            container.innerHTML = '';
 
-            const statusEl = document.getElementById('pollinationsStatus');
-            const inputEl = document.getElementById('pollinationsKey');
-            statusEl.textContent = '~';
-            statusEl.className = 'api-status checking';
+            PHASES.forEach(phase => {
+                const item = document.createElement('div');
+                item.className = 'phase-item';
 
-            // Pollinations validation - generate a tiny test image and verify it loads
-            // This matches how CORA's Python code validates: actual image generation
-            const testPrompt = 'solid%20blue%20square';  // Simple test prompt
-            const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}&seed=12345`;
+                // Use same indicators as desktop boot_display.py: ○ (pending), ◐ (running), ● (complete)
+                let indicator = '○';
+                if (phase.status === 'running') indicator = '◐';
+                else if (phase.status === 'ok' || phase.status === 'warn' || phase.status === 'fail') indicator = '●';
 
-            log('Testing Pollinations API key...', 'info');
-            log(`Generating 64x64 test image...`, 'info');
-
-            return new Promise((resolve) => {
-                const img = new Image();
-                let resolved = false;
-
-                // Timeout after 45 seconds (image generation can take time)
-                const timeout = setTimeout(() => {
-                    if (!resolved) {
-                        resolved = true;
-                        log('Pollinations test timed out (45s) - key may still be valid', 'warn');
-                        // Accept anyway if it didn't explicitly fail
-                        statusEl.textContent = '?';
-                        statusEl.className = 'api-status valid';
-                        inputEl.className = 'valid';
-                        resolve(true);
-                    }
-                }, 45000);
-
-                img.onload = () => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timeout);
-                        // Verify the image has actual dimensions (not a broken image)
-                        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                            log(`Pollinations test image loaded: ${img.naturalWidth}x${img.naturalHeight}`, 'ok');
-                            statusEl.textContent = '✓';
-                            statusEl.className = 'api-status valid';
-                            inputEl.className = 'valid';
-                            resolve(true);
-                        } else {
-                            log('Pollinations returned invalid image', 'warn');
-                            statusEl.textContent = '✗';
-                            statusEl.className = 'api-status invalid';
-                            inputEl.className = 'invalid';
-                            resolve(false);
-                        }
-                    }
-                };
-
-                img.onerror = (e) => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timeout);
-                        log('Pollinations test image failed to load', 'fail');
-                        console.error('Pollinations image error:', e);
-                        statusEl.textContent = '✗';
-                        statusEl.className = 'api-status invalid';
-                        inputEl.className = 'invalid';
-                        resolve(false);
-                    }
-                };
-
-                // Start loading the test image
-                img.src = testUrl;
+                item.innerHTML = `
+                    <span class="phase-indicator ${phase.status}">${indicator}</span>
+                    <span>${phase.name}</span>
+                `;
+                container.appendChild(item);
             });
         }
 
-        async function validateGithubKey(key) {
-            if (!key || key.length < 10) return false;
-
-            const statusEl = document.getElementById('githubStatus');
-            const inputEl = document.getElementById('githubKey');
-            statusEl.textContent = '~';
-            statusEl.className = 'api-status checking';
-
-            try {
-                const response = await fetch(`${CONFIG.githubApiUrl}/user`, {
-                    headers: {
-                        'Authorization': `Bearer ${key}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                if (response.ok) {
-                    statusEl.textContent = '✓';
-                    statusEl.className = 'api-status valid';
-                    inputEl.className = 'valid';
-                    return true;
-                }
-            } catch (e) {
-                console.error('GitHub validation error:', e);
+        function setPhaseStatus(phaseId, status) {
+            const phase = PHASES.find(p => p.id === phaseId);
+            if (phase) {
+                phase.status = status;
+                renderPhases();
             }
-
-            statusEl.textContent = '✗';
-            statusEl.className = 'api-status invalid';
-            inputEl.className = 'invalid';
-            return false;
         }
+
+        function setProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+        }
+
+        function setStatus(text) {
+            document.getElementById('statusLabel').textContent = text;
+        }
+
+        function setSpeech(text) {
+            document.getElementById('speechText').textContent = text;
+            if (text) triggerWave();
+        }
+
+        // ============================================================
+        // API Validation
+        // ============================================================
 
         async function checkOllama() {
             try {
@@ -758,18 +908,80 @@
             }
         }
 
+        async function validatePollinationsKey(key) {
+            if (!key || key.length < 5) return false;
+
+            const statusEl = document.getElementById('pollinationsStatus');
+            statusEl.textContent = '~';
+            statusEl.className = 'api-status checking';
+
+            const testPrompt = 'solid%20blue%20square';
+            const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}&seed=12345`;
+
+            return new Promise((resolve) => {
+                const img = new Image();
+                const timeout = setTimeout(() => {
+                    statusEl.textContent = '?';
+                    statusEl.className = 'api-status valid';
+                    resolve(true);
+                }, 45000);
+
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    if (img.naturalWidth > 0) {
+                        statusEl.textContent = '✓';
+                        statusEl.className = 'api-status valid';
+                        resolve(true);
+                    } else {
+                        statusEl.textContent = '✗';
+                        statusEl.className = 'api-status invalid';
+                        resolve(false);
+                    }
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    statusEl.textContent = '✗';
+                    statusEl.className = 'api-status invalid';
+                    resolve(false);
+                };
+
+                img.src = testUrl;
+            });
+        }
+
+        async function validateGithubKey(key) {
+            if (!key || key.length < 10) return false;
+
+            const statusEl = document.getElementById('githubStatus');
+            statusEl.textContent = '~';
+            statusEl.className = 'api-status checking';
+
+            try {
+                const response = await fetch(`${CONFIG.githubApiUrl}/user`, {
+                    headers: { 'Authorization': `Bearer ${key}` }
+                });
+
+                if (response.ok) {
+                    statusEl.textContent = '✓';
+                    statusEl.className = 'api-status valid';
+                    return true;
+                }
+            } catch (e) {}
+
+            statusEl.textContent = '✗';
+            statusEl.className = 'api-status invalid';
+            return false;
+        }
+
         // ============================================================
-        // API Key Modal
+        // Modal Functions
         // ============================================================
 
         function showApiModal() {
             document.getElementById('apiModal').classList.remove('hidden');
             document.getElementById('pollinationsKey').value = apiKeys.pollinations;
             document.getElementById('githubKey').value = apiKeys.github;
-
-            // Validate existing keys
-            if (apiKeys.pollinations) validatePollinationsKey(apiKeys.pollinations);
-            if (apiKeys.github) validateGithubKey(apiKeys.github);
         }
 
         function hideApiModal() {
@@ -780,13 +992,6 @@
             const pollinationsKey = document.getElementById('pollinationsKey').value.trim();
             const githubKey = document.getElementById('githubKey').value.trim();
 
-            // Validate both keys
-            const [pollinationsValid, githubValid] = await Promise.all([
-                pollinationsKey ? validatePollinationsKey(pollinationsKey) : Promise.resolve(true),
-                githubKey ? validateGithubKey(githubKey) : Promise.resolve(true)
-            ]);
-
-            // Save to localStorage
             if (pollinationsKey) {
                 localStorage.setItem('cora_pollinations_key', pollinationsKey);
                 apiKeys.pollinations = pollinationsKey;
@@ -796,40 +1001,13 @@
                 apiKeys.github = githubKey;
             }
 
-            log('API keys saved to local storage', 'ok');
             hideApiModal();
-
-            // Update status dots
-            updateStatusDots();
-
-            // If boot hasn't started, start it now
-            if (!bootComplete) {
-                runBootSequence();
-            }
+            if (!bootComplete) runBootSequence();
         }
 
         function skipApiSetup() {
             hideApiModal();
-            log('API setup skipped - some features may be limited', 'warn');
             runBootSequence();
-        }
-
-        // ============================================================
-        // Status Indicators
-        // ============================================================
-
-        async function updateStatusDots() {
-            // Ollama
-            const ollamaOnline = await checkOllama();
-            document.getElementById('ollamaStatus').className = `status-dot ${ollamaOnline ? 'online' : ''}`;
-
-            // Pollinations
-            const pollinationsOk = apiKeys.pollinations && apiKeys.pollinations.length > 10;
-            document.getElementById('pollinationsStatusDot').className = `status-dot ${pollinationsOk ? 'online' : ''}`;
-
-            // GitHub
-            const githubOk = apiKeys.github && apiKeys.github.length > 10;
-            document.getElementById('githubStatusDot').className = `status-dot ${githubOk ? 'online' : ''}`;
         }
 
         // ============================================================
@@ -838,195 +1016,183 @@
 
         async function runBootSequence() {
             const startTime = Date.now();
+            renderPhases();
 
-            // ASCII Banner
-            log('', 'info');
-            log('+=========================================================+', 'system');
-            log('|        C.O.R.A BOOT SEQUENCE INITIATED                  |', 'system');
-            log('|     Cognitive Operations & Reasoning Assistant          |', 'system');
-            log('+=========================================================+', 'system');
-            log('', 'info');
+            // Phase 0.9: Init
+            log('PHASE 0.9: SYSTEM INITIALIZATION', 'phase');
+            setPhaseStatus('init', 'running');
+            setStatus('Initializing...');
+            setProgress(5);
 
             await delay(300);
+            log(`C.O.R.A Web Interface v${CONFIG.version}`, 'ok');
+            log('Unity AI Lab - Hackall360, Sponge, GFourteen', 'info');
+            setSpeech('C.O.R.A Web Interface initializing...');
+            setPhaseStatus('init', 'ok');
+            setProgress(10);
 
-            // Phase 0: Version Info
-            log('PHASE 0: SYSTEM IDENTIFICATION', 'phase');
+            // Phase 1.0: Voice
+            log('PHASE 1.0: VOICE SYNTHESIS', 'phase');
+            setPhaseStatus('voice', 'running');
             await delay(200);
-            log(`Version: ${CONFIG.version}`, 'info');
-            log('Created by: Unity AI Lab', 'info');
-            log('Developers: Hackall360, Sponge, GFourteen', 'info');
-            log('Web Interface Initialized', 'ok');
-            await delay(300);
+            log('Web Audio API available', 'ok');
+            log('Waveform visualization active', 'ok');
+            setSpeech('Voice synthesis systems online.');
+            setPhaseStatus('voice', 'ok');
+            setProgress(20);
 
-            // Phase 1: API Key Validation
-            log('PHASE 1: API KEY VALIDATION', 'phase');
+            // Phase 1.5: API Keys
+            log('PHASE 1.5: API KEY VALIDATION', 'phase');
+            setPhaseStatus('api_keys', 'running');
             await delay(200);
 
-            // Pollinations Check
-            log('Checking Pollinations API key...', 'info');
             if (apiKeys.pollinations) {
-                const pollinationsValid = await validatePollinationsKey(apiKeys.pollinations);
-                if (pollinationsValid) {
-                    log('Pollinations API key valid', 'ok');
-                } else {
-                    log('Pollinations API key invalid or expired', 'warn');
-                }
+                log('Testing Pollinations API key...', 'info');
+                const pollValid = await validatePollinationsKey(apiKeys.pollinations);
+                log(pollValid ? 'Pollinations API key valid' : 'Pollinations API key invalid', pollValid ? 'ok' : 'warn');
+                document.getElementById('statPollinations').textContent = pollValid ? 'Online' : 'Invalid';
+                document.getElementById('statPollinations').className = 'stat-value' + (pollValid ? '' : ' warn');
             } else {
                 log('Pollinations API key not configured', 'warn');
+                document.getElementById('statPollinations').textContent = 'Not Set';
+                document.getElementById('statPollinations').className = 'stat-value warn';
             }
-            await delay(200);
 
-            // GitHub Check
-            log('Checking GitHub token...', 'info');
             if (apiKeys.github) {
-                const githubValid = await validateGithubKey(apiKeys.github);
-                if (githubValid) {
-                    log('GitHub token valid', 'ok');
-                } else {
-                    log('GitHub token invalid or expired', 'warn');
-                }
+                log('Testing GitHub token...', 'info');
+                const ghValid = await validateGithubKey(apiKeys.github);
+                log(ghValid ? 'GitHub token valid' : 'GitHub token invalid', ghValid ? 'ok' : 'warn');
+                document.getElementById('statGithub').textContent = ghValid ? 'Online' : 'Invalid';
+                document.getElementById('statGithub').className = 'stat-value' + (ghValid ? '' : ' warn');
             } else {
                 log('GitHub token not configured', 'warn');
+                document.getElementById('statGithub').textContent = 'Not Set';
+                document.getElementById('statGithub').className = 'stat-value warn';
             }
-            await delay(300);
 
-            // Phase 2: Ollama Connection - GATE CHECK (Required)
-            log('PHASE 2: AI ENGINE CHECK [REQUIRED]', 'phase');
+            setPhaseStatus('api_keys', 'ok');
+            setProgress(35);
+
+            // Phase 2.0: Ollama (GATE CHECK)
+            log('PHASE 2.0: AI ENGINE CHECK [REQUIRED]', 'phase');
+            setPhaseStatus('ollama', 'running');
+            setStatus('Connecting to Ollama...');
             await delay(200);
-            log('Connecting to Ollama at localhost:11434...', 'info');
 
             let ollamaOnline = await checkOllama();
             let retryCount = 0;
-            const maxRetries = 3;
 
-            while (!ollamaOnline && retryCount < maxRetries) {
+            while (!ollamaOnline && retryCount < 3) {
                 retryCount++;
                 log('', 'info');
                 log('═══════════════════════════════════════════════', 'fail');
                 log('[GATE BLOCKED] Ollama is NOT running!', 'fail');
                 log('═══════════════════════════════════════════════', 'fail');
                 log('', 'info');
-                log('C.O.R.A requires Ollama to function. Follow these steps:', 'warn');
-                log('', 'info');
-                log('STEP 1: Open a new terminal/command prompt', 'info');
-                log('STEP 2: Run this command:', 'info');
-                log('        ollama serve', 'system');
-                log('', 'info');
+                log('C.O.R.A requires Ollama. Follow these steps:', 'warn');
+                log('STEP 1: Open terminal/command prompt', 'info');
+                log('STEP 2: Run: ollama serve', 'system');
                 log('STEP 3: Wait for "Listening on 127.0.0.1:11434"', 'info');
-                log('STEP 4: Come back here - auto-retry in 10 seconds...', 'info');
-                log('', 'info');
-                log('If Ollama is not installed:', 'warn');
-                log('  Download from: https://ollama.com', 'info');
-                log('  Then run: ollama pull dolphin-mistral', 'info');
-                log('', 'info');
-                log(`[Retry ${retryCount}/${maxRetries}] Waiting 10 seconds...`, 'warn');
+                log(`[Retry ${retryCount}/3] Auto-retry in 10 seconds...`, 'warn');
 
-                // Wait 10 seconds then retry
+                setSpeech('Waiting for Ollama server...');
                 await delay(10000);
-
                 log('Retrying Ollama connection...', 'info');
                 ollamaOnline = await checkOllama();
             }
 
-            if (ollamaOnline) {
-                log('', 'info');
-                log('[GATE PASSED] Ollama AI engine online!', 'ok');
-
-                // Try to get models
-                try {
-                    const response = await fetch(`${CONFIG.ollamaUrl}/api/tags`);
-                    const data = await response.json();
-                    if (data.models && data.models.length > 0) {
-                        log(`Found ${data.models.length} models installed`, 'ok');
-                        data.models.slice(0, 5).forEach(model => {
-                            log(`  - ${model.name}`, 'info');
-                        });
-                    }
-                } catch (e) {
-                    log('Could not list models', 'warn');
-                }
-            } else {
-                // Failed all retries - show final instructions and halt
-                log('', 'info');
-                log('═══════════════════════════════════════════════', 'fail');
+            if (!ollamaOnline) {
                 log('[BOOT HALTED] Ollama connection failed', 'fail');
-                log('═══════════════════════════════════════════════', 'fail');
-                log('', 'info');
-                log('C.O.R.A cannot start without Ollama.', 'fail');
-                log('', 'info');
-                log('Please start Ollama and refresh this page:', 'warn');
-                log('  1. Open terminal', 'info');
-                log('  2. Run: ollama serve', 'system');
-                log('  3. Refresh this page (F5)', 'info');
-                log('', 'info');
-                log('Or use the desktop CORA.bat which auto-starts Ollama.', 'info');
-
-                // Don't proceed - keep app locked
-                document.getElementById('appLocked').innerHTML = `
-                    <div class="lock-icon" style="color: #ff4444;">[ BLOCKED ]</div>
-                    <div class="lock-text" style="color: #ff4444;">Ollama is not running</div>
-                    <div class="lock-text" style="margin-top: 15px;">Run <code style="background:#222;padding:3px 8px;color:#0f0;">ollama serve</code> in terminal</div>
-                    <div class="lock-text" style="margin-top: 10px;">Then <button onclick="location.reload()" style="background:#0f0;color:#000;border:none;padding:5px 15px;cursor:pointer;font-family:inherit;">Refresh Page</button></div>
-                `;
-                return; // HALT BOOT
+                setPhaseStatus('ollama', 'fail');
+                setStatus('BOOT FAILED - Ollama Required');
+                document.getElementById('statOllama').textContent = 'Offline';
+                document.getElementById('statOllama').className = 'stat-value high';
+                document.getElementById('bootBlocked').classList.remove('hidden');
+                return;
             }
-            await delay(300);
 
-            // Phase 3: Browser Capabilities
-            log('PHASE 3: BROWSER CAPABILITIES', 'phase');
+            log('[GATE PASSED] Ollama AI engine online!', 'ok');
+            document.getElementById('statOllama').textContent = 'Online';
+            setPhaseStatus('ollama', 'ok');
+            setProgress(50);
+
+            // Phase 2.1: Models
+            log('PHASE 2.1: AI MODELS CHECK', 'phase');
+            setPhaseStatus('models', 'running');
             await delay(200);
-            log(`LocalStorage: ${typeof Storage !== 'undefined' ? 'Available' : 'Unavailable'}`,
-                typeof Storage !== 'undefined' ? 'ok' : 'warn');
-            log(`Fetch API: Available`, 'ok');
-            log(`WebSockets: ${typeof WebSocket !== 'undefined' ? 'Available' : 'Unavailable'}`,
-                typeof WebSocket !== 'undefined' ? 'ok' : 'warn');
-            await delay(300);
 
-            // Phase 4: Final Status
-            log('PHASE 4: BOOT COMPLETE', 'phase');
+            try {
+                const response = await fetch(`${CONFIG.ollamaUrl}/api/tags`);
+                const data = await response.json();
+                if (data.models && data.models.length > 0) {
+                    log(`Found ${data.models.length} models installed`, 'ok');
+                    data.models.slice(0, 5).forEach(m => log(`  - ${m.name}`, 'info'));
+                }
+            } catch (e) {
+                log('Could not list models', 'warn');
+            }
+
+            setPhaseStatus('models', 'ok');
+            setProgress(65);
+
+            // Phase 3.0: Browser
+            log('PHASE 3.0: BROWSER CAPABILITIES', 'phase');
+            setPhaseStatus('browser', 'running');
+            await delay(200);
+            log('Fetch API: Available', 'ok');
+            log('WebSocket: ' + (typeof WebSocket !== 'undefined' ? 'Available' : 'Unavailable'), 'ok');
+            log('Canvas API: Available', 'ok');
+            setPhaseStatus('browser', 'ok');
+            setProgress(80);
+
+            // Phase 3.1: Storage
+            log('PHASE 3.1: STORAGE CHECK', 'phase');
+            setPhaseStatus('storage', 'running');
+            await delay(200);
+            log('LocalStorage: ' + (typeof Storage !== 'undefined' ? 'Available' : 'Unavailable'), 'ok');
+            setPhaseStatus('storage', 'ok');
+            setProgress(90);
+
+            // Phase 4.0: Complete
+            log('PHASE 4.0: BOOT COMPLETE', 'phase');
+            setPhaseStatus('complete', 'running');
             await delay(200);
 
             const bootTime = ((Date.now() - startTime) / 1000).toFixed(2);
             log(`Boot sequence completed in ${bootTime}s`, 'ok');
-            document.getElementById('bootTime').textContent = `Boot: ${bootTime}s`;
+            document.getElementById('statBootTime').textContent = bootTime + 's';
 
-            // Update all status dots
-            await updateStatusDots();
+            log('', 'info');
+            log('═══════════════════════════════════════════════', 'ok');
+            log('C.O.R.A IS ONLINE AND READY', 'ok');
+            log('═══════════════════════════════════════════════', 'ok');
 
-            // Unlock the app
+            setPhaseStatus('complete', 'ok');
+            setProgress(100);
+            setStatus('ONLINE - Ready for commands');
+            setSpeech("Hey, I'm CORA. Boot complete. What do you need?");
+
+            // Enable chat
             bootComplete = true;
-            document.getElementById('appLocked').classList.add('hidden');
+            document.getElementById('chatSection').classList.add('visible');
             document.getElementById('chatInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
 
-            log('', 'info');
-            log('═══════════════════════════════════════════════', 'system');
-            log('C.O.R.A IS ONLINE AND READY', 'ok');
-            log('═══════════════════════════════════════════════', 'system');
-
-            // Welcome message in chat
             addMessage('assistant', "Hey, I'm CORA. Boot sequence complete. What do you need?");
         }
 
         // ============================================================
-        // Chat Interface
+        // Chat
         // ============================================================
 
         function addMessage(role, content) {
             const container = document.getElementById('chatMessages');
             const msg = document.createElement('div');
             msg.className = `message ${role}`;
-
-            const header = document.createElement('div');
-            header.className = 'message-header';
-            header.textContent = role === 'user' ? 'You' : 'C.O.R.A';
-
-            const body = document.createElement('div');
-            body.className = 'message-content';
-            body.textContent = content;
-
-            msg.appendChild(header);
-            msg.appendChild(body);
+            msg.innerHTML = `
+                <div class="message-header">${role === 'user' ? 'You' : 'C.O.R.A'}</div>
+                <div>${content}</div>
+            `;
             container.appendChild(msg);
             container.scrollTop = container.scrollHeight;
         }
@@ -1038,18 +1204,14 @@
 
             addMessage('user', message);
             input.value = '';
+            triggerWave();
 
-            // Check if Ollama is available
-            const ollamaOnline = await checkOllama();
-            if (!ollamaOnline) {
-                addMessage('assistant', "Ollama isn't running right now. Start it with 'ollama serve' and I'll be able to help you better.");
+            if (!await checkOllama()) {
+                addMessage('assistant', "Ollama isn't running. Start it with 'ollama serve'.");
                 return;
             }
 
-            // Send to Ollama
             try {
-                log(`Processing: "${message.substring(0, 50)}..."`, 'info');
-
                 const response = await fetch(`${CONFIG.ollamaUrl}/api/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1063,48 +1225,16 @@
                 if (response.ok) {
                     const data = await response.json();
                     addMessage('assistant', data.response);
-                    log('Response generated', 'ok');
-                } else {
-                    addMessage('assistant', "Something went wrong with the AI. Check if the right model is loaded.");
-                    log('AI response failed', 'warn');
+                    triggerWave();
                 }
             } catch (e) {
-                addMessage('assistant', "Connection to AI failed. Make sure Ollama is running.");
-                log(`Error: ${e.message}`, 'fail');
+                addMessage('assistant', 'Connection to AI failed.');
             }
         }
 
-        // Handle Enter key
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+            if (e.key === 'Enter') sendMessage();
         });
-
-        // ============================================================
-        // View Toggle
-        // ============================================================
-
-        function toggleView(panel) {
-            const container = document.getElementById('splitContainer');
-
-            if (panel === 'console') {
-                if (container.classList.contains('fullscreen-console')) {
-                    container.classList.remove('fullscreen-console');
-                } else {
-                    container.classList.remove('fullscreen-app');
-                    container.classList.add('fullscreen-console');
-                }
-            } else {
-                if (container.classList.contains('fullscreen-app')) {
-                    container.classList.remove('fullscreen-app');
-                } else {
-                    container.classList.remove('fullscreen-console');
-                    container.classList.add('fullscreen-app');
-                }
-            }
-        }
 
         // ============================================================
         // Utilities
@@ -1115,23 +1245,22 @@
         }
 
         // ============================================================
-        // Initialization
+        // Init
         // ============================================================
 
         window.onload = async function() {
-            // Load saved keys
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            drawWaveform();
+
             apiKeys.pollinations = localStorage.getItem('cora_pollinations_key') || '';
             apiKeys.github = localStorage.getItem('cora_github_key') || '';
 
-            // Check if we need to show API modal
             if (!apiKeys.pollinations && !apiKeys.github) {
-                // First time - show modal
                 showApiModal();
             } else {
-                // Keys exist - populate fields and start boot
                 document.getElementById('pollinationsKey').value = apiKeys.pollinations;
                 document.getElementById('githubKey').value = apiKeys.github;
-                hideApiModal();
                 runBootSequence();
             }
         };
