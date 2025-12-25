@@ -680,42 +680,26 @@
         }
 
         // ============================================================
-        // Waveform - EXACT replica of boot_display.py AudioWaveform
-        // 100 sample points, smooth spline, scrolling buffer, decay
-        // Colors: #400060, #8000a0, #ff40ff, #ffc0ff
+        // WAVEFORM - EXACT 1:1 PORT FROM boot_display.py AudioWaveform
         // ============================================================
 
-        const NUM_POINTS = 100;  // Exact match to boot_display.py
-        let sampleBuffer = new Array(NUM_POINTS).fill(0);
-        let wavePoints = new Array(NUM_POINTS).fill(0);
-        let phase = 0;
+        // EXACT values from boot_display.py line 140-149
+        const NUM_POINTS = 100;
+        let wave_points = new Array(NUM_POINTS).fill(0.0);
+        let sample_buffer = new Array(NUM_POINTS).fill(0.0);
+        let wavePhase = 0.0;
 
         function initWaveform() {
             const canvas = document.getElementById('waveformCanvas');
+            // Set actual pixel size (retina support)
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
             waveformCtx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth * 2;
-            canvas.height = 200;
             waveformCtx.scale(2, 2);
-            // Start continuous animation like desktop (runs forever)
-            requestAnimationFrame(animateWaveformLoop);
-        }
 
-        function drawCenterLine() {
-            const canvas = document.getElementById('waveformCanvas');
-            const ctx = waveformCtx;
-            const w = canvas.offsetWidth;
-            const h = 100;
-
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, w, h);
-
-            // Dim baseline like desktop
-            ctx.strokeStyle = '#201030';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(0, h/2);
-            ctx.lineTo(w, h/2);
-            ctx.stroke();
+            // Start animation loop - runs FOREVER like desktop
+            _animate();
         }
 
         function startWaveform() {
@@ -723,117 +707,121 @@
         }
 
         function stopWaveform() {
+            // Don't stop - waveform runs forever, decays naturally
             waveformActive = false;
-            // Don't stop animation - it runs forever like desktop
-            // Wave naturally decays to flat when not speaking
         }
 
-        function animateWaveformLoop() {
+        function _animate() {
+            // EXACT port of boot_display.py _animate() method (lines 205-322)
             const canvas = document.getElementById('waveformCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+
+            if (waveformActive) {
+                // Simulate audio chunks scrolling in from right
+                // Desktop uses samples_to_add = min(20, num_points // 5) = 20
+                wavePhase += 0.12;
+                const samples_to_add = 8;
+
+                // Generate voice-like samples (simulating Kokoro TTS output)
+                const new_samples = [];
+                for (let i = 0; i < samples_to_add; i++) {
+                    const t = wavePhase + i * 0.25;
+                    // Voice harmonics simulation
+                    let sample = Math.sin(t * 3.2) * 0.5
+                              + Math.sin(t * 6.7) * 0.3
+                              + Math.sin(t * 11.3) * 0.15
+                              + (Math.random() - 0.5) * 0.25;
+                    // Envelope modulation
+                    sample *= (0.6 + Math.sin(t * 0.7) * 0.4);
+                    // Clamp to -1 to 1 (line 273)
+                    sample = Math.max(-1.0, Math.min(1.0, sample));
+                    new_samples.push(sample);
+                }
+
+                // Shift buffer left, add new on right (line 276)
+                sample_buffer = sample_buffer.slice(samples_to_add).concat(new_samples);
+
+                // Smooth transition: wave_points[i] = wave_points[i] * 0.3 + target * 0.7 (line 305)
+                for (let i = 0; i < NUM_POINTS; i++) {
+                    wave_points[i] = wave_points[i] * 0.3 + sample_buffer[i] * 0.7;
+                }
+            } else {
+                // Decay when not speaking (lines 313-316)
+                const decay = 0.92;
+                for (let i = 0; i < NUM_POINTS; i++) {
+                    wave_points[i] *= decay;
+                    sample_buffer[i] *= decay;
+                }
+            }
+
+            // Draw the wave - EXACT port of _draw_wave() (lines 324-384)
+            _draw_wave(width, height);
+
+            // 25ms = ~40 FPS (line 322)
+            setTimeout(() => requestAnimationFrame(_animate), 25);
+        }
+
+        function _draw_wave(width, height) {
+            // EXACT port of boot_display.py _draw_wave() method
             const ctx = waveformCtx;
-            const w = canvas.offsetWidth;
-            const h = 100;
-            const centerY = h / 2;
-            const maxAmp = (h / 2) - 5;
+            const center_y = height / 2;
+            const max_amp = (height / 2) - 5;  // line 334
 
+            // Clear canvas (line 326)
             ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, w, h);
+            ctx.fillRect(0, 0, width, height);
 
-            // Draw dim center reference line
+            // Draw center reference line - #201030 width 1 (lines 337-338)
             ctx.strokeStyle = '#201030';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(0, centerY);
-            ctx.lineTo(w, centerY);
+            ctx.moveTo(0, center_y);
+            ctx.lineTo(width, center_y);
             ctx.stroke();
 
-            if (waveformActive) {
-                // Generate new audio-like samples and scroll them in from right
-                // Simulates real audio chunks like Kokoro TTS provides
-                phase += 0.15;
-                const samplesToAdd = 5;
-
-                // Generate samples that look like real voice audio
-                const newSamples = [];
-                for (let i = 0; i < samplesToAdd; i++) {
-                    const t = phase + i * 0.3;
-                    // Multiple frequencies to simulate voice harmonics
-                    const fundamental = Math.sin(t * 2.5) * 0.6;
-                    const harmonic1 = Math.sin(t * 5.1) * 0.25;
-                    const harmonic2 = Math.sin(t * 7.8) * 0.15;
-                    const noise = (Math.random() - 0.5) * 0.2;
-                    // Envelope variation
-                    const envelope = 0.7 + Math.sin(t * 0.4) * 0.3;
-                    let sample = (fundamental + harmonic1 + harmonic2 + noise) * envelope;
-                    sample = Math.max(-1, Math.min(1, sample));
-                    newSamples.push(sample);
-                }
-
-                // Shift buffer left, add new samples on right (scrolling effect)
-                sampleBuffer = sampleBuffer.slice(samplesToAdd).concat(newSamples);
-
-                // Smooth transition from buffer to wave points (prevents jitter)
-                for (let i = 0; i < NUM_POINTS; i++) {
-                    wavePoints[i] = wavePoints[i] * 0.3 + sampleBuffer[i] * 0.7;
-                }
-            } else {
-                // Decay existing wave toward zero when not speaking
-                const decay = 0.92;
-                for (let i = 0; i < NUM_POINTS; i++) {
-                    wavePoints[i] *= decay;
-                    sampleBuffer[i] *= decay;
-                }
-            }
-
-            // Build smooth spline coordinates
-            const step = w / (NUM_POINTS - 1);
+            // Build coordinates (lines 341-347)
+            const step = width / (NUM_POINTS - 1);
             const coords = [];
             for (let i = 0; i < NUM_POINTS; i++) {
                 const x = i * step;
-                const y = centerY - (wavePoints[i] * maxAmp);
-                coords.push({ x, y });
+                const y = center_y - (wave_points[i] * max_amp);
+                coords.push([x, y]);
             }
 
-            // Draw 4 glow layers - EXACT colors from boot_display.py
-            const layers = [
-                { color: '#400060', width: 8 },   // Outer glow
-                { color: '#8000a0', width: 5 },   // Mid glow
-                { color: '#ff40ff', width: 3 },   // Main wave
-                { color: '#ffc0ff', width: 1 }    // Bright core
-            ];
+            if (coords.length >= 4) {
+                // EXACT 4 layers from lines 350-384
+                const layers = [
+                    { fill: '#400060', width: 8 },   // Outer glow
+                    { fill: '#8000a0', width: 5 },   // Mid glow
+                    { fill: '#ff40ff', width: 3 },   // Main wave
+                    { fill: '#ffc0ff', width: 1 }    // Bright core
+                ];
 
-            layers.forEach(layer => {
-                ctx.strokeStyle = layer.color;
-                ctx.lineWidth = layer.width;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
+                layers.forEach(layer => {
+                    ctx.strokeStyle = layer.fill;
+                    ctx.lineWidth = layer.width;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
 
-                // Draw smooth curve through points (like Tkinter smooth=True)
-                ctx.beginPath();
-                if (coords.length > 2) {
-                    ctx.moveTo(coords[0].x, coords[0].y);
+                    // smooth=True, splinesteps=16 in Tkinter
+                    // Use quadratic curves for smooth appearance
+                    ctx.beginPath();
+                    ctx.moveTo(coords[0][0], coords[0][1]);
 
-                    // Catmull-Rom spline for smooth curves (like splinesteps=16)
-                    for (let i = 0; i < coords.length - 1; i++) {
-                        const p0 = coords[Math.max(0, i - 1)];
-                        const p1 = coords[i];
-                        const p2 = coords[Math.min(coords.length - 1, i + 1)];
-                        const p3 = coords[Math.min(coords.length - 1, i + 2)];
-
-                        // Control points for bezier approximation
-                        const cp1x = p1.x + (p2.x - p0.x) / 6;
-                        const cp1y = p1.y + (p2.y - p0.y) / 6;
-                        const cp2x = p2.x - (p3.x - p1.x) / 6;
-                        const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                    for (let i = 1; i < coords.length - 1; i++) {
+                        const xc = (coords[i][0] + coords[i + 1][0]) / 2;
+                        const yc = (coords[i][1] + coords[i + 1][1]) / 2;
+                        ctx.quadraticCurveTo(coords[i][0], coords[i][1], xc, yc);
                     }
-                }
-                ctx.stroke();
-            });
 
-            // ~40 FPS like desktop (25ms interval)
-            animationId = requestAnimationFrame(animateWaveformLoop);
+                    // Last point
+                    const last = coords[coords.length - 1];
+                    ctx.lineTo(last[0], last[1]);
+                    ctx.stroke();
+                });
+            }
         }
 
         // ============================================================
