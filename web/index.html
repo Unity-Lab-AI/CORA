@@ -546,11 +546,6 @@
                 <input type="password" id="githubToken" placeholder="ghp_...">
                 <a href="https://github.com/settings/tokens" target="_blank">Generate at github.com/settings/tokens</a>
             </div>
-            <div class="modal-field">
-                <label>Weather API Key (optional)</label>
-                <input type="password" id="weatherKey" placeholder="Your OpenWeatherMap key">
-                <a href="https://openweathermap.org/api" target="_blank">Get free key at openweathermap.org</a>
-            </div>
             <button class="modal-btn" onclick="saveApiKeys()">Save & Continue</button>
             <button class="modal-btn" style="background: #333; margin-top: 10px;" onclick="skipApiKeys()">Skip (Limited Features)</button>
             <button class="modal-btn" style="background: #660000; margin-top: 20px; font-size: 11px;" onclick="clearAllData()">Clear All Data</button>
@@ -685,7 +680,6 @@
 
         let pollinationsKey = localStorage.getItem('cora_pollinations_key') || '';
         let githubToken = localStorage.getItem('cora_github_key') || '';
-        let weatherKey = localStorage.getItem('cora_weather_key') || '';
 
         // ============================================================
         // KOKORO TTS - Neural voice (same as desktop af_bella)
@@ -1369,27 +1363,32 @@
             return null;
         }
 
-        async function getWeather(apiKey) {
-            if (!apiKey) {
-                log('Weather API key not configured', 'info');
-                return null;
-            }
+        async function getWeather(location = '') {
+            // Uses wttr.in - FREE, no API key needed (same as desktop app)
             try {
-                let coords = cachedCoords;
-                if (!coords) {
-                    coords = await requestLocationPermission();
+                // wttr.in format: %t=temp, %C=condition, %h=humidity, %w=wind, %f=feels like
+                const url = `https://wttr.in/${encodeURIComponent(location)}?format=%t|%C|%h|%w|%f`;
+                const res = await fetch(url, {
+                    headers: { 'User-Agent': 'CORA/2.0' }
+                });
+                if (res.ok) {
+                    const text = await res.text();
+                    const parts = text.trim().split('|');
+                    if (parts.length >= 5) {
+                        return {
+                            temp: parts[0].trim(),
+                            conditions: parts[1].trim(),
+                            humidity: parts[2].trim(),
+                            wind: parts[3].trim(),
+                            feels_like: parts[4].trim(),
+                            success: true
+                        };
+                    }
                 }
-                if (!coords) {
-                    log('Weather requires location permission', 'warn');
-                    return null;
-                }
-
-                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${apiKey}&units=imperial`);
-                if (res.ok) return await res.json();
             } catch (e) {
                 log(`Weather error: ${e.message}`, 'warn');
             }
-            return null;
+            return { success: false };
         }
 
         async function getNews() {
@@ -1847,29 +1846,22 @@
                 log(`Audio test failed: ${e.message}`, 'warn');
             }
 
-            // Also check weather since we have location
-            if (weatherKey && cachedCoords) {
-                log('Fetching weather data...', 'info');
-                const weather = await getWeather(weatherKey);
-                if (weather) {
-                    const temp = Math.round(weather.main.temp);
-                    const cond = weather.weather[0]?.description || 'unknown';
-                    const humidity = weather.main.humidity;
-                    log(`Weather: ${temp}°F, ${cond}`, 'ok');
-                    log(`Humidity: ${humidity}%`, 'info');
-                    document.getElementById('statWeather').textContent = `${temp}°F`;
-                    document.getElementById('statWeather').className = 'stat-value';
-                    setPhase('audio', 'ok');
-                    await speakAndWait(`Audio working. That beep you heard was a 440 hertz test tone. Weather is ${temp} degrees and ${cond}.`);
-                } else {
-                    setPhase('audio', 'ok');
-                    await speakAndWait("Audio test passed. That beep was a 440 hertz sine wave.");
-                }
+            // Get weather using wttr.in (free, no API key needed)
+            log('Fetching weather from wttr.in...', 'info');
+            const weather = await getWeather(location?.city || '');
+            if (weather.success) {
+                log(`Weather: ${weather.temp}, ${weather.conditions}`, 'ok');
+                log(`Feels like: ${weather.feels_like}`, 'info');
+                log(`Humidity: ${weather.humidity}`, 'info');
+                document.getElementById('statWeather').textContent = weather.temp;
+                document.getElementById('statWeather').className = 'stat-value';
+                setPhase('audio', 'ok');
+                await speakAndWait(`Audio working. That beep was a 440 hertz test tone. Weather is ${weather.temp} and ${weather.conditions.toLowerCase()}.`);
             } else {
-                document.getElementById('statWeather').textContent = weatherKey ? 'No Loc' : 'No Key';
+                document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('audio', 'ok');
-                await speakAndWait("Audio test complete. You should have heard a short beep.");
+                await speakAndWait("Audio test complete. Weather data unavailable.");
             }
 
             // ================================================================
@@ -2200,10 +2192,8 @@ You ARE Cora. That's just who you are.`;
         function saveApiKeys() {
             pollinationsKey = document.getElementById('pollinationsKey').value.trim();
             githubToken = document.getElementById('githubToken').value.trim();
-            weatherKey = document.getElementById('weatherKey').value.trim();
             if (pollinationsKey) localStorage.setItem('cora_pollinations_key', pollinationsKey);
             if (githubToken) localStorage.setItem('cora_github_key', githubToken);
-            if (weatherKey) localStorage.setItem('cora_weather_key', weatherKey);
             document.getElementById('apiModal').classList.remove('visible');
             runBootSequence();
         }
@@ -2279,14 +2269,15 @@ You ARE Cora. That's just who you are.`;
             renderPhases();
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
-            document.getElementById('weatherKey').value = weatherKey;
 
             if (!(await checkOllama())) {
                 document.getElementById('gateOverlay').classList.add('visible');
                 return;
             }
 
-            if (!pollinationsKey && !weatherKey) {
+            // Show API modal only if Pollinations key is missing (optional but enhances image gen)
+            // Weather now uses wttr.in - free, no key needed
+            if (!pollinationsKey) {
                 document.getElementById('apiModal').classList.add('visible');
             } else {
                 runBootSequence();
