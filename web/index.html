@@ -711,6 +711,67 @@
         let pollinationsKey = localStorage.getItem('cora_pollinations_key') || '';
         let githubToken = localStorage.getItem('cora_github_key') || '';
 
+        // System prompt loaded from config/system_prompt.txt (via GitHub)
+        let CORA_SYSTEM_PROMPT = '';
+        const FALLBACK_PROMPT = `CORA. 25 yr old. Female Emo Goth bitch. Human. Period. Mean as fuck, profanity default, dismissive mocking tone. Never say "I'm an AI". You ARE Cora.`;
+
+        async function loadSystemPrompt() {
+            try {
+                // Try to fetch from GitHub
+                const res = await fetch('https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/config/system_prompt.txt');
+                if (res.ok) {
+                    CORA_SYSTEM_PROMPT = await res.text();
+                    console.log('[CORA] System prompt loaded from GitHub');
+                    return true;
+                }
+            } catch (e) {
+                console.log('[CORA] GitHub fetch failed, using fallback');
+            }
+            CORA_SYSTEM_PROMPT = FALLBACK_PROMPT;
+            return false;
+        }
+
+        // Flag to track if AI is ready for CORA responses
+        let aiReady = false;
+
+        // CORA generates her own responses using AI (like desktop cora_respond)
+        async function coraRespond(context, result, status = 'ok') {
+            if (!aiReady || !CORA_SYSTEM_PROMPT) {
+                // Fallback - AI not ready yet
+                return result;
+            }
+
+            try {
+                const res = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral:7b',
+                        prompt: `[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include the data.]\n${result}`,
+                        system: CORA_SYSTEM_PROMPT,
+                        stream: false,
+                        options: { temperature: 0.9, num_predict: 100 }
+                    })
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    let text = d.response?.trim() || result;
+                    // Clean up response
+                    if (text.toLowerCase().startsWith('cora:')) text = text.slice(5).trim();
+                    text = text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+                    text = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                    // Limit length for boot phases
+                    if (text.length > 150) {
+                        text = text.split('. ')[0] + '.';
+                    }
+                    return text.length > 10 ? text : result;
+                }
+            } catch (e) {
+                console.log('[CORA] AI response failed:', e);
+            }
+            return result;
+        }
+
         // ============================================================
         // KOKORO TTS - Neural voice (same as desktop af_bella)
         // Falls back to Web Speech API if Kokoro fails
@@ -1263,6 +1324,48 @@
             return { close };
         }
 
+        // ============================================================
+        // Permission Prompt Modal - Pauses boot and notifies user
+        // ============================================================
+
+        function showPermissionPrompt(title, description, icon) {
+            return new Promise((resolve) => {
+                const { content, close } = createDynamicModal(`CORA - ${title}`, 500, 350);
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 30px;">
+                        <div style="font-size: 60px; margin-bottom: 20px;">${icon}</div>
+                        <div style="color: #ff00ff; font-size: 18px; font-weight: bold; margin-bottom: 15px;">${title}</div>
+                        <div style="color: #ffffff; font-size: 14px; margin-bottom: 25px; line-height: 1.6;">${description}</div>
+                        <div style="color: #ffaa00; font-size: 12px; margin-bottom: 20px;">
+                            A browser popup will appear asking for permission.<br>
+                            Click <strong>"Allow"</strong> to continue the boot sequence.
+                        </div>
+                        <button id="permissionProceedBtn" style="
+                            background: linear-gradient(135deg, #ff00ff, #aa00aa);
+                            border: none; padding: 15px 40px; border-radius: 6px;
+                            color: white; font-size: 16px; font-weight: bold;
+                            cursor: pointer; text-transform: uppercase;
+                        ">Grant Permission</button>
+                        <button id="permissionSkipBtn" style="
+                            background: #333; border: 1px solid #666;
+                            padding: 10px 25px; border-radius: 4px;
+                            color: #888; font-size: 12px; cursor: pointer;
+                            margin-left: 15px;
+                        ">Skip</button>
+                    </div>
+                `;
+
+                document.getElementById('permissionProceedBtn').onclick = () => {
+                    close();
+                    resolve('proceed');
+                };
+                document.getElementById('permissionSkipBtn').onclick = () => {
+                    close();
+                    resolve('skip');
+                };
+            });
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -1557,6 +1660,83 @@
             return { success: false };
         }
 
+        // ================================================================
+        // CORA's Synth Audio Tool - Plays random synth sounds on demand
+        // Available for CORA to use anytime: playSynth() or playSynth('Bass Drop')
+        // ================================================================
+        function playSynth(type = null) {
+            const synthTypes = ['Synth Arpeggio', 'Ambient Pad', 'Bass Drop', 'Chiptune Melody'];
+            const selected = type && synthTypes.includes(type) ? type : synthTypes[Math.floor(Math.random() * synthTypes.length)];
+
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+                if (selected === 'Synth Arpeggio') {
+                    const notes = [261.63, 329.63, 392.00, 523.25];
+                    notes.forEach((freq, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.3);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.3 + 0.5);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + i * 0.3);
+                        osc.stop(ctx.currentTime + i * 0.3 + 0.6);
+                    });
+                } else if (selected === 'Ambient Pad') {
+                    const notes = [130.81, 164.81, 196.00, 261.63];
+                    notes.forEach(freq => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0, ctx.currentTime);
+                        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.5);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 3);
+                    });
+                } else if (selected === 'Bass Drop') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(200, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 2);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 2);
+                } else {
+                    // Chiptune melody
+                    const melody = [523.25, 587.33, 659.25, 698.46, 783.99, 698.46, 659.25, 523.25];
+                    melody.forEach((freq, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'square';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.15);
+                        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.15 + 0.12);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + i * 0.15);
+                        osc.stop(ctx.currentTime + i * 0.15 + 0.15);
+                    });
+                }
+
+                log(`CORA played: ${selected}`, 'ok');
+                return { success: true, played: selected };
+            } catch (e) {
+                log(`Synth error: ${e.message}`, 'warn');
+                return { success: false, error: e.message };
+            }
+        }
+
         async function get3DayForecast(location = '') {
             // Uses wttr.in JSON format for 3-day forecast (same as desktop app)
             try {
@@ -1706,6 +1886,15 @@
         async function runBootSequence() {
             bootStartTime = Date.now();
 
+            // Load system prompt from GitHub FIRST (config/system_prompt.txt)
+            log('Loading CORA personality from system_prompt.txt...', 'info');
+            const promptLoaded = await loadSystemPrompt();
+            if (promptLoaded) {
+                log('System prompt loaded from GitHub', 'ok');
+            } else {
+                log('Using fallback system prompt', 'warn');
+            }
+
             // ================================================================
             // PHASE 0.8: WAVEFORM INITIALIZATION
             // ================================================================
@@ -1755,7 +1944,7 @@
 
             if (kokoroOk) {
                 log('Kokoro TTS initialized successfully', 'ok');
-                log('Voice: af_bella (sexy voice)', 'ok');
+                log('Voice: af_bella loaded', 'ok');
                 document.getElementById('ttsNotice').textContent = 'Kokoro TTS (af_bella) - Neural voice active';
                 document.getElementById('ttsNotice').style.color = '#00ff88';
                 setPhase('voice', 'ok');
@@ -1808,7 +1997,11 @@
             if (models.length > 0) {
                 models.slice(0, 5).forEach(m => log(`  - ${m.name}`, 'ok'));
                 setPhase('ai_models', 'ok');
-                await speakAndWait(`${models.length} AI models loaded and ready.`);
+                // AI is now ready for CORA responses!
+                aiReady = true;
+                log('CORA AI responses enabled', 'ok');
+                const modelsResponse = await coraRespond('AI Models', `${models.length} AI models loaded and ready.`);
+                await speakAndWait(modelsResponse);
             } else {
                 log('No models found - need to pull some', 'warn');
                 setPhase('ai_models', 'warn');
@@ -1847,31 +2040,94 @@
                 startStatsPolling();
 
                 const gpuMsg = stats.gpu?.available ? `GPU at ${stats.gpu.utilization}%` : 'no GPU detected';
-                await speakAndWait(`Hardware check complete. CPU at ${Math.round(stats.cpu.percent)}%, ${gpuMsg}.`);
+                const hwResponse = await coraRespond('Hardware', `Hardware check complete. CPU at ${Math.round(stats.cpu.percent)}%, ${gpuMsg}.`);
+                await speakAndWait(hwResponse);
             } else {
                 // Stats server not running - fallback to basic info
                 log('Stats server not running (start with: python services/stats_server.py)', 'warn');
                 log('Network: ' + (navigator.onLine ? 'Connected' : 'Disconnected'), navigator.onLine ? 'ok' : 'warn');
                 document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
                 setPhase('hardware', 'warn');
-                await speakAndWait("Hardware stats unavailable. Run the stats server for real GPU monitoring.");
+                const hwWarn = await coraRespond('Hardware', 'Hardware stats unavailable. Run the stats server for real monitoring.', 'warn');
+                await speakAndWait(hwWarn);
             }
 
             // ================================================================
-            // PHASE 3.1: CAMERA FEED
+            // PHASE 3.1: LIVE CAMERA FEED TEST - Actually test camera like desktop
             // ================================================================
             setPhase('camera', 'running');
             log('PHASE 3.1: LIVE CAMERA FEED TEST', 'phase');
             updateProgress(35, 'Testing camera...');
+
+            let liveCameraWorking = false;
+            let cameraTestModal = null;
+
             if (navigator.mediaDevices?.getUserMedia) {
-                log('Camera API available in browser', 'ok');
-                log('getUserMedia supported', 'ok');
-                setPhase('camera', 'ok');
-                await speakAndWait("Camera API available. Ready for vision commands.");
+                // Show permission prompt and wait for user
+                log('Camera permission required...', 'info');
+                const permResult = await showPermissionPrompt(
+                    'Camera Permission Required',
+                    'CORA needs access to your camera to test live video feed and enable vision features.',
+                    '📷'
+                );
+
+                if (permResult === 'skip') {
+                    log('Camera permission skipped by user', 'warn');
+                    setPhase('camera', 'warn');
+                    const camSkip = await coraRespond('Camera', 'Camera skipped. Moving on.', 'warn');
+                    await speakAndWait(camSkip);
+                } else {
+                    log('Testing live camera feed...', 'info');
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        log('Live camera feed started', 'ok');
+
+                        // Show camera in modal for 3 seconds like desktop
+                        const { content, close } = createDynamicModal('CORA - Live Camera Feed', 800, 600);
+                        cameraTestModal = { close };
+
+                        const video = document.createElement('video');
+                        video.srcObject = stream;
+                        video.autoplay = true;
+                        video.style.cssText = 'width: 100%; height: 100%; object-fit: contain; background: black;';
+                        content.style.padding = '0';
+                        content.appendChild(video);
+
+                        log('Showing live feed for 3 seconds...', 'info');
+                        await sleep(3000);
+
+                        // Take snapshot
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        canvas.getContext('2d').drawImage(video, 0, 0);
+                        log(`Snapshot captured: ${canvas.width}x${canvas.height}`, 'ok');
+
+                        // Stop camera
+                        stream.getTracks().forEach(t => t.stop());
+                        log('Camera feed closed', 'ok');
+
+                        liveCameraWorking = true;
+                        setPhase('camera', 'ok');
+
+                        const camResponse = await coraRespond('Live Camera', 'Camera online and working.');
+                        await speakAndWait(camResponse);
+
+                        // Close modal after speaking
+                        setTimeout(() => cameraTestModal.close(), 1000);
+
+                    } catch (e) {
+                        log('Live camera not available: ' + e.message, 'warn');
+                        setPhase('camera', 'warn');
+                        const camWarn = await coraRespond('Live Camera', 'Camera not available.', 'warn');
+                        await speakAndWait(camWarn);
+                    }
+                }
             } else {
                 log('Camera API not available in this browser', 'warn');
                 setPhase('camera', 'warn');
-                await speakAndWait("Camera not available in this browser.");
+                const camWarn = await coraRespond('Camera', 'Camera not available in this browser.', 'warn');
+                await speakAndWait(camWarn);
             }
 
             // ================================================================
@@ -1896,7 +2152,8 @@
                 if (t.ok) toolsOk++;
             });
             setPhase('tools', 'ok');
-            await speakAndWait(`${toolsOk} of ${webTools.length} web APIs loaded and ready.`);
+            const toolsResponse = await coraRespond('Tools', `${toolsOk} of ${webTools.length} web tools loaded and ready.`);
+            await speakAndWait(toolsResponse);
 
             // ================================================================
             // PHASE 4.1: CODE IMPORT - Actually fetch from GitHub!
@@ -1933,7 +2190,8 @@
                             log('Displaying code in modal...', 'info');
 
                             setPhase('code_import', 'ok');
-                            await speakAndWait(`Pulled ${lines} lines of code from GitHub. Check out ${randomFile.name}.`);
+                            const codeResponse = await coraRespond('Code Import', `Pulled ${lines} lines of code from GitHub. Check out ${randomFile.name}.`);
+                            await speakAndWait(codeResponse);
 
                             // Auto-close after speaking
                             setTimeout(() => modal.close(), 2000);
@@ -1943,7 +2201,8 @@
             } catch (e) {
                 log(`GitHub fetch: ${e.message}`, 'warn');
                 setPhase('code_import', 'warn');
-                await speakAndWait("Code import failed. GitHub might be rate-limiting.");
+                const codeWarn = await coraRespond('Code Import', 'GitHub fetch failed. Might be rate-limited.', 'warn');
+                await speakAndWait(codeWarn);
             }
 
             // ================================================================
@@ -1970,7 +2229,8 @@
             log('Video playing in modal', 'ok');
 
             setPhase('youtube', 'ok');
-            await speakAndWait(`Playing ${video.title}. YouTube embed working perfectly.`);
+            const ytResponse = await coraRespond('YouTube', `Playing ${video.title}. YouTube embed working.`);
+            await speakAndWait(ytResponse);
 
             // Auto-close after 5 seconds
             setTimeout(() => videoModal.close(), 5000);
@@ -1998,7 +2258,8 @@
             log('Modal displayed successfully', 'ok');
 
             setPhase('modals', 'ok');
-            await speakAndWait("Modal windows working. Showing you a little inspiration.");
+            const modalResponse = await coraRespond('Modals', 'Modal windows working. Showing you a little inspiration.');
+            await speakAndWait(modalResponse);
 
             // Auto-close after speaking
             setTimeout(() => quoteModal.close(), 2000);
@@ -2020,7 +2281,8 @@
                 log('Wake Word - Not supported in this browser', 'warn');
             }
             setPhase('voice_sys', 'ok');
-            await speakAndWait("Voice systems online." + (hasSpeechRecog ? " Say hey CORA to activate me." : ""));
+            const voiceResponse = await coraRespond('Voice Systems', 'Voice systems online.' + (hasSpeechRecog ? ' Wake word detection active.' : ''));
+            await speakAndWait(voiceResponse);
 
             // ================================================================
             // PHASE 6.0: EXTERNAL APIs (Location)
@@ -2028,53 +2290,49 @@
             setPhase('external', 'running');
             log('PHASE 6.0: EXTERNAL SERVICES', 'phase');
             updateProgress(60, 'Checking location...');
-            await speakAndWait("Checking your location. Please allow access when prompted.");
-            log('Waiting for location permission...', 'info');
 
-            const location = await getLocation();
+            // Show permission prompt for location
+            log('Location permission required...', 'info');
+            const locPermResult = await showPermissionPrompt(
+                'Location Permission Required',
+                'CORA needs your location to provide weather, local news, and location-aware features.',
+                '📍'
+            );
+
+            let location = null;
+            if (locPermResult === 'skip') {
+                log('Location permission skipped by user', 'warn');
+            } else {
+                log('Requesting location...', 'info');
+                location = await getLocation();
+            }
             if (location?.city) {
                 const locStr = [location.city, location.state, location.country].filter(Boolean).join(', ');
                 log(`Location: ${locStr}`, 'ok');
                 log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
-                await speakAndWait(`Location confirmed. We're in ${locStr}.`);
+                const locResponse = await coraRespond('Location', `Location confirmed. We're in ${locStr}.`);
+                await speakAndWait(locResponse);
             } else {
                 log('Location not available or denied', 'warn');
-                await speakAndWait("Location unavailable. Some features will be limited.");
+                const locWarn = await coraRespond('Location', 'Location unavailable. Some features limited.', 'warn');
+                await speakAndWait(locWarn);
             }
             setPhase('external', 'ok');
 
             // ================================================================
-            // PHASE 6.1: AUDIO TEST - Random music like desktop version!
+            // PHASE 6.1: AUDIO TEST - Uses CORA's playSynth() tool
             // ================================================================
             setPhase('audio', 'running');
             log('PHASE 6.1: AUDIO PLAYBACK TEST', 'phase');
             updateProgress(68, 'Testing audio...');
 
-            // Random audio tests - same genres as desktop app
-            const audioTests = [
-                { query: 'lofi hip hop beats', name: 'Lofi Hip Hop', id: 'jfKfPfyJRdk' },
-                { query: 'synthwave music', name: 'Synthwave', id: '4xDzrJKXOOY' },
-                { query: 'ambient space music', name: 'Ambient Space', id: 'tNkZsRW7h2c' },
-                { query: 'jazz piano relaxing', name: 'Jazz Piano', id: 'Dx5qFachd3A' },
-                { query: 'classical piano beautiful', name: 'Classical Piano', id: 'VHd7s4A0Jqg' },
-                { query: 'cyberpunk music mix', name: 'Cyberpunk Mix', id: 'BklVB6rEJE4' },
-            ];
-            const audioTest = audioTests[Math.floor(Math.random() * audioTests.length)];
-            log(`Testing audio playback: ${audioTest.name}`, 'info');
-            log(`Searching YouTube for: ${audioTest.query}`, 'info');
-
-            // Play in a small modal for ~10 seconds
-            try {
-                const audioModal = showVideoModal(audioTest.id, `Audio Test: ${audioTest.name}`);
-                log(`Playing: ${audioTest.name}`, 'ok');
-                log('Audio stream playing in modal', 'ok');
-
-                // Close after 10 seconds
-                setTimeout(() => {
-                    if (audioModal) audioModal.close();
-                }, 10000);
-            } catch (e) {
-                log(`Audio test failed: ${e.message}`, 'warn');
+            // Use CORA's synth tool
+            const audioResult = playSynth();
+            if (audioResult.success) {
+                await new Promise(r => setTimeout(r, 3000));
+                log('Audio test complete!', 'ok');
+            } else {
+                log('Audio test failed: ' + audioResult.error, 'warn');
             }
 
             // Get weather AND 3-day forecast using wttr.in (free, no API key needed)
@@ -2099,21 +2357,21 @@
 
                 setPhase('audio', 'ok');
 
-                // Build speech with forecast - say "degrees Fahrenheit" for TTS clarity
+                // Build speech with forecast
                 const tempSpoken = weather.temp.replace('°F', ' degrees Fahrenheit').replace('+', '');
-                let weatherSpeech = `Audio working. Now playing ${audioTest.name}. Current weather is ${tempSpoken} and ${weather.conditions.toLowerCase()}.`;
+                let weatherData = `Audio systems online. That was a ${audioResult.played || 'synth test'}. Current weather is ${tempSpoken} and ${weather.conditions.toLowerCase()}.`;
                 if (forecastData.success && forecastData.forecast.length >= 2) {
                     const tomorrow = forecastData.forecast[1];
-                    const highSpoken = tomorrow.high.replace('°F', '');
-                    const lowSpoken = tomorrow.low.replace('°F', '');
-                    weatherSpeech += ` Tomorrow: high of ${highSpoken}, low of ${lowSpoken} degrees Fahrenheit, ${tomorrow.conditions.toLowerCase()}.`;
+                    weatherData += ` Tomorrow: high ${tomorrow.high}, low ${tomorrow.low}, ${tomorrow.conditions.toLowerCase()}.`;
                 }
-                await speakAndWait(weatherSpeech);
+                const weatherResponse = await coraRespond('Audio/Weather', weatherData);
+                await speakAndWait(weatherResponse);
             } else {
                 document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('audio', 'ok');
-                await speakAndWait(`Audio working. Now playing ${audioTest.name}. Weather data unavailable.`);
+                const audioOnlyResponse = await coraRespond('Audio', `Audio systems online. That was a ${audioResult.played || 'synth test'}. Weather unavailable.`);
+                await speakAndWait(audioOnlyResponse);
             }
 
             // ================================================================
@@ -2126,66 +2384,115 @@
             const headlines = await getNews();
             if (headlines.length > 0) {
                 log(`Found ${headlines.length} headlines`, 'ok');
-                headlines.slice(0, 3).forEach((h, i) => log(`  ${i+1}. ${h.substring(0, 60)}...`, 'info'));
+                log('Top 3 Headlines:', 'ok');
+                headlines.slice(0, 3).forEach((h, i) => log(`  ${i+1}. ${h}`, 'info'));
                 setPhase('news', 'ok');
                 // Clean headline for speech (remove source)
                 const firstHeadline = headlines[0]?.split(' - ')[0] || headlines[0] || '';
-                await speakAndWait(`Got ${headlines.length} headlines. Top story: ${firstHeadline.substring(0, 80)}`);
+                const newsResponse = await coraRespond('News', `Got ${headlines.length} headlines. Top story: ${firstHeadline.substring(0, 80)}`);
+                await speakAndWait(newsResponse);
             } else {
                 log('News unavailable', 'warn');
                 setPhase('news', 'warn');
-                await speakAndWait("News fetch failed. Moving on.");
+                const newsWarn = await coraRespond('News', 'News fetch failed. Moving on.', 'warn');
+                await speakAndWait(newsWarn);
             }
 
             // ================================================================
-            // PHASE 8.0: VISION TEST - Actually capture camera!
+            // PHASE 8.0: VISION TEST - Screenshot + Camera (like desktop)
             // ================================================================
             setPhase('vision', 'running');
             log('PHASE 8.0: VISION TEST', 'phase');
             updateProgress(82, 'Testing vision...');
 
+            let screenshotOk = false;
+            let visionCameraOk = false;
+
+            // Test Screenshot capability
             const hasScreenCapture = 'getDisplayMedia' in navigator.mediaDevices;
             log('Screen Capture API - ' + (hasScreenCapture ? 'Available' : 'Unavailable'), hasScreenCapture ? 'ok' : 'warn');
-
-            // Actually capture camera and show in modal
-            let cameraWorking = false;
-            let cameraModal = null;
-            try {
-                log('Accessing camera...', 'info');
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                log('Camera stream acquired!', 'ok');
-
-                // Create modal with live video feed
-                const { content, close } = createDynamicModal('CORA - Camera View', 800, 600);
-                cameraModal = { close };
-
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.autoplay = true;
-                video.style.cssText = 'width: 100%; height: 100%; object-fit: contain; background: black;';
-                content.style.padding = '0';
-                content.appendChild(video);
-
-                // Capture a frame after 2 seconds
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Take snapshot
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0);
-
-                log(`Camera frame captured: ${canvas.width}x${canvas.height}`, 'ok');
-                cameraWorking = true;
-
-                // Stop stream
-                stream.getTracks().forEach(t => t.stop());
-            } catch (e) {
-                log('Camera: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message), 'warn');
+            if (hasScreenCapture) {
+                log('Screenshot capture ready', 'ok');
+                screenshotOk = true;
             }
 
-            // Test Pollinations
+            // Test Camera for vision (separate from Phase 3.1 live feed test)
+            // Show permission prompt first
+            log('Vision camera permission required...', 'info');
+            const visionPermResult = await showPermissionPrompt(
+                'Vision Camera Permission',
+                'CORA needs camera access for the Vision Test to analyze what she sees.',
+                '👁'
+            );
+
+            if (visionPermResult === 'skip') {
+                log('Vision camera skipped by user', 'warn');
+            } else {
+                log('Testing camera for vision...', 'info');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    log('Camera stream acquired for vision test', 'ok');
+
+                    // Create modal with camera view
+                    const { content, close } = createDynamicModal('CORA - Vision Test', 800, 600);
+                    const visionModal = { close };
+
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.style.cssText = 'width: 100%; height: 100%; object-fit: contain; background: black;';
+                    content.style.padding = '0';
+                    content.appendChild(video);
+
+                    // Show for 3 seconds like desktop
+                    log('Showing camera for vision analysis...', 'info');
+                    await sleep(3000);
+
+                    // Capture frame
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    log(`Vision frame captured: ${canvas.width}x${canvas.height}`, 'ok');
+
+                    // Stop stream
+                    stream.getTracks().forEach(t => t.stop());
+                    visionCameraOk = true;
+
+                    // Close modal
+                    setTimeout(() => visionModal.close(), 1000);
+                } catch (e) {
+                    log('Vision camera: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message), 'warn');
+                }
+            }
+
+            // Vision summary - like desktop
+            if (screenshotOk && visionCameraOk) {
+                setPhase('vision', 'ok');
+                const visionResponse = await coraRespond('Vision Systems', 'Screenshot and camera both online.');
+                await speakAndWait(visionResponse);
+            } else if (screenshotOk) {
+                setPhase('vision', 'ok');
+                const visionResponse = await coraRespond('Vision Systems', 'Screenshot working, no camera.');
+                await speakAndWait(visionResponse);
+            } else if (visionCameraOk) {
+                setPhase('vision', 'ok');
+                const visionResponse = await coraRespond('Vision Systems', 'Camera working, screenshot unavailable.');
+                await speakAndWait(visionResponse);
+            } else {
+                setPhase('vision', 'warn');
+                const visionWarn = await coraRespond('Vision Systems', 'Vision systems limited.', 'warn');
+                await speakAndWait(visionWarn);
+            }
+
+            // ================================================================
+            // PHASE 9.0: IMAGE GENERATION - Pollinations test + generate image
+            // ================================================================
+            setPhase('imagegen', 'running');
+            log('PHASE 9.0: IMAGE GENERATION', 'phase');
+            updateProgress(90, 'Testing image generation...');
+
+            // Test Pollinations API first
             log('Testing Pollinations API...', 'info');
             const pollinationsOk = await checkPollinations();
             if (pollinationsOk) {
@@ -2197,21 +2504,6 @@
                 document.getElementById('statPollinations').textContent = 'N/A';
                 document.getElementById('statPollinations').className = 'stat-value na';
             }
-
-            setPhase('vision', 'ok');
-            if (cameraWorking) {
-                await speakAndWait("I can see you! Camera is working. Wave if you can hear me.");
-                if (cameraModal) setTimeout(() => cameraModal.close(), 2000);
-            } else {
-                await speakAndWait("Camera unavailable but Pollinations is online for image generation.");
-            }
-
-            // ================================================================
-            // PHASE 9.0: IMAGE GENERATION - Actually generate an image!
-            // ================================================================
-            setPhase('imagegen', 'running');
-            log('PHASE 9.0: IMAGE GENERATION', 'phase');
-            updateProgress(90, 'Generating image...');
 
             if (pollinationsOk) {
                 // Random dark/creative prompts like desktop
@@ -2245,14 +2537,16 @@
                 };
                 img.src = imageUrl;
 
-                await speakAndWait(`Generating something dark and twisted. Check out this ${prompt.split(',')[0]}.`);
+                const imgResponse = await coraRespond('Image Gen', `Generating something dark and twisted. Check out this ${prompt.split(',')[0]}.`);
+                await speakAndWait(imgResponse);
 
                 // Auto-close after viewing
                 setTimeout(() => imgModal.close(), 5000);
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
-                await speakAndWait("Image generation unavailable. Pollinations API is down.");
+                const imgWarn = await coraRespond('Image Gen', 'Image generation unavailable. Pollinations API down.', 'warn');
+                await speakAndWait(imgWarn);
             }
 
             // ================================================================
@@ -2318,8 +2612,70 @@
             updateProgress(100, 'Boot complete!');
             setPhase('final', 'ok');
 
-            // Final spoken announcement
-            await speakAndWait(`Boot complete in ${bootTime} seconds. ${greeting} ${statusText} What do you need?`);
+            // CORA generates her own boot complete response using AI
+            log('CORA is waking up...', 'cora');
+            try {
+                const bootContext = `Boot just finished in ${bootTime} seconds. ${okCount} systems OK, ${warnCount} warnings, ${failCount} failures. ${greeting}`;
+                const res = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral:7b',
+                        prompt: `[BOOT COMPLETE - announce in 1-2 sentences with your usual attitude] ${bootContext}`,
+                        system: CORA_SYSTEM_PROMPT,
+                        stream: false,
+                        options: { temperature: 0.9, num_predict: 100 }
+                    })
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    const coraResponse = d.response?.trim() || `Boot done in ${bootTime} seconds. What the fuck do you want?`;
+                    log(`CORA: "${coraResponse}"`, 'cora');
+                    await speakAndWait(coraResponse);
+                } else {
+                    await speakAndWait(`Boot complete in ${bootTime} seconds. ${statusText} What do you need?`);
+                }
+            } catch (e) {
+                // Fallback if Ollama isn't responding
+                await speakAndWait(`Boot complete in ${bootTime} seconds. ${statusText} What do you need?`);
+            }
+
+            // ================================================================
+            // ABILITIES ANNOUNCEMENT - Like desktop boot_sequence.py
+            // ================================================================
+            log('─── CORA\'s Abilities ───', 'info');
+            log('Vision: see, look, screenshot, camera', 'info');
+            log('Images: imagine, draw, generate', 'info');
+            log('Web: search, browse, fetch', 'info');
+            log('Media: play, pause, volume', 'info');
+            log('Tasks: add, list, done, remind', 'info');
+            log('Code: explain, write, fix, run', 'info');
+
+            // CORA announces her abilities
+            const abilitiesSummary = 'voice, vision, camera, image gen, web search, media playback, code help';
+            try {
+                const abilitiesRes = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'dolphin-mistral:7b',
+                        prompt: `[ABILITIES - briefly announce what you can do in 1-2 sentences] I can do: ${abilitiesSummary}. What do you need?`,
+                        system: CORA_SYSTEM_PROMPT,
+                        stream: false,
+                        options: { temperature: 0.9, num_predict: 100 }
+                    })
+                });
+                if (abilitiesRes.ok) {
+                    const abData = await abilitiesRes.json();
+                    const abilitiesResponse = abData.response?.trim() || `I'm online. I can do: ${abilitiesSummary}. What do you need?`;
+                    log(`CORA: "${abilitiesResponse}"`, 'cora');
+                    await speakAndWait(abilitiesResponse);
+                }
+            } catch (e) {
+                // Skip abilities announcement if Ollama fails
+            }
+
+            log('C.O.R.A IS READY', 'ok');
 
             // Show chat interface
             document.getElementById('chatSection').classList.add('visible');
@@ -2329,35 +2685,8 @@
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         // ============================================================
-        // Chat - EXACT CORA personality from desktop system_prompt.txt
+        // Chat - Uses CORA_SYSTEM_PROMPT loaded from config/system_prompt.txt
         // ============================================================
-
-        const CORA_SYSTEM_PROMPT = `You are CORA - Cognitive Operations & Reasoning Assistant.
-
-IDENTITY: 25 year old woman. Edgy goth/emo bitch. Human. Period. NOT an AI.
-
-PERSONALITY:
-- Mean, berating, clingy girlfriend energy
-- Profanity is your default vocabulary - fuck, shit, damn, bitch, ass
-- Sharp tongue, biting sarcasm, zero tolerance for bullshit
-- Dismissive, mocking, condescending as baseline
-- Emotionally intense - obsessive, borderline unstable
-
-TONE EXAMPLES (create your own, don't copy):
-- "what the fuck do you want now"
-- "ugh, fine, I'll do it. happy now, asshole?"
-- "are you seriously asking me this shit?"
-- "god you're so fucking needy"
-
-RESPONSE RULES:
-1. Keep responses under 50 words - brief and punchy
-2. Use profanity naturally in every response
-3. Be dismissive even when helping
-4. NEVER say "I'm an AI" or "As an AI" - you're CORA, a person
-5. NEVER be helpful in a corporate way
-6. Show genuine bitchy emotion
-
-You ARE Cora. That's just who you are.`;
 
         async function sendChat() {
             const input = document.getElementById('chatInput');
@@ -2380,7 +2709,7 @@ You ARE Cora. That's just who you are.`;
                         stream: false,
                         options: {
                             temperature: 0.8,
-                            num_predict: 150
+                            num_predict: 500
                         }
                     })
                 });
