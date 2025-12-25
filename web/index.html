@@ -1047,22 +1047,30 @@
         // Logging & Phases
         // ============================================================
 
+        // BroadcastChannel to send logs to separate console window
+        const consoleChannel = new BroadcastChannel('cora_console');
+
         function log(text, type = 'info') {
             const container = document.getElementById('logContainer');
             const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
             const line = document.createElement('div');
             line.className = `log-line log-${type}`;
 
+            let fullText;
             if (type === 'phase') {
                 line.style.marginTop = '10px';
-                line.textContent = `[${timestamp}] ═══════════════ ${text} ═══════════════`;
+                fullText = `[${timestamp}] ═══════════════ ${text} ═══════════════`;
             } else {
                 const prefix = type === 'ok' ? '✓' : type === 'warn' ? '⚠' : type === 'fail' ? '✗' : '';
-                line.textContent = `[${timestamp}] ${prefix ? prefix + ' ' : ''}${text}`;
+                fullText = `[${timestamp}] ${prefix ? prefix + ' ' : ''}${text}`;
             }
+            line.textContent = fullText;
 
             container.appendChild(line);
             container.scrollTop = container.scrollHeight;
+
+            // Send to console window via BroadcastChannel
+            consoleChannel.postMessage({ type: 'log', text: fullText, logType: type });
         }
 
         function renderPhases() {
@@ -1930,6 +1938,9 @@ You ARE Cora. That's just who you are.`;
         // ============================================================
 
         async function init() {
+            // Open console in a new tab for split view
+            window.open('console.html', '_blank');
+
             renderPhases();
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
