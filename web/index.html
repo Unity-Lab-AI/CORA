@@ -365,11 +365,14 @@
             left: 0;
             right: 0;
             bottom: 0;
+            width: 100vw;
+            height: 100vh;
             background: #000;
-            z-index: 50;
+            z-index: 9999;
             display: flex;
             flex-direction: column;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            border: 3px solid #ff00ff;
         }
 
         .setup-terminal .log-header {
@@ -708,8 +711,10 @@
     <!-- Setup Terminal Panel (like CORA.bat output) - OUTSIDE mainContainer so it shows when container is hidden -->
     <div class="setup-terminal" id="setupTerminal" style="display: none;">
         <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ BACKEND TERMINAL ] - System Setup & Checks</div>
-        <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto;">
-            <!-- Content populated dynamically by initSetupTerminal() -->
+        <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto; color: #00ff00;">
+            <pre style="color: #ff00ff; font-size: 16px;">BACKEND TERMINAL LOADING...</pre>
+            <div style="color: #ffff00;">If you see this, the terminal panel is visible!</div>
+            <div style="color: #00ffff;">JavaScript will populate the actual content...</div>
         </div>
     </div>
 
@@ -4551,6 +4556,7 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
         let viewMode = 'split';  // 'split', 'setup', 'console', 'status'
 
         async function toggleView() {
+            alert('toggleView called! Mode: ' + viewMode);
             const container = document.getElementById('mainContainer');
             const setupTerminal = document.getElementById('setupTerminal');
             const btn = document.getElementById('toggleBtn');
@@ -4560,9 +4566,14 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
             if (viewMode === 'split') {
                 // Show setup terminal (like CORA.bat output)
                 viewMode = 'setup';
+                if (!setupTerminal) {
+                    alert('ERROR: setupTerminal element not found!');
+                    return;
+                }
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
                 btn.textContent = '[ SETUP TERMINAL ]';
+                alert('Setup terminal should be visible now. Display: ' + setupTerminal.style.display);
                 console.log('[VIEW] Setup terminal visible:', setupTerminal.style.display);
                 console.log('[VIEW] Setup terminal dimensions:', setupTerminal.offsetWidth, 'x', setupTerminal.offsetHeight);
                 // Initialize the setup terminal with real checks (force refresh)
@@ -4570,6 +4581,7 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                     await initSetupTerminal(true);
                 } catch (e) {
                     console.error('[SETUP] Error:', e);
+                    alert('initSetupTerminal error: ' + e.message);
                     setupLog('ERROR: ' + e.message, '#ff0000');
                 }
             } else if (viewMode === 'setup') {
