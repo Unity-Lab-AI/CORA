@@ -1181,14 +1181,14 @@ WHEN RESPONDING:
                 let maxTokens;
 
                 if (mode === 'quick') {
-                    // Short status updates - CORA's edgy personality with profanity
-                    prompt = `[BOOT STATUS - You're CORA, an edgy goth bitch. Announce this in 1-2 sentences. Be sarcastic, use profanity (fuck, shit, damn, bitch), dark humor. Include the key data/numbers but make it sound like YOU.]\n${result}`;
-                    temperature = 1.0;
+                    // Short status updates - system prompt already has personality
+                    prompt = `[Announce this in 1-2 sentences, include the key info]\n${result}`;
+                    temperature = 0.9;
                     maxTokens = 150;
                 } else {
                     // Full mode for weather, news, camera descriptions, etc.
-                    prompt = `[You're CORA - edgy, sarcastic, uses profanity constantly. Announce this your way - be a bitch about it, dark humor, include key info:]\n${result}`;
-                    temperature = 0.9;
+                    prompt = `[Announce this, include the key details]\n${result}`;
+                    temperature = 0.8;
                     maxTokens = 300;
                 }
 
@@ -3463,13 +3463,9 @@ WHEN RESPONDING:
             log('© 2025 Unity AI Lab. All rights reserved.', 'info');
             log('═══════════════════════════════════════════════', 'system');
 
-            // CORA introduces herself with full personality
-            const aboutText = await coraRespond(
-                'about',
-                'Introduce yourself in 2-3 sentences. You are CORA version 1.0.0, created by Unity AI Lab. Your creators are Hackall360, Sponge, and GFourteen. Website is unityailab.com. You are their edgy goth AI assistant with a dark attitude. Be sassy about it.',
-                'ok',
-                'quick'
-            );
+            // CORA introduces herself - just pass the raw data, system prompt handles personality
+            const aboutData = "System online. CORA version 1.0.0. Unity AI Lab. Creators Hackall360, Sponge, GFourteen.";
+            const aboutText = await coraRespond('about', aboutData, 'ok', 'quick');
             await speakAndWait(aboutText);
 
             setPhase('about', 'ok');
