@@ -2760,22 +2760,33 @@ WHEN RESPONDING:
         }
 
         async function downloadStatsServer() {
-            // Fetch and download stats_server.py as a file
+            // Fetch file and show native Save As dialog
             try {
                 const response = await fetch('https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/services/stats_server.py');
                 if (!response.ok) throw new Error('Failed to fetch');
                 const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'stats_server.py';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
+
+                // Use File System Access API for native Save As dialog
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'stats_server.py',
+                        types: [{ description: 'Python File', accept: { 'text/x-python': ['.py'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } else {
+                    // Fallback for browsers without File System Access API
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'stats_server.py';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                }
             } catch (e) {
-                // Fallback: open in new tab so user can save manually
-                alert('Auto-download failed. Opening file in new tab - right-click and "Save As"');
+                if (e.name === 'AbortError') return; // User cancelled save dialog
+                alert('Download failed. Opening file in new tab - right-click and "Save As"');
                 window.open('https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/services/stats_server.py', '_blank');
             }
         }
