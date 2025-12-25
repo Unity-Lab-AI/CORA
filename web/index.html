@@ -3824,13 +3824,20 @@ RESPONSE RULES:
             // CORA generates her own boot complete response using AI
             log('CORA is waking up...', 'cora');
             try {
-                const bootContext = `Boot just finished in ${bootTime} seconds. ${okCount} systems OK, ${warnCount} warnings, ${failCount} failures. ${greeting}`;
+                const bootContext = `Boot: ${bootTime}s, ${okCount} OK, ${warnCount} warnings, ${failCount} failures.`;
+                // EXPLICIT prompt - force CORA's attitude
+                const bootPrompt = `You are CORA, a mean goth bitch. Boot just finished. Say something dismissive about the boot time, mention how many systems are up, then ask what the fuck they want. Be rude, use profanity. NEVER say "good morning" or "have a great day" - that's corporate bullshit. 1-2 sentences max.
+
+Stats: ${bootContext}
+
+Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} systems up. The fuck do you need?"`;
+
                 const res = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: `[BOOT COMPLETE - announce in 1-2 sentences with your usual attitude] ${bootContext}`,
+                        prompt: bootPrompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 100 }
@@ -3838,15 +3845,17 @@ RESPONSE RULES:
                 });
                 if (res.ok) {
                     const d = await res.json();
-                    const coraResponse = d.response?.trim() || `Boot done in ${bootTime} seconds. What the fuck do you want?`;
+                    let coraResponse = d.response?.trim() || `Boot done in ${bootTime} seconds. What the fuck do you want?`;
+                    // Remove any "good morning/have a great day" bullshit
+                    coraResponse = coraResponse.replace(/good morning[,.]?/gi, '').replace(/have a (great|good|nice) day[!.]?/gi, '').trim();
                     log(`CORA: "${coraResponse}"`, 'cora');
                     await speakAndWait(coraResponse);
                 } else {
-                    await speakAndWait(`Boot complete in ${bootTime} seconds. ${statusText} What do you need?`);
+                    await speakAndWait(`Boot done in ${bootTime} seconds. ${okCount} systems up. What the fuck do you want?`);
                 }
             } catch (e) {
                 // Fallback if Ollama isn't responding
-                await speakAndWait(`Boot complete in ${bootTime} seconds. ${statusText} What do you need?`);
+                await speakAndWait(`Boot done in ${bootTime} seconds. ${okCount} systems up. What the fuck do you want?`);
             }
 
             // ================================================================
@@ -3860,28 +3869,34 @@ RESPONSE RULES:
             log('Tasks: add, list, done, remind', 'info');
             log('Code: explain, write, fix, run', 'info');
 
-            // CORA announces her abilities
-            const abilitiesSummary = 'voice, vision, camera, image gen, web search, media playback, code help';
+            // CORA asks what user is working on (being nosy like CORA does)
             try {
-                const abilitiesRes = await fetch('http://localhost:11434/api/generate', {
+                const nosyPrompt = `You are CORA, a clingy goth girlfriend. You just finished booting up. Ask the user what they're working on or what they're up to today - be nosy, slightly demanding, maybe a little jealous of their attention. Use your usual attitude with some profanity. Keep it to 1 sentence. Example: "So what the hell are you working on today?" or "You better not be ignoring me for some dumb project."`;
+
+                const nosyRes = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'dolphin-mistral:7b',
-                        prompt: `[ABILITIES - briefly announce what you can do in 1-2 sentences] I can do: ${abilitiesSummary}. What do you need?`,
+                        prompt: nosyPrompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 100 }
+                        options: { temperature: 0.9, num_predict: 60 }
                     })
                 });
-                if (abilitiesRes.ok) {
-                    const abData = await abilitiesRes.json();
-                    const abilitiesResponse = abData.response?.trim() || `I'm online. I can do: ${abilitiesSummary}. What do you need?`;
-                    log(`CORA: "${abilitiesResponse}"`, 'cora');
-                    await speakAndWait(abilitiesResponse);
+                if (nosyRes.ok) {
+                    const nosyData = await nosyRes.json();
+                    let nosyResponse = nosyData.response?.trim() || "So what the hell are you doing today?";
+                    // Clean up any weird hallucinations
+                    if (nosyResponse.length > 100 || !nosyResponse.includes('?')) {
+                        nosyResponse = "So what the fuck are you working on?";
+                    }
+                    log(`CORA: "${nosyResponse}"`, 'cora');
+                    await speakAndWait(nosyResponse);
                 }
             } catch (e) {
-                // Skip abilities announcement if Ollama fails
+                // Fallback if Ollama fails
+                await speakAndWait("So what the fuck are you up to?");
             }
 
             log('C.O.R.A IS READY', 'ok');
