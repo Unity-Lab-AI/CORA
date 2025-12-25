@@ -103,27 +103,27 @@ def set_audio_chunk(chunk):
 class AudioWaveform(tk.Canvas):
     """Real-time audio waveform visualization using shared audio buffer from TTS."""
 
-    def __init__(self, parent, width=400, height=80, **kwargs):
+    def __init__(self, parent, width=480, height=60, **kwargs):
         super().__init__(parent, width=width, height=height,
                         bg='#0a0a0a', highlightthickness=0, **kwargs)
         self.width = width
         self.height = height
         self.is_playing = False
         self.bars = []
-        self.num_bars = 50
-        self.bar_width = max(2, (width - 20) // self.num_bars)
+        self.num_bars = 40  # Fewer, wider bars for more visible movement
+        self.bar_width = max(4, (width - 40) // self.num_bars)  # Wider bars
         self.animation_id = None
         self.audio_data = [0] * self.num_bars
         self.target_heights = [0] * self.num_bars
         self.current_heights = [0.0] * self.num_bars
-        self.smoothing = 0.5  # Higher = snappier response to audio
+        self.smoothing = 0.5
         self.sample_rate = 24000  # Kokoro TTS sample rate
-        self.samples_per_frame = self.sample_rate // 30  # ~30 FPS
+        self.samples_per_frame = self.sample_rate // 30
 
-        # Colors - goth/cyberpunk gradient (brighter for visibility)
-        self.color_low = (100, 0, 150)     # Purple
-        self.color_mid = (200, 0, 200)     # Bright magenta
-        self.color_high = (255, 100, 200)  # Hot pink
+        # Colors - vibrant cyberpunk gradient
+        self.color_low = (150, 0, 200)     # Bright purple
+        self.color_mid = (255, 0, 255)     # Bright magenta
+        self.color_high = (255, 100, 255)  # Hot pink
 
         self._create_bars()
 
@@ -202,17 +202,19 @@ class AudioWaveform(tk.Canvas):
             return
 
         center_y = self.height // 2
-        max_height = (self.height // 2) - 3
+        max_height = (self.height // 2) - 5  # Leave some margin
 
         # Get the CURRENT audio chunk being played right now
+        has_audio = False
         try:
             buf = get_audio_buffer()
             with _audio_buffer_lock:
                 chunk = buf.get('current_chunk')
                 chunk_time = buf.get('chunk_time', 0)
 
-                # Only use chunk if it's fresh (within last 100ms)
-                if chunk is not None and len(chunk) > 0 and (time.time() - chunk_time) < 0.1:
+                # Only use chunk if it's fresh (within last 150ms)
+                if chunk is not None and len(chunk) > 0 and (time.time() - chunk_time) < 0.15:
+                    has_audio = True
                     samples_per_bar = max(1, len(chunk) // self.num_bars)
 
                     for i in range(self.num_bars):
@@ -221,13 +223,17 @@ class AudioWaveform(tk.Canvas):
                         if bar_end > bar_start:
                             bar_chunk = chunk[bar_start:bar_end]
                             if HAS_NUMPY:
+                                # Use RMS for more accurate volume representation
+                                rms = float(np.sqrt(np.mean(bar_chunk ** 2)))
                                 peak = float(np.max(np.abs(bar_chunk)))
-                                self.target_heights[i] = min(1.0, peak * 2.5)
+                                # Combine RMS and peak, amplify significantly
+                                combined = (rms * 0.6 + peak * 0.4)
+                                self.target_heights[i] = min(1.0, combined * 5.0)
                             else:
                                 peak = max(abs(float(x)) for x in bar_chunk)
-                                self.target_heights[i] = min(1.0, peak * 2.5)
+                                self.target_heights[i] = min(1.0, peak * 5.0)
                 else:
-                    # No fresh audio - flatten bars
+                    # No fresh audio - decay bars
                     for i in range(self.num_bars):
                         self.target_heights[i] = 0
         except Exception as e:
@@ -236,20 +242,28 @@ class AudioWaveform(tk.Canvas):
 
         # Animate bars towards target heights
         for i, bar in enumerate(self.bars):
-            # Smooth interpolation (faster response)
-            self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.6
+            # Smooth interpolation - faster rise, slower fall
+            if self.target_heights[i] > self.current_heights[i]:
+                # Rising - fast response
+                self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.7
+            else:
+                # Falling - slower decay for visual smoothness
+                self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.3
 
             height = int(self.current_heights[i] * max_height)
-            height = max(2, height)
+            height = max(2, height)  # Minimum visible height
 
             x1, _, x2, _ = self.coords(bar)
             self.coords(bar, x1, center_y - height, x2, center_y + height)
 
             # Color based on intensity
-            color = self._get_color(self.current_heights[i])
+            if self.current_heights[i] > 0.05:
+                color = self._get_color(self.current_heights[i])
+            else:
+                color = '#1a0a2a'  # Dark when quiet
             self.itemconfig(bar, fill=color)
 
-        self.animation_id = self.after(25, self._animate)  # ~40 FPS for smoother animation
+        self.animation_id = self.after(20, self._animate)  # ~50 FPS for smoother animation
 
 
 class BootDisplay:
