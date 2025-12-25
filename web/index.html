@@ -1067,14 +1067,6 @@
 
             container.appendChild(line);
             container.scrollTop = container.scrollHeight;
-
-            // Sync to popup console if open
-            if (typeof popupConsole !== 'undefined' && popupConsole && !popupConsole.closed) {
-                popupConsole.postMessage({
-                    type: 'log',
-                    html: line.outerHTML
-                }, '*');
-            }
         }
 
         function renderPhases() {
@@ -2173,7 +2165,6 @@ You ARE Cora. That's just who you are.`;
         // ============================================================
 
         let popupConsole = null;
-        let consoleLogBuffer = [];  // Buffer for syncing logs to popup
 
         function openPopupConsole() {
             // Check if popup already open
@@ -2277,9 +2268,6 @@ You ARE Cora. That's just who you are.`;
 
             log('Console opened in popup window', 'ok');
         }
-
-        // Override log function to also send to popup
-        const originalLog = typeof log !== 'undefined' ? log : null;
 
         // ============================================================
         // MODAL SYSTEM - Like desktop's create_popup(), create_code_window(), etc.
