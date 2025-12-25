@@ -972,16 +972,16 @@
         }
 
         function _draw_wave(width, height) {
-            // EXACT port of boot_display.py _draw_wave() lines 324-384
+            // Symmetric waveform - expands OUT from center, collapses TO center at silence
             const ctx = waveformCtx;
             const center_y = height / 2;
-            const max_amp = (height / 2) - 5;  // line 334
+            const max_amp = (height / 2) - 5;
 
-            // Clear - line 326
+            // Clear
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, width, height);
 
-            // Center reference line - lines 337-338
+            // Center reference line (dim)
             ctx.strokeStyle = '#201030';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -989,17 +989,21 @@
             ctx.lineTo(width, center_y);
             ctx.stroke();
 
-            // Build coordinates - lines 341-347
+            // Build coordinates for top and bottom curves
+            // Amplitude expands symmetrically from center
             const step = width / (NUM_POINTS - 1);
-            const coords = [];
+            const topCoords = [];
+            const bottomCoords = [];
+
             for (let i = 0; i < NUM_POINTS; i++) {
                 const x = i * step;
-                const y = center_y - (wave_points[i] * max_amp);
-                coords.push([x, y]);
+                const amp = Math.abs(wave_points[i]) * max_amp;
+                topCoords.push([x, center_y - amp]);      // Above center
+                bottomCoords.push([x, center_y + amp]);   // Below center (mirror)
             }
 
-            if (coords.length >= 4) {
-                // 4 glow layers - lines 350-384
+            if (topCoords.length >= 4) {
+                // 4 glow layers
                 const layers = [
                     { color: '#400060', width: 8 },   // Outer glow
                     { color: '#8000a0', width: 5 },   // Mid glow
@@ -1007,24 +1011,33 @@
                     { color: '#ffc0ff', width: 1 }    // Bright core
                 ];
 
+                // Draw each layer as a closed shape (top curve + bottom curve mirrored)
                 layers.forEach(layer => {
                     ctx.strokeStyle = layer.color;
                     ctx.lineWidth = layer.width;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
 
-                    // smooth=True, splinesteps=16
+                    // Draw top curve (above center)
                     ctx.beginPath();
-                    ctx.moveTo(coords[0][0], coords[0][1]);
-
-                    for (let i = 1; i < coords.length - 1; i++) {
-                        const xc = (coords[i][0] + coords[i + 1][0]) / 2;
-                        const yc = (coords[i][1] + coords[i + 1][1]) / 2;
-                        ctx.quadraticCurveTo(coords[i][0], coords[i][1], xc, yc);
+                    ctx.moveTo(topCoords[0][0], topCoords[0][1]);
+                    for (let i = 1; i < topCoords.length - 1; i++) {
+                        const xc = (topCoords[i][0] + topCoords[i + 1][0]) / 2;
+                        const yc = (topCoords[i][1] + topCoords[i + 1][1]) / 2;
+                        ctx.quadraticCurveTo(topCoords[i][0], topCoords[i][1], xc, yc);
                     }
+                    ctx.lineTo(topCoords[topCoords.length - 1][0], topCoords[topCoords.length - 1][1]);
+                    ctx.stroke();
 
-                    const last = coords[coords.length - 1];
-                    ctx.lineTo(last[0], last[1]);
+                    // Draw bottom curve (below center - mirror)
+                    ctx.beginPath();
+                    ctx.moveTo(bottomCoords[0][0], bottomCoords[0][1]);
+                    for (let i = 1; i < bottomCoords.length - 1; i++) {
+                        const xc = (bottomCoords[i][0] + bottomCoords[i + 1][0]) / 2;
+                        const yc = (bottomCoords[i][1] + bottomCoords[i + 1][1]) / 2;
+                        ctx.quadraticCurveTo(bottomCoords[i][0], bottomCoords[i][1], xc, yc);
+                    }
+                    ctx.lineTo(bottomCoords[bottomCoords.length - 1][0], bottomCoords[bottomCoords.length - 1][1]);
                     ctx.stroke();
                 });
             }
