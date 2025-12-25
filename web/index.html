@@ -616,7 +616,7 @@
     </div>
 
     <!-- Toggle Button -->
-    <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
+    <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ BACKEND TERMINAL ]</button>
 
     <!-- Settings Button (next to split view) -->
     <button id="settingsBtn" onclick="openSettings()" style="
@@ -710,11 +710,14 @@
 
     <!-- Setup Terminal Panel (like CORA.bat output) - OUTSIDE mainContainer so it shows when container is hidden -->
     <div class="setup-terminal" id="setupTerminal" style="display: none;">
+        <!-- Fixed toggle buttons that scroll with the terminal -->
+        <div id="terminalButtons" style="position: fixed; top: 10px; right: 10px; z-index: 10000; display: flex; gap: 8px;">
+            <button onclick="backToMain()" style="background: #ff00ff; border: none; color: #000; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-family: Consolas, monospace; font-weight: bold;">[ BACK ]</button>
+            <button onclick="showSplitWithTerminal()" style="background: #00ffff; border: none; color: #000; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-family: Consolas, monospace; font-weight: bold;">[ SPLIT VIEW ]</button>
+        </div>
         <div class="log-header" style="background: linear-gradient(90deg, #002020 0%, #001515 100%); border-color: #00ffff;">[ BACKEND TERMINAL ] - System Setup & Checks</div>
         <div class="log-container" id="setupLog" style="background: #000; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; padding: 15px; overflow-y: auto; color: #00ff00;">
-            <pre style="color: #ff00ff; font-size: 16px;">BACKEND TERMINAL LOADING...</pre>
-            <div style="color: #ffff00;">If you see this, the terminal panel is visible!</div>
-            <div style="color: #00ffff;">JavaScript will populate the actual content...</div>
+            <!-- Content populated by initSetupTerminal() -->
         </div>
     </div>
 
@@ -4553,57 +4556,64 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
         // View Toggle - Split / Setup Terminal / Console / Status
         // ============================================================
 
-        let viewMode = 'split';  // 'split', 'setup', 'console', 'status'
+        let viewMode = 'split';  // 'split', 'setup'
 
+        // Show backend terminal fullscreen
         async function toggleView() {
-            alert('toggleView called! Mode: ' + viewMode);
             const container = document.getElementById('mainContainer');
             const setupTerminal = document.getElementById('setupTerminal');
             const btn = document.getElementById('toggleBtn');
 
-            console.log('[VIEW] toggleView called, current mode:', viewMode);
-
             if (viewMode === 'split') {
                 // Show setup terminal (like CORA.bat output)
                 viewMode = 'setup';
-                if (!setupTerminal) {
-                    alert('ERROR: setupTerminal element not found!');
-                    return;
-                }
                 setupTerminal.style.display = 'flex';
                 container.style.display = 'none';
-                btn.textContent = '[ SETUP TERMINAL ]';
-                alert('Setup terminal should be visible now. Display: ' + setupTerminal.style.display);
-                console.log('[VIEW] Setup terminal visible:', setupTerminal.style.display);
-                console.log('[VIEW] Setup terminal dimensions:', setupTerminal.offsetWidth, 'x', setupTerminal.offsetHeight);
-                // Initialize the setup terminal with real checks (force refresh)
+                btn.textContent = '[ BACKEND TERMINAL ]';
+                // Initialize the setup terminal with real checks
                 try {
                     await initSetupTerminal(true);
                 } catch (e) {
                     console.error('[SETUP] Error:', e);
-                    alert('initSetupTerminal error: ' + e.message);
                     setupLog('ERROR: ' + e.message, '#ff0000');
                 }
-            } else if (viewMode === 'setup') {
-                // Console only
-                viewMode = 'console';
-                setupTerminal.style.display = 'none';
-                container.style.display = 'grid';
-                container.classList.remove('fullscreen-status');
-                container.classList.add('fullscreen-console');
-                btn.textContent = '[ CONSOLE ONLY ]';
-            } else if (viewMode === 'console') {
-                // Status only
-                viewMode = 'status';
-                container.classList.remove('fullscreen-console');
-                container.classList.add('fullscreen-status');
-                btn.textContent = '[ STATUS ONLY ]';
             } else {
-                // Back to split
-                viewMode = 'split';
-                container.classList.remove('fullscreen-console', 'fullscreen-status');
-                btn.textContent = '[ SPLIT VIEW ]';
+                // Back to main split view
+                backToMain();
             }
+        }
+
+        // Back to main split view
+        function backToMain() {
+            const container = document.getElementById('mainContainer');
+            const setupTerminal = document.getElementById('setupTerminal');
+            const btn = document.getElementById('toggleBtn');
+
+            viewMode = 'split';
+            setupTerminal.style.display = 'none';
+            container.style.display = 'grid';
+            container.classList.remove('fullscreen-console', 'fullscreen-status');
+            btn.textContent = '[ BACKEND TERMINAL ]';
+        }
+
+        // Show split view with terminal on the right side
+        function showSplitWithTerminal() {
+            const container = document.getElementById('mainContainer');
+            const setupTerminal = document.getElementById('setupTerminal');
+            const btn = document.getElementById('toggleBtn');
+            const logContainer = document.getElementById('logContainer');
+            const setupLog = document.getElementById('setupLog');
+
+            // Copy terminal content to the right panel log
+            if (setupLog && logContainer) {
+                logContainer.innerHTML = setupLog.innerHTML;
+            }
+
+            viewMode = 'split';
+            setupTerminal.style.display = 'none';
+            container.style.display = 'grid';
+            container.classList.remove('fullscreen-console', 'fullscreen-status');
+            btn.textContent = '[ BACKEND TERMINAL ]';
         }
 
         // Keyboard shortcut: F key toggles view
