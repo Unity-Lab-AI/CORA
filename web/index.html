@@ -1524,8 +1524,9 @@ WHEN RESPONDING:
                 }
 
                 // Validate data.audio exists and has content
+                console.log(`[TTS] Validating audio data: exists=${!!data.audio}, byteLength=${data.audio?.byteLength || 0}`);
                 if (!data.audio || data.audio.byteLength === 0) {
-                    console.error('[TTS] Received empty audio buffer');
+                    console.error('[TTS] Received empty audio buffer - THIS IS THE BUG');
                     if (text) {
                         document.getElementById('speechText').textContent = `"${text}"`;
                         log(`CORA: "${text}"`, 'cora');
@@ -1538,7 +1539,13 @@ WHEN RESPONDING:
                 const float32Audio = new Float32Array(data.audio);
                 const sampleRate = data.sampleRate || 24000;
                 const duration = float32Audio.length / sampleRate;
-                console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${sampleRate}Hz, ${duration.toFixed(2)}s duration`);
+
+                // Check if audio is actually silence (all zeros)
+                let maxSample = 0;
+                for (let i = 0; i < Math.min(1000, float32Audio.length); i++) {
+                    maxSample = Math.max(maxSample, Math.abs(float32Audio[i]));
+                }
+                console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${sampleRate}Hz, ${duration.toFixed(2)}s, maxSample=${maxSample.toFixed(4)}`);
 
                 // Stop any currently playing audio first
                 if (currentAudioSource) {
@@ -1608,6 +1615,7 @@ WHEN RESPONDING:
                 }, fallbackMs);
 
                 // Start waveform FIRST so it's active when audio starts
+                console.log(`[TTS] Calling startWaveform() for id=${id}`);
                 startWaveform();
 
                 // NOW show the speech text - we're about to play
@@ -1617,7 +1625,9 @@ WHEN RESPONDING:
                 }
 
                 // Start audio and waveform update loop
+                console.log(`[TTS] About to call source.start(0) for id=${id}, audioContext.state=${audioContext.state}`);
                 source.start(0);
+                console.log(`[TTS] source.start(0) called successfully for id=${id}`);
                 updateWaveform();
                 console.log(`[TTS] Audio started for id=${id}, will wait ${duration.toFixed(2)}s`);
 
