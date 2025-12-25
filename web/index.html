@@ -667,6 +667,27 @@
         </div>
     </div>
 
+    <!-- Auto-Install Stats Server Gate -->
+    <div class="modal-overlay" id="autoInstallGate">
+        <div class="modal" style="max-width: 550px; text-align: center;">
+            <h2 style="color: #ff00ff; font-size: 22px; margin-bottom: 15px;">⚡ AUTO-INSTALL REQUIRES BACKEND</h2>
+            <p style="font-size: 14px; line-height: 1.6; margin-bottom: 15px;">
+                To auto-install models and configure everything, you need to run the <strong style="color: #00ffff;">stats server</strong> first.
+            </p>
+            <div style="background: #1a1a2e; border: 1px solid #444; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: left;">
+                <p style="font-size: 12px; color: #888; margin-bottom: 10px;">Open a terminal in the project folder and run:</p>
+                <code style="color: #00ff00; font-size: 14px; display: block; padding: 10px; background: #0a0a15; border-radius: 4px;">python services/stats_server.py</code>
+                <p style="font-size: 11px; color: #666; margin-top: 10px;">This server handles Ollama control, model downloads, and system stats.</p>
+            </div>
+            <button class="modal-btn" onclick="retryAutoInstall()" style="background: #00ff00; color: #000; font-size: 14px; padding: 12px 25px; font-weight: bold;">
+                I started it - Try Again
+            </button>
+            <button class="modal-btn" onclick="backToFirstTime()" style="background: #666; color: #fff; margin-top: 15px; font-size: 12px; padding: 10px 20px;">
+                Go Back - I'll do manual setup
+            </button>
+        </div>
+    </div>
+
     <!-- Toggle Button -->
     <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ BACKEND TERMINAL ]</button>
 
@@ -2670,14 +2691,15 @@ WHEN RESPONDING:
 
         function continueAfterStatsCheck() {
             // Check if this is first boot or returning user
-            const hasBootedBefore = localStorage.getItem('cora_boot_complete');
+            // Use cora_first_time for consistency (set in init and acceptFirstTime)
+            const hasBootedBefore = localStorage.getItem('cora_first_time') === 'done';
 
             if (hasBootedBefore) {
                 // Returning user - quick boot
                 runQuickBoot();
             } else {
-                // FIRST TIME USER - Show patience warning popup first!
-                document.getElementById('firstTimeModal').classList.add('visible');
+                // First time - run full boot sequence
+                runBootSequence();
             }
         }
 
@@ -2685,7 +2707,8 @@ WHEN RESPONDING:
         async function acceptFirstTime() {
             // User has patience - continue with normal setup flow
             document.getElementById('firstTimeModal').classList.remove('visible');
-            localStorage.setItem('cora_first_time', 'done');
+            // Don't set cora_first_time yet - let runBootSequence set it when complete
+            // This ensures returning users only get quick boot after successful first boot
 
             // Continue with normal gate checks (Ollama, stats server, etc.)
             await continueInit();
@@ -2697,9 +2720,39 @@ WHEN RESPONDING:
         }
 
         async function autoInstallEverything() {
-            // User wants auto-install - do everything for them
+            // User wants auto-install - check if stats server is running first
             document.getElementById('firstTimeModal').classList.remove('visible');
 
+            // Gate: Stats server required for auto-install
+            const statsOk = await checkStatsServer();
+            if (!statsOk) {
+                // Show the stats server gate modal
+                document.getElementById('autoInstallGate').classList.add('visible');
+                return;
+            }
+
+            // Stats server running - proceed with auto-install
+            await runAutoInstall();
+        }
+
+        async function retryAutoInstall() {
+            // User says they started the stats server - check again
+            const statsOk = await checkStatsServer();
+            if (statsOk) {
+                document.getElementById('autoInstallGate').classList.remove('visible');
+                await runAutoInstall();
+            } else {
+                alert('Stats server still not responding.\n\nMake sure you ran:\npython services/stats_server.py\n\nAnd it shows "Server running on http://localhost:11435"');
+            }
+        }
+
+        function backToFirstTime() {
+            // Go back to first-time modal
+            document.getElementById('autoInstallGate').classList.remove('visible');
+            document.getElementById('firstTimeModal').classList.add('visible');
+        }
+
+        async function runAutoInstall() {
             // Switch to backend terminal view so user can see progress
             const mainContent = document.getElementById('mainContent');
             const setupTerminal = document.getElementById('setupTerminal');
@@ -4817,6 +4870,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             log('C.O.R.A IS READY', 'ok');
 
             // Save boot complete flag for quick boot next time
+            localStorage.setItem('cora_first_time', 'done');  // Key for returning user detection
             localStorage.setItem('cora_boot_complete', 'true');
             localStorage.setItem('cora_boot_date', new Date().toISOString());
             log('First-time setup saved - next boot will be faster!', 'info');
@@ -4828,6 +4882,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
 
         // Force full boot (for testing or re-setup)
         function forceFullBoot() {
+            localStorage.removeItem('cora_first_time');  // Returning user detection
             localStorage.removeItem('cora_boot_complete');
             localStorage.removeItem('cora_permissions');
             location.reload();
