@@ -1103,20 +1103,49 @@ WHEN RESPONDING:
                 ollamaStatus = await checkOllamaRunning();
 
                 if (!ollamaStatus.running) {
-                    setupLog('[ERROR] Ollama is NOT running!', '#ff4444');
-                    setupLog('', '#ffffff');
-                    setupLog('Ollama is required for CORA to function.', '#ffffff');
-                    setupLog('', '#ffffff');
-                    setupLogHTML('<span style="color: #00ffff;">Download Ollama:</span> <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff; text-decoration: underline;">https://ollama.com/download</a>');
-                    setupLog('', '#ffffff');
-                    setupLog('After installing, run: ollama serve', '#00ff00');
-                    setupLog('Then refresh this page.', '#ffff00');
-                    setupLog('============================================================', '#ff4444');
-                    setupLog('[BLOCKED] Cannot proceed without Ollama', '#ff4444');
-                    return;
-                }
+                    setupLog('[WARN] Ollama is NOT running!', '#ffaa00');
+                    setupLog('  Attempting to start Ollama service...', '#ffff00');
 
-                setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                    // Try to start Ollama via stats server
+                    try {
+                        const startResp = await fetch('http://localhost:11435/setup/start-ollama', {
+                            method: 'POST',
+                            signal: AbortSignal.timeout(10000)
+                        });
+                        const result = await startResp.json();
+
+                        if (result.success) {
+                            setupLog('  [OK] Ollama service starting...', '#00ff00');
+                            // Wait for Ollama to be ready
+                            setupLog('  Waiting for Ollama to initialize...', '#ffff00');
+                            await new Promise(r => setTimeout(r, 5000));
+
+                            // Re-check
+                            ollamaStatus = await checkOllamaRunning();
+                            if (ollamaStatus.running) {
+                                setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                            } else {
+                                setupLog('[WARN] Ollama started but not responding yet - may need more time', '#ffaa00');
+                            }
+                        } else {
+                            throw new Error(result.message);
+                        }
+                    } catch (e) {
+                        setupLog(`  [ERROR] Could not start Ollama: ${e.message}`, '#ff4444');
+                        setupLog('', '#ffffff');
+                        setupLog('Ollama is required for CORA to function.', '#ffffff');
+                        setupLog('', '#ffffff');
+                        setupLogHTML('<span style="color: #00ffff;">Download Ollama:</span> <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff; text-decoration: underline;">https://ollama.com/download</a>');
+                        setupLog('', '#ffffff');
+                        setupLog('After installing, run: ollama serve', '#00ff00');
+                        setupLog('Then refresh this page.', '#ffff00');
+                        setupLog('============================================================', '#ff4444');
+                        setupLog('[BLOCKED] Cannot proceed without Ollama', '#ff4444');
+                        return;
+                    }
+                } else {
+                    setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                }
                 setupLog('', '#ffffff');
 
                 // Check required models
@@ -1140,7 +1169,27 @@ WHEN RESPONDING:
 
                 if (missingModels.length > 0) {
                     setupLog('', '#ffffff');
-                    setupLog('Run: ollama pull <model> for missing models', '#ffaa00');
+                    setupLog('[INSTALL] Downloading missing models...', '#ffaa00');
+
+                    // Actually pull missing models via stats server
+                    for (const model of missingModels) {
+                        setupLog(`  [DOWNLOAD] ${model.display} (~4GB)...`, '#ffff00');
+                        try {
+                            const pullResp = await fetch(`http://localhost:11435/setup/pull-model/${model.display}`, {
+                                method: 'POST',
+                                signal: AbortSignal.timeout(600000)  // 10 min timeout
+                            });
+                            const result = await pullResp.json();
+                            if (result.success) {
+                                setupLog(`  [OK] ${model.display} installed!`, '#00ff00');
+                            } else {
+                                setupLog(`  [FAIL] ${model.display}: ${result.message}`, '#ff4444');
+                            }
+                        } catch (e) {
+                            setupLog(`  [ERROR] ${model.display}: ${e.message}`, '#ff4444');
+                            setupLog('    Stats server not running? Start with: python services/stats_server.py', '#ffaa00');
+                        }
+                    }
                 } else {
                     setupLog('[OK] All required models installed!', '#00ff00');
                 }
