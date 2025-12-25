@@ -3927,7 +3927,8 @@ WHEN RESPONDING:
             const searchTerm = randomSearchTerms[Math.floor(Math.random() * randomSearchTerms.length)];
             log(`Searching YouTube: "${searchTerm}"`, 'info');
 
-            let video = { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop (fallback)' }; // Fallback
+            let video = { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio' }; // Default
+            let searchWorked = false;
             try {
                 // Use Invidious API (no API key needed) for random YouTube search
                 const instances = ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yt.artemislena.eu'];
@@ -3942,28 +3943,29 @@ WHEN RESPONDING:
                         const randomIndex = Math.floor(Math.random() * Math.min(10, results.length));
                         const found = results[randomIndex];
                         video = { id: found.videoId, title: found.title?.substring(0, 50) || searchTerm };
+                        searchWorked = true;
                     }
                 }
             } catch (e) {
-                log('Search failed, using fallback', 'warn');
+                log('Search timeout, using default video', 'info');
             }
 
             log(`Found: ${video.title}`, 'ok');
-            log('Embedding YouTube video...', 'info');
-
-            // Show video in modal
-            const videoModal = showVideoModal(video.id, `CORA - YouTube Test: ${video.title}`);
-            log('Video playing in modal', 'ok');
-
             setPhase('youtube', 'ok');
-            // YouTube phase - give CORA the video title
-            const ytResponse = await coraRespond('YouTube Test', `YouTube test done. Playing "${video.title}". Report.`, 'ok');
+
+            // SPEAK FIRST - before showing video (no audio overlap)
+            const ytResponse = await coraRespond('YouTube Test', `YouTube working. Playing "${video.title}". Respond briefly.`, 'ok');
             await speakAndWait(ytResponse);
 
-            // Wait for video to play, then close before moving on
-            await sleep(5000);
+            // NOW show video after TTS is done
+            log('Embedding YouTube video...', 'info');
+            const videoModal = showVideoModal(video.id, `CORA - ${video.title}`);
+            log('Video playing in modal', 'ok');
+
+            // Let video play, then close
+            await sleep(8000);
             videoModal.close();
-            log('YouTube test complete, modal closed', 'info');
+            log('YouTube test complete', 'info');
 
             // ================================================================
             // PHASE 4.3: MODAL WINDOWS - Show actual test modal!
