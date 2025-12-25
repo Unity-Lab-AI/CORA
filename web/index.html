@@ -1401,23 +1401,43 @@ WHEN RESPONDING:
             }
         }
 
+        // Strip URLs, emails, links from text for TTS - keeps log readable, speech natural
+        function stripUrlsForSpeech(text) {
+            let clean = text;
+            // Strip URLs (https://, http://, www.)
+            clean = clean.replace(/https?:\/\/[^\s]+/gi, '');
+            clean = clean.replace(/www\.[^\s]+/gi, '');
+            // Strip email addresses
+            clean = clean.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi, '');
+            // Strip discord.gg links
+            clean = clean.replace(/discord\.gg\/[^\s]+/gi, '');
+            // Clean up multiple spaces and trim
+            clean = clean.replace(/\s+/g, ' ').trim();
+            // Remove trailing commas from stripped URLs
+            clean = clean.replace(/,\s*,/g, ',').replace(/,\s*\./g, '.').replace(/\s+,/g, ',');
+            return clean;
+        }
+
         function speak(text, callback) {
             // DON'T show speech text or log yet - wait until audio actually starts playing
+            // Strip URLs for TTS but keep original for log display
+            const displayText = text;  // Full text for log
+            const speakText = stripUrlsForSpeech(text);  // Clean text for TTS
 
             if (kokoroReady && !useFallbackTTS) {
-                // Use Kokoro neural TTS
+                // Use Kokoro neural TTS - speakText for TTS, displayText for log
                 const id = ++messageId;
                 pendingCallbacks[id] = {
                     resolve: callback || (() => {}),
                     startTime: Date.now(),
-                    text: text  // Store text to display when audio starts
+                    text: displayText  // Full text with URLs for log display
                 };
 
-                // Don't start waveform yet - wait for audio ready
+                // Send CLEAN text (no URLs) to TTS
                 kokoroWorker.postMessage({
                     type: 'generate',
                     id,
-                    data: { text, voice: 'af_bella', speed: 1.0 }
+                    data: { text: speakText, voice: 'af_bella', speed: 1.0 }
                 });
             } else {
                 // Fallback to Web Speech API
@@ -1425,7 +1445,8 @@ WHEN RESPONDING:
                     const synth = window.speechSynthesis;
                     synth.cancel();
 
-                    const utterance = new SpeechSynthesisUtterance(text);
+                    // speakText = clean (no URLs), displayText = full
+                    const utterance = new SpeechSynthesisUtterance(speakText);
                     utterance.rate = 1.0;
                     utterance.pitch = 1.1;
 
@@ -1436,10 +1457,10 @@ WHEN RESPONDING:
                     ) || voices[0];
                     if (femaleVoice) utterance.voice = femaleVoice;
 
-                    // Show text and log only when audio starts
+                    // Show FULL text in log, but TTS speaks CLEAN text
                     utterance.onstart = () => {
-                        document.getElementById('speechText').textContent = `"${text}"`;
-                        log(`CORA: "${text}"`, 'cora');
+                        document.getElementById('speechText').textContent = `"${displayText}"`;
+                        log(`CORA: "${displayText}"`, 'cora');
                         startWaveform();
                     };
                     utterance.onend = () => { stopWaveform(); if (callback) callback(); };
@@ -3615,13 +3636,14 @@ WHEN RESPONDING:
                 // Start polling for live updates
                 startStatsPolling();
 
-                // Hardware summary - EXACT format from desktop line 866-870
-                let hw_data = `CPU ${Math.round(stats.cpu.percent)}%, RAM ${Math.round(stats.memory.percent)}%, Disk ${Math.round(stats.disk.percent)}%`;
+                // Hardware summary - give CORA the ACTUAL stats to report
+                let hw_data = `Hardware scan done. CPU at ${Math.round(stats.cpu.percent)}%, RAM at ${Math.round(stats.memory.percent)}%, Disk at ${Math.round(stats.disk.percent)}%`;
                 if (stats.gpu && stats.gpu.available) {
-                    hw_data += `, GPU ${stats.gpu.name} at ${stats.gpu.utilization}%`;
+                    hw_data += `, GPU ${stats.gpu.name} running at ${stats.gpu.utilization}% load, ${stats.gpu.temperature}°C`;
                 } else {
-                    hw_data += `, no GPU`;
+                    hw_data += `, no dedicated GPU detected`;
                 }
+                hw_data += `. Report these stats.`;
                 const hwResponse = await coraRespond('PC Hardware scan', hw_data, 'ok');
                 await speakAndWait(hwResponse);
             } else {
@@ -3630,7 +3652,7 @@ WHEN RESPONDING:
                 log('Network: ' + (navigator.onLine ? 'Connected' : 'Disconnected'), navigator.onLine ? 'ok' : 'warn');
                 document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
                 setPhase('hardware', 'warn');
-                const hwWarn = await coraRespond('Hardware', 'Hardware stats unavailable. Run the stats server for real monitoring.', 'warn');
+                const hwWarn = await coraRespond('Hardware', 'Hardware stats server not running. No real-time monitoring available. Report.', 'warn');
                 await speakAndWait(hwWarn);
             }
 
@@ -3656,7 +3678,7 @@ WHEN RESPONDING:
                 if (permResult === 'skip' || permResult === 'denied') {
                     log(`Camera permission ${permResult} by user`, 'warn');
                     setPhase('camera', 'warn');
-                    const camSkip = await coraRespond('Camera', `Camera ${permResult}. Moving on.`, 'warn');
+                    const camSkip = await coraRespond('Camera', `Camera permission ${permResult}. Report.`, 'warn');
                     await speakAndWait(camSkip);
                 } else if (permResult === 'granted') {
                     log('Testing live camera feed...', 'info');
@@ -3733,12 +3755,12 @@ WHEN RESPONDING:
                         liveCameraWorking = true;
                         setPhase('camera', 'ok');
 
-                        // EXACT format from desktop line 938 - CORA describes what she sees!
+                        // Camera phase - give CORA the vision data
                         let camResponse;
                         if (camera_desc && camera_desc.length > 10) {
-                            camResponse = await coraRespond('Live Camera', `Camera online. I see: ${camera_desc.substring(0, 80)}`, 'ok');
+                            camResponse = await coraRespond('Live Camera', `Camera test done. Vision sees: ${camera_desc.substring(0, 100)}. Report.`, 'ok');
                         } else {
-                            camResponse = await coraRespond('Live Camera', 'Camera online.', 'ok');
+                            camResponse = await coraRespond('Live Camera', 'Camera online, vision test passed. Report.', 'ok');
                         }
                         await speakAndWait(camResponse);
 
@@ -3750,14 +3772,14 @@ WHEN RESPONDING:
                     } catch (e) {
                         log('Live camera not available: ' + e.message, 'warn');
                         setPhase('camera', 'warn');
-                        const camWarn = await coraRespond('Live Camera', 'Camera not available.', 'warn');
+                        const camWarn = await coraRespond('Live Camera', 'Camera test failed, not available. Report.', 'warn');
                         await speakAndWait(camWarn);
                     }
                 }
             } else {
                 log('Camera API not available in this browser', 'warn');
                 setPhase('camera', 'warn');
-                const camWarn = await coraRespond('Camera', 'Camera not available in this browser.', 'warn');
+                const camWarn = await coraRespond('Camera', 'Browser camera API not available. Report.', 'warn');
                 await speakAndWait(camWarn);
             }
 
@@ -3783,8 +3805,8 @@ WHEN RESPONDING:
                 if (t.ok) toolsOk++;
             });
             setPhase('tools', 'ok');
-            // EXACT format from desktop line 1129-1131
-            const tools_result = `${toolsOk} of ${webTools.length} tools loaded.`;
+            // Tools phase - give CORA the count
+            const tools_result = `Core tools check done. ${toolsOk} of ${webTools.length} browser APIs available. Report.`;
             const tools_status = toolsOk >= webTools.length - 2 ? 'ok' : (toolsOk >= webTools.length / 2 ? 'warn' : 'fail');
             const toolsResponse = await coraRespond('Core Tools check', tools_result, tools_status);
             await speakAndWait(toolsResponse);
@@ -3812,7 +3834,7 @@ WHEN RESPONDING:
                     log('Code browser opened - browse CORA source!', 'ok');
 
                     setPhase('code_import', 'ok');
-                    const codeResponse = await coraRespond('Code Browser', `My codebase is now viewable. ${fileCount} items loaded. Browse away.`, 'ok');
+                    const codeResponse = await coraRespond('Code Browser', `Code browser loaded. ${fileCount} files from Unity-Lab-AI/CORA repo. Report.`, 'ok');
                     await speakAndWait(codeResponse);
 
                     // Give time to browse, then close before moving on
@@ -3825,7 +3847,7 @@ WHEN RESPONDING:
             } catch (e) {
                 log(`Code browser: ${e.message}`, 'warn');
                 setPhase('code_import', 'warn');
-                const codeWarn = await coraRespond('Code Browser', 'GitHub API shit the bed. Rate-limited probably.', 'warn');
+                const codeWarn = await coraRespond('Code Browser', 'Code browser failed, GitHub API rate limited. Report.', 'warn');
                 await speakAndWait(codeWarn);
             }
 
@@ -3880,8 +3902,8 @@ WHEN RESPONDING:
             log('Video playing in modal', 'ok');
 
             setPhase('youtube', 'ok');
-            // EXACT format from desktop line 1549
-            const ytResponse = await coraRespond('YouTube Test', `Found: ${video.title}. Playing sample.`, 'ok');
+            // YouTube phase - give CORA the video title
+            const ytResponse = await coraRespond('YouTube Test', `YouTube test done. Playing "${video.title}". Report.`, 'ok');
             await speakAndWait(ytResponse);
 
             // Wait for video to play, then close before moving on
@@ -3912,8 +3934,8 @@ WHEN RESPONDING:
             log('Modal displayed successfully', 'ok');
 
             setPhase('modals', 'ok');
-            // EXACT format from desktop line 1667
-            const modalResponse = await coraRespond('Modal Windows', 'Modal windows working.', 'ok');
+            // Modal phase - confirm working
+            const modalResponse = await coraRespond('Modal Windows', 'Modal windows test passed. Report.', 'ok');
             await speakAndWait(modalResponse);
 
             // Wait then close modal before moving on
@@ -3938,8 +3960,9 @@ WHEN RESPONDING:
                 log('Wake Word - Not supported in this browser', 'warn');
             }
             setPhase('voice_sys', 'ok');
-            // EXACT format from desktop line 1727-1728
-            const voice_result = 'Voice systems online.' + (hasSpeechRecog ? ' Wake word active.' : '');
+            // Voice phase - give CORA the TTS/STT status
+            const ttsType = kokoroReady ? 'Kokoro neural TTS' : 'Web Speech fallback';
+            const voice_result = `Voice systems done. Using ${ttsType}. Wake word ${hasSpeechRecog ? 'active' : 'not supported'}. Report.`;
             const voiceResponse = await coraRespond('Voice Systems check', voice_result, 'ok');
             await speakAndWait(voiceResponse);
 
@@ -3969,12 +3992,12 @@ WHEN RESPONDING:
                 const locStr = [location.city, location.state, location.country].filter(Boolean).join(', ');
                 log(`Location: ${locStr}`, 'ok');
                 log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
-                // EXACT format from desktop line 1762
-                const locResponse = await coraRespond('Location check', `Location: ${locStr}`, 'ok');
+                // Location phase - give CORA the location
+                const locResponse = await coraRespond('Location check', `Location acquired: ${locStr}. Report.`, 'ok');
                 await speakAndWait(locResponse);
             } else {
                 log('Location not available or denied', 'warn');
-                const locWarn = await coraRespond('Location check', 'Location unavailable.', 'warn');
+                const locWarn = await coraRespond('Location check', 'Location unavailable or denied. Report.', 'warn');
                 await speakAndWait(locWarn);
             }
             setPhase('external', 'ok');
@@ -3992,12 +4015,12 @@ WHEN RESPONDING:
                 await new Promise(r => setTimeout(r, 3000));
                 log('Audio test complete!', 'ok');
                 setPhase('audio', 'ok');
-                const audioResponse = await coraRespond('Audio Playback', `Audio working. Playing ${audioResult.played || 'synth test'}.`, 'ok');
+                const audioResponse = await coraRespond('Audio Playback', `Audio test passed. Played ${audioResult.played || 'synth tone'}. Report.`, 'ok');
                 await speakAndWait(audioResponse);
             } else {
                 log('Audio test failed: ' + audioResult.error, 'warn');
                 setPhase('audio', 'warn');
-                const audioWarn = await coraRespond('Audio Playback', 'Audio test failed.', 'warn');
+                const audioWarn = await coraRespond('Audio Playback', 'Audio test failed. Report.', 'warn');
                 await speakAndWait(audioWarn);
             }
 
@@ -4029,26 +4052,26 @@ WHEN RESPONDING:
 
                 setPhase('weather', 'ok');
 
-                // Build weather report - EXACT format from desktop line 1880-1891
+                // Weather phase - give CORA actual temp and conditions
                 const tempSpoken = weather.temp.replace('°F', ' degrees').replace('+', '');
-                let weather_report = `Current conditions: ${tempSpoken}, ${weather.conditions.toLowerCase()}. `;
+                let weather_report = `Weather done. Currently ${tempSpoken}, ${weather.conditions.toLowerCase()}`;
+                if (location?.city) weather_report += ` in ${location.city}`;
+                weather_report += `. `;
                 if (forecastData.success && forecastData.forecast.length >= 2) {
+                    weather_report += `Forecast: `;
                     forecastData.forecast.slice(1, 3).forEach(day => {
-                        if (day.conditions) {
-                            weather_report += `${day.day} will be ${day.conditions.toLowerCase()} with a high of ${day.high} and a low of ${day.low}. `;
-                        } else {
-                            weather_report += `${day.day} the high will be ${day.high} and the low will be ${day.low}. `;
-                        }
+                        weather_report += `${day.day} ${day.high}/${day.low}. `;
                     });
                 }
-                // mode='full' for weather like desktop line 1891
+                weather_report += `Give your take.`;
+                // mode='full' for weather - more detail allowed
                 const weatherResponse = await coraRespond('Weather', weather_report, 'ok', 'full');
                 await speakAndWait(weatherResponse);
             } else {
                 document.getElementById('statWeather').textContent = 'N/A';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('weather', 'warn');
-                const weatherWarn = await coraRespond('Weather', 'Weather unavailable.', 'warn');
+                const weatherWarn = await coraRespond('Weather', 'Weather service unavailable. Report.', 'warn');
                 await speakAndWait(weatherWarn);
             }
 
@@ -4065,20 +4088,20 @@ WHEN RESPONDING:
                 log('Top 3 Headlines:', 'ok');
                 headlines.slice(0, 3).forEach((h, i) => log(`  ${i+1}. ${h}`, 'info'));
                 setPhase('news', 'ok');
-                // EXACT format from desktop line 2055-2057 - clean headlines, mode='full'
+                // News phase - give CORA actual headlines
                 const clean_headlines = headlines.slice(0, 3).map(hl => {
                     let clean = hl.split(' - ')[0] || hl;
-                    if (clean.length > 100) clean = clean.substring(0, 97) + '...';
+                    if (clean.length > 80) clean = clean.substring(0, 77) + '...';
                     return clean;
                 });
-                const news_data = 'Top headlines: ' + clean_headlines.join('. ');
+                const news_data = `News done. ${headlines.length} headlines found. Top 3: ${clean_headlines.join('. ')}. Give your take.`;
                 const newsResponse = await coraRespond('News Headlines', news_data, 'ok', 'full');
                 await speakAndWait(newsResponse);
             } else {
                 log('News unavailable', 'warn');
                 setPhase('news', 'warn');
-                // EXACT format from desktop line 2061
-                const newsWarn = await coraRespond('News Headlines', 'No headlines found.', 'warn');
+                // News failure
+                const newsWarn = await coraRespond('News Headlines', 'News service unavailable. Report.', 'warn');
                 await speakAndWait(newsWarn);
             }
 
@@ -4211,16 +4234,16 @@ WHEN RESPONDING:
                 }
             }
 
-            // Vision summary - EXACT format from desktop line 2313-2321
+            // Vision summary - give CORA the actual status
             let vision_result;
             if (screenshotOk && visionCameraOk) {
-                vision_result = "Screenshot and camera both online.";
+                vision_result = "Vision test done. Screenshot and camera both working. Report.";
             } else if (screenshotOk) {
-                vision_result = "Screenshot working, no camera.";
+                vision_result = "Vision test done. Screenshot working, camera unavailable. Report.";
             } else if (visionCameraOk) {
-                vision_result = "Camera working, screenshot failed.";
+                vision_result = "Vision test done. Camera working, screenshot failed. Report.";
             } else {
-                vision_result = "Vision systems failed.";
+                vision_result = "Vision test failed. Both screenshot and camera unavailable. Report.";
             }
             setPhase('vision', (screenshotOk || visionCameraOk) ? 'ok' : 'warn');
             const visionResponse = await coraRespond('Vision Systems summary', vision_result, 'ok');
@@ -4309,13 +4332,13 @@ WHEN RESPONDING:
                     if (image_description && image_description.length > 10) {
                         await speakAndWait(image_description);
                     } else {
-                        const imgResponse = await coraRespond('Image Generation', `Image generated in ${genTime}s. Vision failed.`, 'warn');
+                        const imgResponse = await coraRespond('Image Generation', `Image generated in ${genTime}s but vision analysis failed. Report.`, 'warn');
                         await speakAndWait(imgResponse);
                     }
                 } catch (e) {
                     log('Image generation failed: ' + e.message, 'warn');
                     setPhase('imagegen', 'warn');
-                    const imgFail = await coraRespond('Image Generation', `Image gen failed: ${e.message.substring(0, 50)}`, 'fail');
+                    const imgFail = await coraRespond('Image Generation', `Image generation failed: ${e.message.substring(0, 40)}. Report.`, 'fail');
                     await speakAndWait(imgFail);
                 }
 
@@ -4326,7 +4349,7 @@ WHEN RESPONDING:
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
-                const imgWarn = await coraRespond('Image Generation', 'Image generation unavailable. Pollinations API down.', 'warn');
+                const imgWarn = await coraRespond('Image Generation', 'Image generation unavailable, Pollinations API down. Report.', 'warn');
                 await speakAndWait(imgWarn);
             }
 
@@ -4393,17 +4416,17 @@ WHEN RESPONDING:
             updateProgress(100, 'Boot complete!');
             setPhase('final', 'ok');
 
-            // CORA generates her own boot complete response - system prompt handles personality
+            // Boot complete - give CORA the stats to report
             log('CORA is waking up...', 'cora');
             try {
-                const bootContext = `Boot: ${bootTime}s, ${okCount} OK, ${warnCount} warnings, ${failCount} failures.`;
+                const bootContext = `Boot done in ${bootTime} seconds. ${okCount} systems OK, ${warnCount} warnings, ${failCount} failures. Report.`;
 
                 const res = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: CORA_MODEL,
-                        prompt: `Boot sequence complete. ${bootContext}`,
+                        prompt: bootContext,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
                         options: { temperature: 0.9, num_predict: 100 }
