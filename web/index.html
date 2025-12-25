@@ -380,10 +380,12 @@
         }
 
         .setup-terminal .log-container {
+            flex: 1;
             background: #000;
             padding: 20px;
             font-size: 13px;
             line-height: 1.8;
+            overflow-y: auto;
         }
 
         .log-line { margin-bottom: 2px; }
@@ -1018,12 +1020,20 @@ WHEN RESPONDING:
         }
 
         async function initSetupTerminal(forceRefresh = false) {
+            console.log('[SETUP] initSetupTerminal called, forceRefresh:', forceRefresh);
             // Always run fresh checks when user opens setup terminal
-            if (setupTerminalInitialized && !forceRefresh) return;
+            if (setupTerminalInitialized && !forceRefresh) {
+                console.log('[SETUP] Already initialized, skipping');
+                return;
+            }
             setupTerminalInitialized = true;
 
             const container = document.getElementById('setupLog');
-            if (!container) return;
+            if (!container) {
+                console.error('[SETUP] setupLog container not found!');
+                return;
+            }
+            console.log('[SETUP] Container found, clearing and populating...');
             container.innerHTML = '';  // Clear any old content
 
             const isFirstRun = !localStorage.getItem('cora_setup_complete');
