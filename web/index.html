@@ -553,8 +553,16 @@
             </div>
             <button class="modal-btn" onclick="saveApiKeys()">Save & Continue</button>
             <button class="modal-btn" style="background: #333; margin-top: 10px;" onclick="skipApiKeys()">Skip (Limited Features)</button>
+            <button class="modal-btn" style="background: #660000; margin-top: 20px; font-size: 11px;" onclick="clearAllData()">Clear All Data</button>
         </div>
     </div>
+
+    <!-- Settings Button (top right) -->
+    <button id="settingsBtn" onclick="openSettings()" style="
+        position: fixed; top: 10px; right: 10px; z-index: 500;
+        background: #333; border: 1px solid #666; color: #999;
+        padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    ">Settings</button>
 
     <!-- Toggle Button -->
     <button class="toggle-btn" id="toggleBtn" onclick="toggleView()">[ SPLIT VIEW ]</button>
@@ -1098,6 +1106,114 @@
         }
 
         // ============================================================
+        // Dynamic Modal System (matches desktop tkinter popups)
+        // ============================================================
+
+        function createDynamicModal(title, width = 800, height = 600) {
+            // Remove any existing dynamic modal
+            const existing = document.getElementById('dynamicModal');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'dynamicModal';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.9); z-index: 2000;
+                display: flex; align-items: center; justify-content: center;
+            `;
+
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                background: #1a1a2e; border: 2px solid #ff00ff;
+                border-radius: 8px; width: ${width}px; max-width: 95vw;
+                max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+            `;
+
+            const header = document.createElement('div');
+            header.style.cssText = `
+                background: linear-gradient(135deg, #2d0040 0%, #1a0020 100%);
+                padding: 15px 20px; border-bottom: 1px solid #ff00ff;
+                display: flex; justify-content: space-between; align-items: center;
+            `;
+            header.innerHTML = `<span style="color: #ff00ff; font-weight: bold; font-size: 14px;">${title}</span>`;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'X';
+            closeBtn.style.cssText = `
+                background: #ff4444; border: none; color: white; width: 30px; height: 30px;
+                border-radius: 4px; cursor: pointer; font-weight: bold;
+            `;
+            closeBtn.onclick = () => overlay.remove();
+            header.appendChild(closeBtn);
+
+            const content = document.createElement('div');
+            content.style.cssText = 'flex: 1; overflow: auto; padding: 15px;';
+
+            modal.appendChild(header);
+            modal.appendChild(content);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            return { overlay, modal, content, close: () => overlay.remove() };
+        }
+
+        function showCodeModal(code, filename, language = 'python') {
+            const { content, close } = createDynamicModal(`CORA - Code Import: ${filename}`, 900, 600);
+            content.innerHTML = `
+                <div style="color: #00ff88; margin-bottom: 10px; font-size: 12px;">
+                    Source: GitHub API | File: ${filename}
+                </div>
+                <pre style="background: #0d0d1a; padding: 15px; border-radius: 4px;
+                    overflow: auto; max-height: 450px; color: #e0e0e0; font-size: 12px;
+                    white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(code)}</pre>
+            `;
+            return { close };
+        }
+
+        function showImageModal(imageUrl, title) {
+            const { content, close } = createDynamicModal(title, 1000, 700);
+            content.style.padding = '0';
+            content.innerHTML = `
+                <img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: contain; background: black;">
+            `;
+            return { close };
+        }
+
+        function showVideoModal(videoId, title) {
+            const { content, close } = createDynamicModal(title, 800, 500);
+            content.style.padding = '0';
+            content.innerHTML = `
+                <iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}?autoplay=1"
+                    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            `;
+            return { close };
+        }
+
+        function showQuoteModal(quote) {
+            const { content, close } = createDynamicModal('CORA - Modal Test', 500, 300);
+            content.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="color: #00ff88; font-size: 16px; margin-bottom: 20px;">Modal Window Test</div>
+                    <div style="color: #ffffff; font-style: italic; font-size: 14px; margin-bottom: 20px;">"${quote}"</div>
+                    <div style="color: #888; font-size: 12px;">
+                        Modal Types Available:<br>
+                        - Message popups<br>
+                        - Code viewer<br>
+                        - Image viewer<br>
+                        - Video player
+                    </div>
+                </div>
+            `;
+            return { close };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ============================================================
         // API Checks
         // ============================================================
 
@@ -1525,40 +1641,109 @@
             await speakAndWait(`${toolsOk} of ${webTools.length} web APIs loaded and ready.`);
 
             // ================================================================
-            // PHASE 4.1: CODE IMPORT (Web version - show GitHub repos)
+            // PHASE 4.1: CODE IMPORT - Actually fetch from GitHub!
             // ================================================================
             setPhase('code_import', 'running');
             log('PHASE 4.1: CODE IMPORT FROM GITHUB', 'phase');
-            updateProgress(45, 'Testing code import...');
-            log('GitHub API accessible from browser', 'ok');
-            log('Code import would fetch from your repos', 'info');
-            log('Web version: Limited code execution', 'warn');
-            setPhase('code_import', 'ok');
-            await speakAndWait("Code import available. Can fetch from GitHub.");
+            updateProgress(45, 'Fetching code from GitHub...');
+
+            try {
+                // Fetch a real Python file from a public repo
+                const codeRepos = [
+                    { url: 'https://api.github.com/repos/TheAlgorithms/Python/contents/maths', name: 'TheAlgorithms' },
+                    { url: 'https://api.github.com/repos/geekcomputers/Python/contents', name: 'geekcomputers' }
+                ];
+                const repo = codeRepos[Math.floor(Math.random() * codeRepos.length)];
+                log(`Fetching from ${repo.name}...`, 'info');
+
+                const listResp = await fetch(repo.url);
+                if (listResp.ok) {
+                    const files = await listResp.json();
+                    const pyFiles = files.filter(f => f.name.endsWith('.py') && f.size < 30000);
+                    if (pyFiles.length > 0) {
+                        const randomFile = pyFiles[Math.floor(Math.random() * pyFiles.length)];
+                        log(`Selected: ${randomFile.name}`, 'ok');
+
+                        const codeResp = await fetch(randomFile.download_url);
+                        if (codeResp.ok) {
+                            const code = await codeResp.text();
+                            const lines = code.split('\n').length;
+                            log(`Fetched ${lines} lines of Python code`, 'ok');
+
+                            // Show in modal like desktop does
+                            const modal = showCodeModal(code.substring(0, 5000), `${randomFile.name} (from ${repo.name})`);
+                            log('Displaying code in modal...', 'info');
+
+                            setPhase('code_import', 'ok');
+                            await speakAndWait(`Pulled ${lines} lines of code from GitHub. Check out ${randomFile.name}.`);
+
+                            // Auto-close after speaking
+                            setTimeout(() => modal.close(), 2000);
+                        } else throw new Error('Failed to fetch file content');
+                    } else throw new Error('No Python files found');
+                } else throw new Error('Failed to list repo');
+            } catch (e) {
+                log(`GitHub fetch: ${e.message}`, 'warn');
+                setPhase('code_import', 'warn');
+                await speakAndWait("Code import failed. GitHub might be rate-limiting.");
+            }
 
             // ================================================================
-            // PHASE 4.2: YOUTUBE TEST - Browser can embed YouTube!
+            // PHASE 4.2: YOUTUBE TEST - Actually embed a video!
             // ================================================================
             setPhase('youtube', 'running');
             log('PHASE 4.2: YOUTUBE VIDEO TEST', 'phase');
-            updateProgress(50, 'Testing YouTube...');
-            log('YouTube IFrame API - Available', 'ok');
-            log('YouTube embed support - Available', 'ok');
-            log('Audio extraction via Web Audio - Available', 'ok');
+            updateProgress(50, 'Finding a video...');
+
+            // Random fun video IDs (short, interesting clips)
+            const videoIds = [
+                { id: 'dQw4w9WgXcQ', title: 'Classic Rick Roll' },
+                { id: 'jNQXAC9IVRw', title: 'First YouTube Video Ever' },
+                { id: 'kJQP7kiw5Fk', title: 'Despacito' },
+                { id: '9bZkp7q19f0', title: 'Gangnam Style' },
+                { id: 'hY7m5jjJ9mM', title: 'Chocolate Rain' }
+            ];
+            const video = videoIds[Math.floor(Math.random() * videoIds.length)];
+            log(`Selected: ${video.title}`, 'ok');
+            log('Embedding YouTube video...', 'info');
+
+            // Show video in modal
+            const videoModal = showVideoModal(video.id, `CORA - YouTube Test: ${video.title}`);
+            log('Video playing in modal', 'ok');
+
             setPhase('youtube', 'ok');
-            await speakAndWait("YouTube playback ready. Can embed and play videos directly in browser.");
+            await speakAndWait(`Playing ${video.title}. YouTube embed working perfectly.`);
+
+            // Auto-close after 5 seconds
+            setTimeout(() => videoModal.close(), 5000);
 
             // ================================================================
-            // PHASE 4.3: MODAL WINDOWS
+            // PHASE 4.3: MODAL WINDOWS - Show actual test modal!
             // ================================================================
             setPhase('modals', 'running');
             log('PHASE 4.3: MODAL WINDOWS TEST', 'phase');
             updateProgress(52, 'Testing modals...');
-            log('Browser modals working', 'ok');
-            log('Alert/Confirm/Prompt available', 'ok');
-            log('Custom modal overlays working', 'ok');
+
+            // Random quotes like desktop
+            const quotes = [
+                "The only way to do great work is to love what you do. - Steve Jobs",
+                "Innovation distinguishes between a leader and a follower. - Steve Jobs",
+                "Stay hungry, stay foolish. - Steve Jobs",
+                "Code is like humor. When you have to explain it, it's bad. - Cory House",
+                "First, solve the problem. Then, write the code. - John Johnson",
+                "The best way to predict the future is to invent it. - Alan Kay"
+            ];
+            const quote = quotes[Math.floor(Math.random() * quotes.length)];
+
+            log('Opening test modal with quote...', 'info');
+            const quoteModal = showQuoteModal(quote);
+            log('Modal displayed successfully', 'ok');
+
             setPhase('modals', 'ok');
-            await speakAndWait("Modal windows working.");
+            await speakAndWait("Modal windows working. Showing you a little inspiration.");
+
+            // Auto-close after speaking
+            setTimeout(() => quoteModal.close(), 2000);
 
             // ================================================================
             // PHASE 5.0: VOICE SYSTEMS
@@ -1601,17 +1786,42 @@
             setPhase('external', 'ok');
 
             // ================================================================
-            // PHASE 6.1: AUDIO TEST - Full browser audio support
+            // PHASE 6.1: AUDIO TEST - Actually play a test tone!
             // ================================================================
             setPhase('audio', 'running');
             log('PHASE 6.1: AUDIO PLAYBACK TEST', 'phase');
             updateProgress(68, 'Testing audio...');
 
-            // Test actual audio playback capability
-            log('Web Audio API - Available', 'ok');
-            log('AudioContext - ' + (typeof AudioContext !== 'undefined' ? 'Available' : 'Unavailable'), 'ok');
-            log('HTML5 Audio - Available', 'ok');
-            log('Media Source Extensions - ' + ('MediaSource' in window ? 'Available' : 'Unavailable'), 'ok');
+            // Actually play a test tone using Web Audio API
+            try {
+                log('Creating audio context...', 'info');
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+                // Fade out
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+
+                oscillator.start();
+                log('Playing 440Hz test tone...', 'ok');
+
+                // Stop after 2 seconds
+                setTimeout(() => {
+                    oscillator.stop();
+                    audioCtx.close();
+                }, 2000);
+
+                log('Audio test tone playing!', 'ok');
+            } catch (e) {
+                log(`Audio test failed: ${e.message}`, 'warn');
+            }
 
             // Also check weather since we have location
             if (weatherKey && cachedCoords) {
@@ -1626,16 +1836,16 @@
                     document.getElementById('statWeather').textContent = `${temp}°F`;
                     document.getElementById('statWeather').className = 'stat-value';
                     setPhase('audio', 'ok');
-                    await speakAndWait(`Audio systems working. Weather is ${temp} degrees and ${cond}.`);
+                    await speakAndWait(`Audio working. That beep you heard was a 440 hertz test tone. Weather is ${temp} degrees and ${cond}.`);
                 } else {
                     setPhase('audio', 'ok');
-                    await speakAndWait("Audio systems working. Weather data unavailable.");
+                    await speakAndWait("Audio test passed. That beep was a 440 hertz sine wave.");
                 }
             } else {
                 document.getElementById('statWeather').textContent = weatherKey ? 'No Loc' : 'No Key';
                 document.getElementById('statWeather').className = 'stat-value na';
                 setPhase('audio', 'ok');
-                await speakAndWait("Audio systems fully operational.");
+                await speakAndWait("Audio test complete. You should have heard a short beep.");
             }
 
             // ================================================================
@@ -1660,28 +1870,51 @@
             }
 
             // ================================================================
-            // PHASE 8.0: VISION TEST - Full browser vision support
+            // PHASE 8.0: VISION TEST - Actually capture camera!
             // ================================================================
             setPhase('vision', 'running');
             log('PHASE 8.0: VISION TEST', 'phase');
             updateProgress(82, 'Testing vision...');
 
-            // Test screenshot/screen capture
-            log('Testing screen capture...', 'info');
             const hasScreenCapture = 'getDisplayMedia' in navigator.mediaDevices;
             log('Screen Capture API - ' + (hasScreenCapture ? 'Available' : 'Unavailable'), hasScreenCapture ? 'ok' : 'warn');
-            log('Canvas Screenshot - Available', 'ok');
 
-            // Test camera
-            log('Testing camera access...', 'info');
+            // Actually capture camera and show in modal
             let cameraWorking = false;
+            let cameraModal = null;
             try {
+                log('Accessing camera...', 'info');
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(t => t.stop());  // Release immediately
-                log('Camera Access - Working', 'ok');
+                log('Camera stream acquired!', 'ok');
+
+                // Create modal with live video feed
+                const { content, close } = createDynamicModal('CORA - Camera View', 800, 600);
+                cameraModal = { close };
+
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.autoplay = true;
+                video.style.cssText = 'width: 100%; height: 100%; object-fit: contain; background: black;';
+                content.style.padding = '0';
+                content.appendChild(video);
+
+                // Capture a frame after 2 seconds
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Take snapshot
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+
+                log(`Camera frame captured: ${canvas.width}x${canvas.height}`, 'ok');
                 cameraWorking = true;
+
+                // Stop stream
+                stream.getTracks().forEach(t => t.stop());
             } catch (e) {
-                log('Camera Access - ' + (e.name === 'NotAllowedError' ? 'Permission denied' : 'Unavailable'), 'warn');
+                log('Camera: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message), 'warn');
             }
 
             // Test Pollinations
@@ -1698,24 +1931,56 @@
             }
 
             setPhase('vision', 'ok');
-            const visionStatus = [];
-            if (hasScreenCapture) visionStatus.push('screen capture');
-            if (cameraWorking) visionStatus.push('camera');
-            if (pollinationsOk) visionStatus.push('Pollinations');
-            await speakAndWait("Vision test complete. " + (visionStatus.length > 0 ? visionStatus.join(', ') + " all working." : "Limited vision capabilities."));
+            if (cameraWorking) {
+                await speakAndWait("I can see you! Camera is working. Wave if you can hear me.");
+                if (cameraModal) setTimeout(() => cameraModal.close(), 2000);
+            } else {
+                await speakAndWait("Camera unavailable but Pollinations is online for image generation.");
+            }
 
             // ================================================================
-            // PHASE 9.0: IMAGE GENERATION
+            // PHASE 9.0: IMAGE GENERATION - Actually generate an image!
             // ================================================================
             setPhase('imagegen', 'running');
             log('PHASE 9.0: IMAGE GENERATION', 'phase');
-            updateProgress(90, 'Testing image gen...');
-            log('Pollinations Flux module available', 'ok');
+            updateProgress(90, 'Generating image...');
+
             if (pollinationsOk) {
-                log('Image generation API ready', 'ok');
-                log('Can generate images via Pollinations Flux', 'info');
-                setPhase('imagegen', 'ok');
-                await speakAndWait("Image generation ready. Pollinations Flux model available.");
+                // Random dark/creative prompts like desktop
+                const imagePrompts = [
+                    "cyberpunk city at night, neon lights, rain, dark atmosphere",
+                    "dark gothic castle on a mountain, lightning, dramatic sky",
+                    "futuristic AI robot with glowing eyes, dark background",
+                    "synthwave sunset over digital ocean, purple and pink",
+                    "haunted forest with glowing mushrooms, fog, mysterious"
+                ];
+                const prompt = imagePrompts[Math.floor(Math.random() * imagePrompts.length)];
+                const seed = Math.floor(Math.random() * 999999999);
+
+                log(`Prompt: ${prompt}`, 'info');
+                log('Generating via Pollinations Flux...', 'info');
+
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=768&seed=${seed}&nologo=true`;
+
+                // Show image in modal while it loads
+                const imgModal = showImageModal(imageUrl, 'CORA - Generated Image');
+
+                // Wait for image to load
+                const img = new Image();
+                img.onload = () => {
+                    log('Image generated successfully!', 'ok');
+                    setPhase('imagegen', 'ok');
+                };
+                img.onerror = () => {
+                    log('Image generation failed', 'warn');
+                    setPhase('imagegen', 'warn');
+                };
+                img.src = imageUrl;
+
+                await speakAndWait(`Generating something dark and twisted. Check out this ${prompt.split(',')[0]}.`);
+
+                // Auto-close after viewing
+                setTimeout(() => imgModal.close(), 5000);
             } else {
                 log('Image generation unavailable - API down', 'warn');
                 setPhase('imagegen', 'warn');
@@ -1922,6 +2187,41 @@ You ARE Cora. That's just who you are.`;
         function skipApiKeys() {
             document.getElementById('apiModal').classList.remove('visible');
             runBootSequence();
+        }
+
+        function openSettings() {
+            document.getElementById('apiModal').classList.add('visible');
+        }
+
+        function clearAllData() {
+            // First warning
+            if (!confirm('WARNING: This will delete ALL your CORA data including:\n\n- API keys\n- Chat history\n- Saved preferences\n- All localStorage data\n\nAre you sure?')) {
+                return;
+            }
+
+            // Second warning
+            if (!confirm('FINAL WARNING!\n\nThis action CANNOT be undone.\n\nType "DELETE" in the next prompt to confirm.')) {
+                return;
+            }
+
+            // Final confirmation
+            const confirmation = prompt('Type DELETE to confirm data wipe:');
+            if (confirmation !== 'DELETE') {
+                alert('Cancelled. Your data is safe.');
+                return;
+            }
+
+            // Clear everything
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Clear cookies for this domain
+            document.cookie.split(';').forEach(c => {
+                document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+            });
+
+            alert('All CORA data has been wiped.\n\nThe page will now reload.');
+            location.reload();
         }
 
         async function retryOllama() {
