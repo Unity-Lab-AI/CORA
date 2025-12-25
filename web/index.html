@@ -1938,8 +1938,12 @@ You ARE Cora. That's just who you are.`;
         // ============================================================
 
         async function init() {
-            // Auto-open console in new tab
-            window.open('console.html', '_blank');
+            // Auto-open console in new tab (safe - won't break if blocked)
+            try {
+                window.open('console.html', '_blank');
+            } catch (e) {
+                console.log('Console popup blocked');
+            }
 
             renderPhases();
             document.getElementById('pollinationsKey').value = pollinationsKey;
