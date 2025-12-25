@@ -168,7 +168,8 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         system_prompt = get_system_prompt()
 
         # Simple, direct prompt - system prompt handles personality
-        prompt = f"Respond in exactly ONE complete sentence that includes all this info: {result}"
+        # MUST include exact numbers/data, not paraphrase
+        prompt = f"Say this in ONE sentence, include the EXACT numbers and data, don't paraphrase: {result}"
 
         response = generate(
             prompt=prompt,
