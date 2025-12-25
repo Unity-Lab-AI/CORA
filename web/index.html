@@ -556,12 +556,36 @@
 <body>
     <!-- Ollama Gate -->
     <div class="gate-overlay" id="gateOverlay">
-        <div class="gate-box">
-            <h2>[ BLOCKED ]</h2>
-            <p>Ollama is not running</p>
-            <pre>ollama serve</pre>
-            <p style="color: var(--text-dim); font-size: 12px;">Run this in your terminal, then click Retry</p>
-            <button onclick="retryOllama()">Retry Connection</button>
+        <div class="gate-box" style="max-width: 500px;">
+            <h2 style="color: #ff4444;">[ OLLAMA NOT RUNNING ]</h2>
+            <p style="color: #ff00ff; font-size: 14px;">CORA needs Ollama to think - it's her brain!</p>
+
+            <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #00ff88; margin-bottom: 10px; font-weight: bold;">What is Ollama?</p>
+                <p style="color: #ccc; font-size: 12px;">Ollama runs AI models locally on YOUR computer. No cloud, no API keys, no monthly fees. Your data stays private.</p>
+            </div>
+
+            <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #00ff88; margin-bottom: 10px; font-weight: bold;">Option 1: Already have Ollama?</p>
+                <p style="color: #ccc; font-size: 12px; margin-bottom: 10px;">Just start it:</p>
+                <code style="display: block; background: #222; padding: 10px; border-radius: 4px; color: #ff00ff; font-size: 13px;">ollama serve</code>
+                <p style="color: #666; font-size: 10px; margin-top: 8px;">Run this in a terminal, keep it open</p>
+            </div>
+
+            <div style="text-align: left; padding: 15px; background: #111; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #00ff88; margin-bottom: 10px; font-weight: bold;">Option 2: Don't have Ollama?</p>
+                <a href="https://ollama.com/download" target="_blank" style="display: inline-block; background: #ff00ff; color: #000; padding: 10px 20px; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 13px;">Download Ollama (Free)</a>
+                <p style="color: #666; font-size: 10px; margin-top: 8px;">~500MB download, installs in 2 minutes</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="retryOllama()" style="background: #00ff88; color: #000; padding: 12px 30px; font-weight: bold;">I Started It - Retry</button>
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
+                <button onclick="autoInstallFromGate()" style="background: #ff00ff; color: #000; padding: 10px 20px; font-size: 12px; font-weight: bold;">Auto-Install Everything</button>
+                <p style="color: #666; font-size: 10px; margin-top: 8px;">Will try to start Ollama and download models automatically</p>
+            </div>
         </div>
     </div>
 
@@ -631,9 +655,13 @@
                 Subsequent boots will be much faster (under 30 seconds).
             </p>
             <button class="modal-btn" onclick="acceptFirstTime()" style="background: #00ff00; color: #000; font-size: 16px; padding: 15px 30px; font-weight: bold;">
-                I have time and don't mind installing shit
+                Let's do this - I'll wait
             </button>
-            <button class="modal-btn" onclick="rejectFirstTime()" style="background: #ff0000; color: #fff; margin-top: 15px; font-size: 14px; padding: 12px 25px;">
+            <button class="modal-btn" onclick="autoInstallEverything()" style="background: #ff00ff; color: #000; margin-top: 15px; font-size: 14px; padding: 12px 25px; font-weight: bold;">
+                Auto-Install Everything For Me
+            </button>
+            <p style="font-size: 10px; color: #666; margin-top: 5px;">Downloads and configures everything automatically</p>
+            <button class="modal-btn" onclick="rejectFirstTime()" style="background: #ff0000; color: #fff; margin-top: 20px; font-size: 12px; padding: 10px 20px;">
                 I don't have time for this shit
             </button>
         </div>
@@ -2654,21 +2682,115 @@ WHEN RESPONDING:
         }
 
         // First-time modal handlers
-        function acceptFirstTime() {
-            // User has patience - continue with setup
+        async function acceptFirstTime() {
+            // User has patience - continue with normal setup flow
             document.getElementById('firstTimeModal').classList.remove('visible');
+            localStorage.setItem('cora_first_time', 'done');
 
-            // Now show API modal if no keys, otherwise start boot
-            if (!pollinationsKey && !githubToken) {
-                document.getElementById('apiModal').classList.add('visible');
-            } else {
-                runBootSequence();
-            }
+            // Continue with normal gate checks (Ollama, stats server, etc.)
+            await continueInit();
         }
 
         function rejectFirstTime() {
-            // User doesn't have time - send them to puppy videos
-            window.location.href = 'https://www.google.com/search?q=puppy+pictures+and+videos';
+            // User doesn't have time - send them to puppy videos lol
+            window.location.href = 'https://www.youtube.com/results?search_query=cute+puppies';
+        }
+
+        async function autoInstallEverything() {
+            // User wants auto-install - do everything for them
+            document.getElementById('firstTimeModal').classList.remove('visible');
+
+            // Switch to backend terminal view so user can see progress
+            const mainContent = document.getElementById('mainContent');
+            const setupTerminal = document.getElementById('setupTerminal');
+            mainContent.style.display = 'none';
+            setupTerminal.style.display = 'flex';
+            document.getElementById('toggleBtn').textContent = '[ MAIN VIEW ]';
+
+            setupLog('', '#ffffff');
+            setupLog('============================================================', '#ff00ff');
+            setupLog('  AUTO-INSTALL MODE - Sit back and relax!', '#ff00ff');
+            setupLog('============================================================', '#ffffff');
+            setupLog('', '#ffffff');
+
+            // Step 1: Check/Start Ollama
+            setupLog('[AUTO] Checking Ollama...', '#ffff00');
+            let ollamaOk = await checkOllama();
+
+            if (!ollamaOk) {
+                setupLog('  Ollama not running - attempting to start...', '#ffaa00');
+                try {
+                    const startResp = await fetch('http://localhost:11435/setup/start-ollama', {
+                        method: 'POST',
+                        signal: AbortSignal.timeout(10000)
+                    });
+                    const result = await startResp.json();
+                    if (result.success) {
+                        setupLog('  [OK] Ollama service starting...', '#00ff00');
+                        setupLog('  Waiting 5 seconds for initialization...', '#ffff00');
+                        await new Promise(r => setTimeout(r, 5000));
+                        ollamaOk = await checkOllama();
+                    }
+                } catch (e) {
+                    setupLog(`  [ERROR] Stats server not running: ${e.message}`, '#ff4444');
+                    setupLog('  Run: python services/stats_server.py', '#ffaa00');
+                }
+            }
+
+            if (ollamaOk) {
+                setupLog('[OK] Ollama is running!', '#00ff00');
+            } else {
+                setupLog('[WARN] Ollama not available - some features disabled', '#ffaa00');
+                setupLogHTML('  <a href="https://ollama.com/download" target="_blank" style="color: #ff00ff;">Download Ollama</a> to enable AI features');
+            }
+
+            // Step 2: Check/Download Models
+            if (ollamaOk) {
+                setupLog('', '#ffffff');
+                setupLog('[AUTO] Checking AI models...', '#ffff00');
+
+                const requiredModels = [
+                    { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', desc: 'Main brain' },
+                    { name: 'llava', display: 'llava', desc: 'Vision' },
+                    { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', desc: 'Coding' }
+                ];
+
+                const ollamaStatus = await checkOllamaRunning();
+                for (const model of requiredModels) {
+                    if (hasModel(ollamaStatus.models, model.name)) {
+                        setupLog(`  [OK] ${model.display} - already installed`, '#00ff00');
+                    } else {
+                        setupLog(`  [DOWNLOAD] ${model.display} (~4GB) - this may take a while...`, '#ffaa00');
+                        try {
+                            const pullResp = await fetch(`http://localhost:11435/setup/pull-model/${model.display}`, {
+                                method: 'POST',
+                                signal: AbortSignal.timeout(600000)
+                            });
+                            const result = await pullResp.json();
+                            if (result.success) {
+                                setupLog(`  [OK] ${model.display} installed!`, '#00ff00');
+                            } else {
+                                setupLog(`  [FAIL] ${model.display}: ${result.message}`, '#ff4444');
+                            }
+                        } catch (e) {
+                            setupLog(`  [ERROR] ${model.display}: ${e.message}`, '#ff4444');
+                        }
+                    }
+                }
+            }
+
+            setupLog('', '#ffffff');
+            setupLog('============================================================', '#00ff00');
+            setupLog('  AUTO-INSTALL COMPLETE - Starting boot sequence!', '#00ff00');
+            setupLog('============================================================', '#ffffff');
+            setupLog('', '#ffffff');
+
+            // Mark as complete and start boot
+            localStorage.setItem('cora_first_time', 'done');
+
+            // Small delay then start boot
+            await new Promise(r => setTimeout(r, 1000));
+            runBootSequence();
         }
 
         // Quick boot for returning users - system checks only, no CORA responses
@@ -4915,6 +5037,13 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             }
         }
 
+        async function autoInstallFromGate() {
+            // Close the gate overlay
+            document.getElementById('gateOverlay').classList.remove('visible');
+            // Run auto-install
+            await autoInstallEverything();
+        }
+
         // ============================================================
         // Init
         // ============================================================
@@ -4931,6 +5060,20 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
             document.getElementById('pollinationsKey').value = pollinationsKey;
             document.getElementById('githubToken').value = githubToken;
 
+            // Check if first-time user - show warning FIRST before any gates
+            const hasBootedBefore = localStorage.getItem('cora_first_time') === 'done';
+            if (!hasBootedBefore) {
+                // First time user - show the setup warning modal
+                // They can choose to wait OR auto-install
+                document.getElementById('firstTimeModal').classList.add('visible');
+                return;  // Modal handlers will continue the flow
+            }
+
+            // Returning user - continue with normal gate checks
+            await continueInit();
+        }
+
+        async function continueInit() {
             // Initialize backend terminal (runs checks like CORA.bat)
             await initSetupTerminal();
 
