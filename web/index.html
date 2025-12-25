@@ -2141,12 +2141,147 @@ RESPONSE RULES:
         }
 
         function continueAfterStatsCheck() {
-            // Show API modal or continue to boot
-            if (!pollinationsKey && !githubToken) {
+            // Check if this is first boot or returning user
+            const hasBootedBefore = localStorage.getItem('cora_boot_complete');
+
+            // Show API modal on first run only if no keys
+            if (!hasBootedBefore && !pollinationsKey && !githubToken) {
                 document.getElementById('apiModal').classList.add('visible');
+            } else if (hasBootedBefore) {
+                // Returning user - quick boot
+                runQuickBoot();
             } else {
+                // First time with API keys already set
                 runBootSequence();
             }
+        }
+
+        // Quick boot for returning users - system checks only, no CORA responses
+        async function runQuickBoot() {
+            bootStartTime = Date.now();
+            const logEl = document.getElementById('logContainer');
+
+            log('═══════════════════════════════════════════════', 'system');
+            log('    QUICK BOOT - Returning User', 'system');
+            log('═══════════════════════════════════════════════', 'system');
+            log('Skipping full boot sequence (first-time setup already done)', 'info');
+            updateProgress(10, 'Quick boot...');
+
+            // Initialize essentials silently
+            initWaveform();
+            setPhase('waveform', 'ok');
+            setPhase('about', 'ok');
+
+            // Quick voice check
+            updateProgress(20, 'Checking voice...');
+            try {
+                await initKokoro((msg, pct) => {});
+                ttsEnabled = true;
+                setPhase('voice', 'ok');
+            } catch {
+                ttsEnabled = false;
+                setPhase('voice', 'warn');
+            }
+
+            // Quick AI check
+            updateProgress(30, 'Checking AI...');
+            try {
+                const r = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
+                if (r.ok) {
+                    aiReady = true;
+                    setPhase('ai_engine', 'ok');
+                    setPhase('ai_models', 'ok');
+                    log('Ollama: Online', 'ok');
+                } else {
+                    setPhase('ai_engine', 'warn');
+                    setPhase('ai_models', 'warn');
+                    log('Ollama: Offline', 'warn');
+                }
+            } catch {
+                setPhase('ai_engine', 'warn');
+                setPhase('ai_models', 'warn');
+                log('Ollama: Offline', 'warn');
+            }
+
+            // Quick hardware check
+            updateProgress(40, 'Checking hardware...');
+            const stats = await fetchSystemStats();
+            if (stats) {
+                log(`CPU: ${Math.round(stats.cpu.percent)}% | RAM: ${Math.round(stats.memory.percent)}%`, 'ok');
+                setPhase('hardware', 'ok');
+            } else {
+                setPhase('hardware', 'warn');
+            }
+
+            // Load saved permissions from localStorage
+            updateProgress(50, 'Loading permissions...');
+            const savedPerms = JSON.parse(localStorage.getItem('cora_permissions') || '{}');
+            log(`Loaded saved permissions: camera=${savedPerms.camera || 'unknown'}, location=${savedPerms.location || 'unknown'}`, 'info');
+
+            // Set phase statuses based on saved state
+            setPhase('camera', savedPerms.camera === 'granted' ? 'ok' : 'warn');
+            setPhase('tools', 'ok');
+            setPhase('code_import', 'ok');
+            setPhase('youtube', 'ok');
+            setPhase('modals', 'ok');
+            setPhase('voice_sys', 'ok');
+            setPhase('external', savedPerms.location === 'granted' ? 'ok' : 'warn');
+            setPhase('audio', 'ok');
+            setPhase('weather', savedPerms.location === 'granted' ? 'ok' : 'warn');
+            setPhase('news', 'ok');
+            setPhase('vision', 'ok');
+            setPhase('imagegen', 'ok');
+
+            updateProgress(80, 'Finalizing...');
+
+            // Quick audio test (silent)
+            try {
+                const actx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = actx.createOscillator();
+                osc.connect(actx.destination);
+                osc.start();
+                osc.stop(actx.currentTime + 0.01);
+            } catch {}
+
+            updateProgress(100, 'Ready!');
+            setPhase('final', 'ok');
+
+            const bootTime = ((Date.now() - bootStartTime) / 1000).toFixed(1);
+            log(`Quick boot complete in ${bootTime}s`, 'ok');
+            log('C.O.R.A IS READY', 'ok');
+
+            // CORA says something quick - no hardcoded fallbacks, let the model do its thing
+            if (aiReady) {
+                try {
+                    const quickPrompt = `You are CORA, a 25 year old goth bitch. You just booted up fast because the user came back. Say ONE short thing - be dismissive, maybe ask what they want, use profanity. Examples of the vibe: "The fuck you want?", "Back again huh?", "Miss me already?". Keep it under 10 words.`;
+                    const res = await fetch('http://localhost:11434/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'dolphin-mistral:7b',
+                            prompt: quickPrompt,
+                            system: CORA_SYSTEM_PROMPT,
+                            stream: false,
+                            options: { temperature: 0.95, num_predict: 25 }
+                        })
+                    });
+                    if (res.ok) {
+                        const d = await res.json();
+                        let response = d.response?.trim();
+                        // Only use if it's short and reasonable
+                        if (response && response.length > 5 && response.length < 60) {
+                            log(`CORA: "${response}"`, 'cora');
+                            await speakAndWait(response);
+                        }
+                    }
+                } catch {
+                    // Silent fail - no fallback needed
+                }
+            }
+
+            // Show chat
+            document.getElementById('chatSection').classList.add('visible');
+            document.getElementById('chatInput').focus();
         }
 
         async function getOllamaModels() {
@@ -2188,6 +2323,10 @@ RESPONSE RULES:
                         (pos) => {
                             cachedCoords = pos.coords;
                             log(`Location acquired on attempt ${attempts}`, 'ok');
+                            // Save permission for quick boot
+                            const perms = JSON.parse(localStorage.getItem('cora_permissions') || '{}');
+                            perms.location = 'granted';
+                            localStorage.setItem('cora_permissions', JSON.stringify(perms));
                             resolve(pos.coords);
                         },
                         (err) => {
@@ -2903,15 +3042,35 @@ RESPONSE RULES:
 
                 if (res.ok) {
                     const d = await res.json();
-                    let response = d.response?.trim() || "Yeah? What's up?";
-                    if (response.toLowerCase().startsWith('cora:')) response = response.slice(5).trim();
-                    log(`CORA: "${response}"`, 'cora');
-                    await speakAndWait(response);
-                } else {
-                    await speakAndWait("Yeah? What do you need?");
+                    let response = d.response?.trim();
+                    if (response && response.length > 3) {
+                        if (response.toLowerCase().startsWith('cora:')) response = response.slice(5).trim();
+                        log(`CORA: "${response}"`, 'cora');
+                        await speakAndWait(response);
+                    } else {
+                        // Retry once if empty response
+                        const retry = await fetch('http://localhost:11434/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: 'dolphin-mistral:7b',
+                                prompt: 'You are CORA. Someone just called your name. Respond with attitude in one sentence.',
+                                system: CORA_SYSTEM_PROMPT,
+                                stream: false,
+                                options: { temperature: 0.95, num_predict: 30 }
+                            })
+                        });
+                        if (retry.ok) {
+                            const rd = await retry.json();
+                            if (rd.response?.trim()) {
+                                log(`CORA: "${rd.response.trim()}"`, 'cora');
+                                await speakAndWait(rd.response.trim());
+                            }
+                        }
+                    }
                 }
             } catch (e) {
-                await speakAndWait("I'm here. What's up?");
+                log('CORA response failed - AI not responding', 'warn');
             }
 
             // Focus chat input
@@ -2995,8 +3154,7 @@ RESPONSE RULES:
                 setPhase('voice', 'ok');
                 ttsEnabled = true;
                 updateProgress(15, 'Neural voice online');
-                await speakAndWait("Voice synthesis online. Kokoro TTS loaded and ready.");
-                await speakAndWait("Hey, I'm CORA. That stands for Cognitive Operations and Reasoning Assistant. Version 1.0.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. I've got voice, vision, and plenty of attitude. Let's get this boot going.");
+                // Don't speak yet - wait until AI is ready so CORA can be CORA
             } else {
                 log('Kokoro failed - using browser TTS', 'warn');
                 document.getElementById('ttsNotice').textContent = 'Browser TTS (fallback mode)';
@@ -3005,7 +3163,7 @@ RESPONSE RULES:
                 ttsEnabled = true;
                 setPhase('voice', 'warn');
                 updateProgress(15, 'Fallback voice');
-                await speakAndWait("Voice synthesis online. Using browser fallback. Hey, I'm CORA. Let's do this.");
+                // Don't speak yet - wait until AI is ready
             }
 
             // ================================================================
@@ -3021,7 +3179,7 @@ RESPONSE RULES:
                 document.getElementById('statOllama').textContent = 'Online';
                 document.getElementById('statOllama').className = 'stat-value';
                 setPhase('ai_engine', 'ok');
-                await speakAndWait("AI engine online. Ollama is running.");
+                // Don't speak hardcoded - CORA will introduce herself after AI models are confirmed
             } else {
                 log('AI Engine not responding', 'fail');
                 document.getElementById('statOllama').textContent = 'Offline';
@@ -3045,13 +3203,39 @@ RESPONSE RULES:
                 // AI is now ready for CORA responses!
                 aiReady = true;
                 log('CORA AI responses enabled', 'ok');
-                // EXACT format from desktop line 777
+
+                // CORA introduces herself - AI-generated, not hardcoded
+                try {
+                    const introRes = await fetch('http://localhost:11434/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'dolphin-mistral:7b',
+                            prompt: `You are CORA (Cognitive Operations and Reasoning Assistant), a 25 year old goth bitch. Introduce yourself in 2-3 sentences. Mention you're version 1.0.0, made by Unity AI Lab. Be dismissive and say let's get this boot going. Use your attitude.`,
+                            system: CORA_SYSTEM_PROMPT,
+                            stream: false,
+                            options: { temperature: 0.9, num_predict: 100 }
+                        })
+                    });
+                    if (introRes.ok) {
+                        const introData = await introRes.json();
+                        if (introData.response?.trim()) {
+                            log(`CORA: "${introData.response.trim()}"`, 'cora');
+                            await speakAndWait(introData.response.trim());
+                        }
+                    }
+                } catch (e) {
+                    log('CORA intro generation failed', 'warn');
+                }
+
+                // Models loaded response
                 const modelsResponse = await coraRespond('AI Models check', `${models.length} models loaded. All good.`, 'ok');
                 await speakAndWait(modelsResponse);
             } else {
                 log('No models found - need to pull some', 'warn');
                 setPhase('ai_models', 'warn');
-                await speakAndWait("No models found. You'll need to pull some.");
+                // Can't use AI since no models - this is a system error message, not CORA
+                log('SYSTEM: No AI models found. Pull models with: ollama pull dolphin-mistral:7b', 'fail');
             }
 
             // ================================================================
@@ -3157,6 +3341,10 @@ RESPONSE RULES:
                     try {
                         if (!stream) throw cameraError || new Error('No camera available');
                         log('Live camera feed started', 'ok');
+                        // Save camera permission for quick boot
+                        const perms = JSON.parse(localStorage.getItem('cora_permissions') || '{}');
+                        perms.camera = 'granted';
+                        localStorage.setItem('cora_permissions', JSON.stringify(perms));
 
                         // Show camera in modal for 3 seconds like desktop
                         const { content, close } = createDynamicModal('CORA - Live Camera Feed', 800, 600);
@@ -3845,17 +4033,19 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 });
                 if (res.ok) {
                     const d = await res.json();
-                    let coraResponse = d.response?.trim() || `Boot done in ${bootTime} seconds. What the fuck do you want?`;
-                    // Remove any "good morning/have a great day" bullshit
-                    coraResponse = coraResponse.replace(/good morning[,.]?/gi, '').replace(/have a (great|good|nice) day[!.]?/gi, '').trim();
-                    log(`CORA: "${coraResponse}"`, 'cora');
-                    await speakAndWait(coraResponse);
-                } else {
-                    await speakAndWait(`Boot done in ${bootTime} seconds. ${okCount} systems up. What the fuck do you want?`);
+                    let coraResponse = d.response?.trim();
+                    if (coraResponse && coraResponse.length > 5) {
+                        // Remove any "good morning/have a great day" bullshit
+                        coraResponse = coraResponse.replace(/good morning[,.]?/gi, '').replace(/have a (great|good|nice) day[!.]?/gi, '').trim();
+                        if (coraResponse.length > 5) {
+                            log(`CORA: "${coraResponse}"`, 'cora');
+                            await speakAndWait(coraResponse);
+                        }
+                    }
                 }
+                // No fallback - if AI fails, just skip speaking (no hardcoded text)
             } catch (e) {
-                // Fallback if Ollama isn't responding
-                await speakAndWait(`Boot done in ${bootTime} seconds. ${okCount} systems up. What the fuck do you want?`);
+                // Silent fail - CORA only speaks when AI generates her response
             }
 
             // ================================================================
@@ -3886,24 +4076,54 @@ Example tone: "Took ${bootTime} seconds to boot, which is whatever. ${okCount} s
                 });
                 if (nosyRes.ok) {
                     const nosyData = await nosyRes.json();
-                    let nosyResponse = nosyData.response?.trim() || "So what the hell are you doing today?";
-                    // Clean up any weird hallucinations
-                    if (nosyResponse.length > 100 || !nosyResponse.includes('?')) {
-                        nosyResponse = "So what the fuck are you working on?";
+                    let nosyResponse = nosyData.response?.trim();
+                    // Only use if it's reasonable - short and a question
+                    if (nosyResponse && nosyResponse.length > 5 && nosyResponse.length < 100) {
+                        log(`CORA: "${nosyResponse}"`, 'cora');
+                        await speakAndWait(nosyResponse);
+                    } else {
+                        // Retry with simpler prompt
+                        const retry = await fetch('http://localhost:11434/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: 'dolphin-mistral:7b',
+                                prompt: 'CORA just booted. Ask what they need in one rude sentence.',
+                                system: CORA_SYSTEM_PROMPT,
+                                stream: false,
+                                options: { temperature: 0.95, num_predict: 25 }
+                            })
+                        });
+                        if (retry.ok) {
+                            const rd = await retry.json();
+                            if (rd.response?.trim()) {
+                                log(`CORA: "${rd.response.trim()}"`, 'cora');
+                                await speakAndWait(rd.response.trim());
+                            }
+                        }
                     }
-                    log(`CORA: "${nosyResponse}"`, 'cora');
-                    await speakAndWait(nosyResponse);
                 }
             } catch (e) {
-                // Fallback if Ollama fails
-                await speakAndWait("So what the fuck are you up to?");
+                log('CORA AI not responding', 'warn');
             }
 
             log('C.O.R.A IS READY', 'ok');
 
+            // Save boot complete flag for quick boot next time
+            localStorage.setItem('cora_boot_complete', 'true');
+            localStorage.setItem('cora_boot_date', new Date().toISOString());
+            log('First-time setup saved - next boot will be faster!', 'info');
+
             // Show chat interface
             document.getElementById('chatSection').classList.add('visible');
             document.getElementById('chatInput').focus();
+        }
+
+        // Force full boot (for testing or re-setup)
+        function forceFullBoot() {
+            localStorage.removeItem('cora_boot_complete');
+            localStorage.removeItem('cora_permissions');
+            location.reload();
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
