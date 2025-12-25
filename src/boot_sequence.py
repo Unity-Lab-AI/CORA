@@ -206,14 +206,19 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         system_prompt = get_system_prompt()
 
         # Build appropriate prompt based on context type
+        # IMPORTANT: Remind CORA to cuss and be herself in EVERY prompt
+        cuss_reminder = "Remember: you're a goth bitch who cusses. Say fuck, shit, damn, hell, ass, etc. Be sarcastic and edgy. Keep it short."
+
         if "headline" in context.lower() or "news" in context.lower():
-            prompt = f"Announce these news headlines in your style: {result}"
+            prompt = f"{cuss_reminder} Announce these news headlines: {result}"
         elif "weather" in context.lower() or "forecast" in context.lower():
-            prompt = f"Announce this weather info in your style: {result}"
+            prompt = f"{cuss_reminder} Announce this weather: {result}"
         elif "location" in context.lower():
-            prompt = f"Announce this location in your style: {result}"
+            prompt = f"{cuss_reminder} Announce this location: {result}"
+        elif "abilities" in context.lower():
+            prompt = f"{cuss_reminder} Tell the user what the fuck you can do for them. Be brief but cover these abilities: {result}"
         else:
-            prompt = f"Announce this boot phase result in your style: {context} - {result}"
+            prompt = f"{cuss_reminder} Announce this: {context} - {result}"
 
         response = generate(
             prompt=prompt,
@@ -1614,10 +1619,38 @@ Just tell me what you need.
 """
 
     display_log("─── CORA's Abilities ───", "info")
-    # Have CORA announce this in her own goth style
-    abilities_prompt = f"Now that boot is done, tell the user what you can do for them. Be yourself - sarcastic, goth, direct. Here's the list of your abilities to mention: {abilities_list}"
-    abilities_response = cora_respond("Abilities announcement", abilities_prompt, "ok")
-    speak(abilities_response)
+    # Have CORA announce this in her own goth style - use generate directly for longer response
+    try:
+        from ai.ollama import generate
+
+        abilities_prompt = f"""Alright bitch, boot is done. Now tell the user what the fuck you can do.
+Be yourself - cuss, be sarcastic, be a goth bitch about it. Say fuck, shit, damn, whatever.
+Keep it to 2-3 sentences max but hit the main points.
+Your abilities: voice chat, vision/screenshots/camera, image generation, reminders/calendar/tasks,
+web search, file management, code help, email. What do they want to do?"""
+
+        abilities_result = generate(
+            prompt=abilities_prompt,
+            system=get_system_prompt(),
+            temperature=0.9,
+            max_tokens=200
+        )
+
+        if abilities_result.content:
+            import re
+            abilities_response = abilities_result.content.strip().strip('"\'')
+            # Clean markdown
+            abilities_response = re.sub(r'\*\*([^*]+)\*\*', r'\1', abilities_response)
+            abilities_response = re.sub(r'\*([^*]+)\*', r'\1', abilities_response)
+            abilities_response = re.sub(r'\n+', ' ', abilities_response)
+            abilities_response = re.sub(r'\s+', ' ', abilities_response).strip()
+            speak(abilities_response)
+        else:
+            # Fallback
+            speak("So what the fuck do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
+    except Exception as e:
+        print(f"  [WARN] Abilities announcement failed: {e}")
+        speak("So what the fuck do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
 
     # Also print the abilities to the console
     for line in abilities_list.strip().split('\n'):
