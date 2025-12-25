@@ -157,47 +157,9 @@ def speak(text: str, blocking: bool = True):
 def cora_respond(context: str, result: str, status: str = "ok") -> str:
     """
     CORA generates a unique response for each boot phase.
-    AI generates the personality/phrasing, but MUST include the exact data.
-    Falls back to templates if AI hallucinates wrong data.
+    ALL responses come from AI using system prompt - no hardcoded templates.
     """
-    import random
-
-    # Fallback templates with exact data - heavy cussing, varied
-    templates_ok = [
-        f"Fuck yeah. {result}.",
-        f"{result}. Moving the hell on.",
-        f"{result}. Next, bitches.",
-        f"Got it, asshole. {result}.",
-        f"{result}. Fucking thrilling.",
-        f"Whatever. {result}.",
-        f"{result}. Cool shit I guess.",
-        f"Ugh, fine. {result}.",
-    ]
-    templates_warn = [
-        f"{result}. Not great but fuck it.",
-        f"{result}. Could be shittier.",
-        f"Hmm, {result}. We'll fucking manage.",
-        f"Shit. {result}. Moving on.",
-        f"{result}. That's annoying as hell.",
-    ]
-    templates_fail = [
-        f"{result}. Well that's fucked.",
-        f"Holy shit. {result}.",
-        f"{result}. Fuck me, not ideal.",
-        f"Are you shitting me? {result}.",
-        f"{result}. Fan-fucking-tastic.",
-    ]
-
-    # Extract key data points from result for validation
-    # Numbers, percentages, names that MUST appear in response
     import re
-    key_data = []
-    # Find numbers/percentages
-    numbers = re.findall(r'\d+\.?\d*%?', result)
-    key_data.extend(numbers[:3])  # First 3 numbers
-    # Find key words (capitalized or model names)
-    words = re.findall(r'\b[A-Z][a-z]+\b|\b[a-z]{4,}\b', result)
-    key_data.extend([w.lower() for w in words[:2]])
 
     try:
         from ai.ollama import generate
@@ -221,7 +183,7 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
         response = generate(
             prompt=prompt,
             system=system_prompt,
-            temperature=0.7,
+            temperature=0.9,
             max_tokens=150
         )
 
@@ -238,48 +200,15 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # # headers
             text = re.sub(r'\n+', ' ', text)  # newlines to spaces
             text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
-            # Take first COMPLETE sentence - find first sentence ending
-            first_period = text.find('. ')
-            first_exclaim = text.find('! ')
-            first_question = text.find('? ')
-            # Get the earliest sentence ending (ignore -1 values)
-            endings = [e for e in [first_period, first_exclaim, first_question] if e > 0]
-            if endings:
-                first_end = min(endings)
-                text = text[:first_end+1]
-            elif text.endswith('.') or text.endswith('!') or text.endswith('?'):
-                # Already a complete sentence
-                pass
-            else:
-                # No sentence ending found, check if there's one at the end without space
-                for punct in ['.', '!', '?']:
-                    idx = text.rfind(punct)
-                    if idx > 10:
-                        text = text[:idx+1]
-                        break
 
-            # VALIDATION: Check that key data appears in response
-            text_lower = text.lower()
-            data_found = 0
-            for kd in key_data:
-                if str(kd).lower() in text_lower:
-                    data_found += 1
+            if len(text) > 10:
+                return text
 
-            # If most key data is present, use AI response
-            if len(key_data) == 0 or data_found >= len(key_data) * 0.5:
-                if len(text) > 10:
-                    return text
+    except Exception as e:
+        print(f"[WARN] AI response failed: {e}")
 
-    except Exception:
-        pass
-
-    # Fallback to templates with exact data
-    if status == "fail":
-        return random.choice(templates_fail)
-    elif status == "warn":
-        return random.choice(templates_warn)
-    else:
-        return random.choice(templates_ok)
+    # If AI fails completely, just return the raw result
+    return result
 
 
 def _safe_ui_call(func, *args):
@@ -1618,35 +1547,9 @@ Just tell me what you need.
 
     display_log("─── CORA's Abilities ───", "info")
     # Have CORA announce abilities - just give her the data, system prompt handles personality
-    try:
-        from ai.ollama import generate
-
-        abilities_prompt = f"""Boot is done. Tell the user what you can do for them.
-Your abilities: voice chat, vision/screenshots/camera, image generation, reminders/calendar/tasks,
-web search, file management, code help, email. Ask what they want to do."""
-
-        abilities_result = generate(
-            prompt=abilities_prompt,
-            system=get_system_prompt(),
-            temperature=0.9,
-            max_tokens=200
-        )
-
-        if abilities_result.content:
-            import re
-            abilities_response = abilities_result.content.strip().strip('"\'')
-            # Clean markdown
-            abilities_response = re.sub(r'\*\*([^*]+)\*\*', r'\1', abilities_response)
-            abilities_response = re.sub(r'\*([^*]+)\*', r'\1', abilities_response)
-            abilities_response = re.sub(r'\n+', ' ', abilities_response)
-            abilities_response = re.sub(r'\s+', ' ', abilities_response).strip()
-            speak(abilities_response)
-        else:
-            # Fallback
-            speak("So what do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
-    except Exception as e:
-        print(f"  [WARN] Abilities announcement failed: {e}")
-        speak("So what do you want? I can see your screen, generate images, set reminders, search the web, write code, whatever. Just tell me.")
+    abilities_data = "voice chat, vision/screenshots/camera, image generation, reminders/calendar/tasks, web search, file management, code help, email"
+    abilities_response = cora_respond("Abilities announcement", f"Boot is done. Tell the user what you can do: {abilities_data}. Ask what they want.", "ok")
+    speak(abilities_response)
 
     # Also print the abilities to the console
     for line in abilities_list.strip().split('\n'):
