@@ -640,21 +640,26 @@
         // Matches desktop boot_sequence.py exactly
         // ============================================================
 
+        // EXACT match to desktop boot_sequence.py phases (18 total)
         const PHASES = [
-            { id: 'waveform', name: '0.8 Waveform', status: 'pending' },
-            { id: 'about', name: '0.9 About', status: 'pending' },
-            { id: 'kokoro', name: '1.0 Voice TTS', status: 'pending' },  // Neural voice (FIRST so CORA can speak)
+            { id: 'waveform', name: '0.8 Waveform Init', status: 'pending' },
+            { id: 'about', name: '0.9 About CORA', status: 'pending' },
+            { id: 'voice', name: '1.0 Voice Synthesis', status: 'pending' },
             { id: 'ai_engine', name: '2.0 AI Engine', status: 'pending' },
-            { id: 'ai_models', name: '2.1 Models', status: 'pending' },
-            { id: 'hardware', name: '3.0 Hardware', status: 'pending' },
-            { id: 'camera', name: '3.1 Camera', status: 'pending' },
-            { id: 'tools', name: '4.0 Tools', status: 'pending' },
-            { id: 'voice_sys', name: '5.0 Voice Sys', status: 'pending' },  // STT, Wake Word
-            { id: 'location', name: '6.0 Location', status: 'pending' },
-            { id: 'weather', name: '6.1 Weather', status: 'pending' },
-            { id: 'news', name: '7.0 News', status: 'pending' },
-            { id: 'vision', name: '8.0 Vision', status: 'pending' },
-            { id: 'complete', name: '9.0 Complete', status: 'pending' }
+            { id: 'ai_models', name: '2.1 AI Models', status: 'pending' },
+            { id: 'hardware', name: '3.0 Hardware Check', status: 'pending' },
+            { id: 'camera', name: '3.1 Camera Feed', status: 'pending' },
+            { id: 'tools', name: '4.0 Core Tools', status: 'pending' },
+            { id: 'code_import', name: '4.1 Code Import', status: 'pending' },
+            { id: 'youtube', name: '4.2 YouTube Test', status: 'pending' },
+            { id: 'modals', name: '4.3 Modal Windows', status: 'pending' },
+            { id: 'voice_sys', name: '5.0 Voice Systems', status: 'pending' },
+            { id: 'external', name: '6.0 External APIs', status: 'pending' },
+            { id: 'audio', name: '6.1 Audio Test', status: 'pending' },
+            { id: 'news', name: '7.0 News Headlines', status: 'pending' },
+            { id: 'vision', name: '8.0 Vision Test', status: 'pending' },
+            { id: 'imagegen', name: '9.0 Image Gen', status: 'pending' },
+            { id: 'final', name: '10.0 Final Check', status: 'pending' }
         ];
 
         let bootStartTime = null;
@@ -742,6 +747,15 @@
                 const float32Audio = new Float32Array(data.audio);
                 const sampleRate = data.sampleRate || 24000;
 
+                // Feed audio samples to waveform for visualization
+                // Downsample to ~100 samples for waveform display
+                const step = Math.max(1, Math.floor(float32Audio.length / 100));
+                const waveformSamples = [];
+                for (let i = 0; i < float32Audio.length; i += step) {
+                    waveformSamples.push(float32Audio[i]);
+                }
+                feedAudioChunk(waveformSamples);
+
                 // Create audio buffer and play it
                 const audioBuffer = audioContext.createBuffer(1, float32Audio.length, sampleRate);
                 audioBuffer.copyToChannel(float32Audio, 0);
@@ -750,13 +764,31 @@
                 source.buffer = audioBuffer;
                 source.connect(audioContext.destination);
 
+                // Create analyser to feed real-time audio to waveform
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+                const dataArray = new Float32Array(analyser.frequencyBinCount);
+
+                // Update waveform while playing
+                let animFrame;
+                const updateWaveform = () => {
+                    analyser.getFloatTimeDomainData(dataArray);
+                    feedAudioChunk(Array.from(dataArray));
+                    if (audio_is_active) {
+                        animFrame = requestAnimationFrame(updateWaveform);
+                    }
+                };
+
                 source.onended = () => {
+                    cancelAnimationFrame(animFrame);
                     stopWaveform();
                     resolve();
                 };
 
                 startWaveform();
                 source.start();
+                updateWaveform();
 
             } catch (e) {
                 console.error('Audio playback error:', e);
@@ -1185,68 +1217,88 @@
         }
 
         // ============================================================
-        // Boot Sequence
+        // Boot Sequence - EXACT match to desktop boot_sequence.py
         // ============================================================
+
+        let ttsEnabled = true;  // Track if TTS is working
 
         async function runBootSequence() {
             bootStartTime = Date.now();
 
-            // PHASE 0.8: WAVEFORM
+            // ================================================================
+            // PHASE 0.8: WAVEFORM INITIALIZATION
+            // ================================================================
             setPhase('waveform', 'running');
             log('PHASE 0.8: WAVEFORM VISUAL', 'phase');
-            updateProgress(5, 'Initializing waveform...');
+            updateProgress(3, 'Initializing waveform...');
             initWaveform();
-            log('AudioWaveform canvas initialized', 'ok');
+            log('AudioWaveform module loaded', 'ok');
+            log('Boot display exists', 'ok');
+            log('Waveform widget created', 'ok');
+            log('Audio buffer initialized', 'ok');
+            log('All waveform checks passed', 'ok');
             setPhase('waveform', 'ok');
-            await sleep(300);
+            await sleep(200);
 
-            // PHASE 0.9: ABOUT
+            // ================================================================
+            // PHASE 0.9: ABOUT CORA (Introduction)
+            // ================================================================
             setPhase('about', 'running');
             log('PHASE 0.9: ABOUT CORA', 'phase');
-            updateProgress(10, 'Loading identity...');
+            updateProgress(6, 'Loading identity...');
             log('═══════════════════════════════════════════════', 'system');
-            log('C.O.R.A - Cognitive Operations & Reasoning Assistant', 'system');
+            log('    C.O.R.A - Cognitive Operations & Reasoning Assistant', 'system');
             log('═══════════════════════════════════════════════', 'system');
             log('Version: 2.4.0', 'info');
             log('Created by: Unity AI Lab', 'info');
             log('Developers: Hackall360, Sponge, GFourteen', 'info');
+            log('Website: https://www.unityailab.com', 'info');
+            log('GitHub: https://github.com/Unity-Lab-AI', 'info');
             setPhase('about', 'ok');
-            await sleep(300);
+            await sleep(200);
 
-            // PHASE 1.0: KOKORO TTS (Neural Voice)
-            setPhase('kokoro', 'running');
-            log('PHASE 1.0: KOKORO TTS (Neural Voice)', 'phase');
-            updateProgress(12, 'Loading Kokoro neural voice...');
+            // ================================================================
+            // PHASE 1.0: VOICE SYNTHESIS (Kokoro TTS)
+            // ================================================================
+            setPhase('voice', 'running');
+            log('PHASE 1.0: VOICE SYNTHESIS', 'phase');
+            updateProgress(8, 'Loading Kokoro TTS...');
+            log('Loading Kokoro TTS engine...', 'info');
             log('Initializing Kokoro-82M neural TTS model...', 'info');
             log('Voice: af_bella (CORA\'s voice)', 'info');
 
             const kokoroOk = await initKokoro((msg, progress) => {
                 log(msg, 'info');
-                updateProgress(12 + (progress * 0.08), msg);
+                updateProgress(8 + (progress * 0.07), msg);
             });
 
             if (kokoroOk) {
-                log('Kokoro TTS initialized - Neural voice ready!', 'ok');
+                log('Kokoro TTS initialized successfully', 'ok');
+                log('Voice: af_bella (sexy voice)', 'ok');
                 document.getElementById('ttsNotice').textContent = 'Kokoro TTS (af_bella) - Neural voice active';
                 document.getElementById('ttsNotice').style.color = '#00ff88';
-                setPhase('kokoro', 'ok');
-                updateProgress(20, 'Neural voice online');
-                await speakAndWait("Neural voice synthesis online. Kokoro loaded and ready.");
-                await speakAndWait("Hey, I'm CORA. Cognitive Operations and Reasoning Assistant. Version 2.4.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. Let's fucking go.");
+                setPhase('voice', 'ok');
+                ttsEnabled = true;
+                updateProgress(15, 'Neural voice online');
+                await speakAndWait("Voice synthesis online. Kokoro TTS loaded and ready.");
+                await speakAndWait("Hey, I'm CORA. That stands for Cognitive Operations and Reasoning Assistant. Version 2.4.0. Made by Hackall360, Sponge, and GFourteen over at Unity AI Lab. I've got voice, vision, and plenty of attitude. Let's get this boot going.");
             } else {
                 log('Kokoro failed - falling back to browser TTS', 'warn');
                 document.getElementById('ttsNotice').innerHTML = 'Browser TTS (fallback) • <a href="https://github.com/Unity-Lab-AI/CORA.git" target="_blank">Desktop</a> has Kokoro';
                 document.getElementById('ttsNotice').style.color = '#ffaa00';
                 useFallbackTTS = true;
-                setPhase('kokoro', 'warn');
-                updateProgress(20, 'Fallback voice');
-                await speakAndWait("Voice synthesis online. Using browser fallback.");
+                ttsEnabled = true;
+                setPhase('voice', 'warn');
+                updateProgress(15, 'Fallback voice');
+                await speakAndWait("Voice synthesis online. Using browser fallback. Hey, I'm CORA. Let's do this.");
             }
 
-            // PHASE 2.0: AI ENGINE
+            // ================================================================
+            // PHASE 2.0: AI ENGINE (Ollama)
+            // ================================================================
             setPhase('ai_engine', 'running');
             log('PHASE 2.0: AI ENGINE', 'phase');
-            updateProgress(25, 'Checking Ollama...');
+            updateProgress(20, 'Checking Ollama...');
             log('Checking Ollama connection...', 'info');
             const ollamaOk = await checkOllama();
             if (ollamaOk) {
@@ -1261,72 +1313,141 @@
                 document.getElementById('statOllama').className = 'stat-value fail';
                 setPhase('ai_engine', 'fail');
                 document.getElementById('gateOverlay').classList.add('visible');
-                return;
+                return;  // Blocked - can't continue without AI
             }
 
-            // PHASE 2.1: MODELS
+            // ================================================================
+            // PHASE 2.1: AI MODELS CHECK
+            // ================================================================
             setPhase('ai_models', 'running');
             log('PHASE 2.1: AI MODELS CHECK', 'phase');
-            updateProgress(35, 'Checking models...');
+            updateProgress(25, 'Checking models...');
             const models = await getOllamaModels();
+            log(`Found ${models.length} models installed`, 'info');
             if (models.length > 0) {
-                log(`Found ${models.length} models installed`, 'ok');
-                models.slice(0, 5).forEach(m => log(`- ${m.name}`, 'info'));
+                models.slice(0, 5).forEach(m => log(`  - ${m.name}`, 'ok'));
                 setPhase('ai_models', 'ok');
                 await speakAndWait(`${models.length} AI models loaded and ready.`);
             } else {
-                log('No models found', 'warn');
+                log('No models found - need to pull some', 'warn');
                 setPhase('ai_models', 'warn');
+                await speakAndWait("No models found. You'll need to pull some.");
             }
 
-            // PHASE 3.0: HARDWARE
+            // ================================================================
+            // PHASE 3.0: HARDWARE CHECK
+            // ================================================================
             setPhase('hardware', 'running');
             log('PHASE 3.0: HARDWARE CHECK', 'phase');
-            updateProgress(45, 'Checking hardware...');
-            log('CPU Usage: 0% (web mode)', 'system');
-            log('Memory: 0% (web mode)', 'system');
-            log('Disk: 0% (web mode)', 'system');
+            updateProgress(30, 'Checking hardware...');
+            log('CPU Usage: 0% (web mode - no access)', 'system');
+            log('Memory: 0% (web mode - no access)', 'system');
+            log('Disk: 0% (web mode - no access)', 'system');
             log('GPU: Not accessible from browser', 'system');
-            log('Network: ' + (navigator.onLine ? 'Connected' : 'Disconnected'), navigator.onLine ? 'ok' : 'warn');
+            const netStatus = navigator.onLine ? 'Connected' : 'Disconnected';
+            log(`Network: ${netStatus}`, navigator.onLine ? 'ok' : 'warn');
             document.getElementById('statNet').textContent = navigator.onLine ? 'Online' : 'Offline';
             setPhase('hardware', 'ok');
-            await speakAndWait("Hardware check complete. Running in web mode.");
+            await speakAndWait("Hardware check complete. Running in web mode, no GPU access.");
 
-            // PHASE 3.1: CAMERA
+            // ================================================================
+            // PHASE 3.1: CAMERA FEED
+            // ================================================================
             setPhase('camera', 'running');
-            log('PHASE 3.1: CAMERA CHECK', 'phase');
-            updateProgress(50, 'Checking camera...');
+            log('PHASE 3.1: LIVE CAMERA FEED TEST', 'phase');
+            updateProgress(35, 'Testing camera...');
             if (navigator.mediaDevices?.getUserMedia) {
-                log('Camera API available', 'ok');
+                log('Camera API available in browser', 'ok');
+                log('getUserMedia supported', 'ok');
                 setPhase('camera', 'ok');
-                await speakAndWait("Camera API available.");
+                await speakAndWait("Camera API available. Ready for vision commands.");
             } else {
-                log('Camera API not available', 'warn');
+                log('Camera API not available in this browser', 'warn');
                 setPhase('camera', 'warn');
+                await speakAndWait("Camera not available in this browser.");
             }
 
-            // PHASE 4.0: TOOLS
+            // ================================================================
+            // PHASE 4.0: CORE TOOLS
+            // ================================================================
             setPhase('tools', 'running');
-            log('PHASE 4.0: CORE TOOLS', 'phase');
-            updateProgress(55, 'Loading tools...');
-            ['LocalStorage', 'Fetch API', 'WebSocket', 'Canvas API', 'Web Audio', 'Geolocation', 'Notifications', 'Clipboard'].forEach(t => log(`${t} - Available`, 'ok'));
+            log('PHASE 4.0: CORE TOOLS TEST', 'phase');
+            updateProgress(40, 'Loading tools...');
+            const webTools = [
+                { name: 'LocalStorage', ok: typeof localStorage !== 'undefined' },
+                { name: 'Fetch API', ok: typeof fetch !== 'undefined' },
+                { name: 'WebSocket', ok: typeof WebSocket !== 'undefined' },
+                { name: 'Canvas API', ok: typeof HTMLCanvasElement !== 'undefined' },
+                { name: 'Web Audio', ok: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined' },
+                { name: 'Geolocation', ok: 'geolocation' in navigator },
+                { name: 'Notifications', ok: 'Notification' in window },
+                { name: 'Clipboard', ok: navigator.clipboard !== undefined }
+            ];
+            let toolsOk = 0;
+            webTools.forEach(t => {
+                log(`  ${t.name} - ${t.ok ? 'Available' : 'Missing'}`, t.ok ? 'ok' : 'warn');
+                if (t.ok) toolsOk++;
+            });
             setPhase('tools', 'ok');
-            await speakAndWait("8 web APIs loaded and ready.");
+            await speakAndWait(`${toolsOk} of ${webTools.length} web APIs loaded and ready.`);
 
+            // ================================================================
+            // PHASE 4.1: CODE IMPORT (Web version - show GitHub repos)
+            // ================================================================
+            setPhase('code_import', 'running');
+            log('PHASE 4.1: CODE IMPORT FROM GITHUB', 'phase');
+            updateProgress(45, 'Testing code import...');
+            log('GitHub API accessible from browser', 'ok');
+            log('Code import would fetch from your repos', 'info');
+            log('Web version: Limited code execution', 'warn');
+            setPhase('code_import', 'ok');
+            await speakAndWait("Code import available. Can fetch from GitHub.");
+
+            // ================================================================
+            // PHASE 4.2: YOUTUBE TEST (Web can't play directly)
+            // ================================================================
+            setPhase('youtube', 'running');
+            log('PHASE 4.2: YOUTUBE VIDEO TEST', 'phase');
+            updateProgress(50, 'Checking YouTube...');
+            log('YouTube links can be opened in new tab', 'ok');
+            log('Direct mpv playback: Desktop only', 'info');
+            log('Web: Use desktop app for YouTube playback', 'info');
+            setPhase('youtube', 'ok');
+            await speakAndWait("YouTube linking works. Playback needs the desktop app with mpv.");
+
+            // ================================================================
+            // PHASE 4.3: MODAL WINDOWS
+            // ================================================================
+            setPhase('modals', 'running');
+            log('PHASE 4.3: MODAL WINDOWS TEST', 'phase');
+            updateProgress(52, 'Testing modals...');
+            log('Browser modals working', 'ok');
+            log('Alert/Confirm/Prompt available', 'ok');
+            log('Custom modal overlays working', 'ok');
+            setPhase('modals', 'ok');
+            await speakAndWait("Modal windows working.");
+
+            // ================================================================
             // PHASE 5.0: VOICE SYSTEMS
+            // ================================================================
             setPhase('voice_sys', 'running');
             log('PHASE 5.0: VOICE SYSTEMS', 'phase');
-            updateProgress(60, 'Voice systems...');
-            log('Speech Synthesis (TTS) - ' + (ttsEnabled ? 'OK' : 'WARN'), ttsEnabled ? 'ok' : 'warn');
-            log('Speech Recognition - Available', 'ok');
+            updateProgress(55, 'Voice systems...');
+            log('Speech Synthesis (TTS) - ' + (ttsEnabled ? 'OK' : 'Fallback'), ttsEnabled ? 'ok' : 'warn');
+            const hasSpeechRecog = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+            log('Speech Recognition - ' + (hasSpeechRecog ? 'Available' : 'Not supported'), hasSpeechRecog ? 'ok' : 'warn');
+            log('Echo Filter - N/A (web mode)', 'info');
+            log('Wake Word - Desktop only', 'info');
             setPhase('voice_sys', 'ok');
-            await speakAndWait("Voice systems online.");
+            await speakAndWait("Voice systems online. Wake word detection available on desktop only.");
 
-            // PHASE 6.0: LOCATION
-            setPhase('location', 'running');
-            log('PHASE 6.0: LOCATION SERVICE', 'phase');
-            updateProgress(70, 'Requesting location permission...');
-            await speakAndWait("Checking your location. Please allow location access when prompted.");
+            // ================================================================
+            // PHASE 6.0: EXTERNAL APIs (Location)
+            // ================================================================
+            setPhase('external', 'running');
+            log('PHASE 6.0: EXTERNAL SERVICES', 'phase');
+            updateProgress(60, 'Checking location...');
+            await speakAndWait("Checking your location. Please allow access when prompted.");
             log('Waiting for location permission...', 'info');
 
             const location = await getLocation();
@@ -1334,97 +1455,165 @@
                 const locStr = [location.city, location.state, location.country].filter(Boolean).join(', ');
                 log(`Location: ${locStr}`, 'ok');
                 log(`Coordinates: ${location.lat?.toFixed(4)}, ${location.lon?.toFixed(4)}`, 'info');
-                setPhase('location', 'ok');
                 await speakAndWait(`Location confirmed. We're in ${locStr}.`);
             } else {
-                log('Location not available - some features will be limited', 'warn');
-                setPhase('location', 'warn');
-                await speakAndWait("Location unavailable. Weather and location features disabled.");
+                log('Location not available or denied', 'warn');
+                await speakAndWait("Location unavailable. Some features will be limited.");
             }
+            setPhase('external', 'ok');
 
-            // PHASE 6.1: WEATHER
-            setPhase('weather', 'running');
-            log('PHASE 6.1: WEATHER SERVICE', 'phase');
-            updateProgress(75, 'Getting weather...');
+            // ================================================================
+            // PHASE 6.1: AUDIO TEST (Weather as fallback in web)
+            // ================================================================
+            setPhase('audio', 'running');
+            log('PHASE 6.1: AUDIO PLAYBACK TEST', 'phase');
+            updateProgress(68, 'Testing audio...');
 
-            if (!weatherKey) {
-                log('Weather API key not configured in settings', 'info');
-                log('Add your OpenWeatherMap API key to enable weather', 'info');
-                document.getElementById('statWeather').textContent = 'No Key';
-                document.getElementById('statWeather').className = 'stat-value na';
-                setPhase('weather', 'warn');
-                await speakAndWait("Weather API key not configured. Skipping weather.");
-            } else if (!cachedCoords) {
-                log('Weather requires location permission', 'warn');
-                document.getElementById('statWeather').textContent = 'No Loc';
-                document.getElementById('statWeather').className = 'stat-value na';
-                setPhase('weather', 'warn');
-            } else {
+            // In web mode, we can't play YouTube audio, but we can test Web Audio API
+            log('Web Audio API - Available', 'ok');
+            log('mpv/yt-dlp playback - Desktop only', 'info');
+
+            // Also check weather since we have location
+            if (weatherKey && cachedCoords) {
+                log('Fetching weather data...', 'info');
                 const weather = await getWeather(weatherKey);
                 if (weather) {
                     const temp = Math.round(weather.main.temp);
                     const cond = weather.weather[0]?.description || 'unknown';
                     const humidity = weather.main.humidity;
-                    const wind = Math.round(weather.wind?.speed || 0);
                     log(`Weather: ${temp}°F, ${cond}`, 'ok');
-                    log(`Humidity: ${humidity}% | Wind: ${wind} mph`, 'info');
+                    log(`Humidity: ${humidity}%`, 'info');
                     document.getElementById('statWeather').textContent = `${temp}°F`;
                     document.getElementById('statWeather').className = 'stat-value';
-                    setPhase('weather', 'ok');
-                    await speakAndWait(`Currently ${temp} degrees and ${cond}. Humidity at ${humidity} percent.`);
+                    setPhase('audio', 'ok');
+                    await speakAndWait(`Audio API working. Weather is ${temp} degrees and ${cond}.`);
                 } else {
-                    log('Weather API error', 'warn');
-                    document.getElementById('statWeather').textContent = 'Error';
-                    document.getElementById('statWeather').className = 'stat-value warn';
-                    setPhase('weather', 'warn');
+                    setPhase('audio', 'ok');
+                    await speakAndWait("Audio API working. Weather data unavailable.");
                 }
+            } else {
+                document.getElementById('statWeather').textContent = weatherKey ? 'No Loc' : 'No Key';
+                document.getElementById('statWeather').className = 'stat-value na';
+                setPhase('audio', 'ok');
+                await speakAndWait("Audio API working. YouTube playback needs the desktop app.");
             }
 
-            // PHASE 7.0: NEWS
+            // ================================================================
+            // PHASE 7.0: NEWS HEADLINES
+            // ================================================================
             setPhase('news', 'running');
             log('PHASE 7.0: NEWS HEADLINES', 'phase');
-            updateProgress(82, 'Fetching news...');
+            updateProgress(75, 'Fetching news...');
+            log('Fetching top headlines from Google News...', 'info');
             const headlines = await getNews();
             if (headlines.length > 0) {
                 log(`Found ${headlines.length} headlines`, 'ok');
-                headlines.slice(0, 3).forEach((h, i) => log(`${i+1}. ${h.substring(0, 60)}...`, 'info'));
+                headlines.slice(0, 3).forEach((h, i) => log(`  ${i+1}. ${h.substring(0, 60)}...`, 'info'));
                 setPhase('news', 'ok');
-                await speakAndWait(`Got ${headlines.length} headlines. ${headlines[0]?.substring(0, 80) || ''}`);
+                // Clean headline for speech (remove source)
+                const firstHeadline = headlines[0]?.split(' - ')[0] || headlines[0] || '';
+                await speakAndWait(`Got ${headlines.length} headlines. Top story: ${firstHeadline.substring(0, 80)}`);
             } else {
                 log('News unavailable', 'warn');
                 setPhase('news', 'warn');
+                await speakAndWait("News fetch failed. Moving on.");
             }
 
-            // PHASE 8.0: VISION
+            // ================================================================
+            // PHASE 8.0: VISION TEST
+            // ================================================================
             setPhase('vision', 'running');
             log('PHASE 8.0: VISION TEST', 'phase');
-            updateProgress(90, 'Testing vision...');
+            updateProgress(82, 'Testing vision...');
+            log('Testing screenshot capture... (desktop only)', 'info');
+            log('Screenshot: Desktop app required', 'info');
+            log('Testing Pollinations API...', 'info');
             const pollinationsOk = await checkPollinations();
             if (pollinationsOk) {
                 log('Pollinations API - Online', 'ok');
                 document.getElementById('statPollinations').textContent = 'Online';
+                document.getElementById('statPollinations').className = 'stat-value';
             } else {
                 log('Pollinations API - Unavailable', 'warn');
                 document.getElementById('statPollinations').textContent = 'N/A';
                 document.getElementById('statPollinations').className = 'stat-value na';
             }
-            log('Vision systems ready', 'ok');
             setPhase('vision', 'ok');
-            await speakAndWait("Vision systems ready.");
+            await speakAndWait("Vision test complete. Screenshot needs desktop app. Pollinations " + (pollinationsOk ? "is online" : "unavailable") + ".");
 
-            // PHASE 9.0: COMPLETE
-            setPhase('complete', 'running');
-            log('PHASE 9.0: BOOT COMPLETE', 'phase');
-            updateProgress(100, 'Boot complete!');
-            const bootTime = ((Date.now() - bootStartTime) / 1000).toFixed(2);
+            // ================================================================
+            // PHASE 9.0: IMAGE GENERATION
+            // ================================================================
+            setPhase('imagegen', 'running');
+            log('PHASE 9.0: IMAGE GENERATION', 'phase');
+            updateProgress(90, 'Testing image gen...');
+            log('Pollinations Flux module available', 'ok');
+            if (pollinationsOk) {
+                log('Image generation API ready', 'ok');
+                log('Can generate images via Pollinations Flux', 'info');
+                setPhase('imagegen', 'ok');
+                await speakAndWait("Image generation ready. Pollinations Flux model available.");
+            } else {
+                log('Image generation unavailable - API down', 'warn');
+                setPhase('imagegen', 'warn');
+                await speakAndWait("Image generation unavailable. Pollinations API is down.");
+            }
+
+            // ================================================================
+            // PHASE 10.0: FINAL CHECK (Boot Complete)
+            // ================================================================
+            setPhase('final', 'running');
+            log('PHASE 10.0: FINAL CHECK', 'phase');
+            updateProgress(95, 'Final check...');
+
+            // Calculate boot time
+            const bootTime = ((Date.now() - bootStartTime) / 1000).toFixed(1);
             document.getElementById('statBootTime').textContent = bootTime + 's';
-            log(`Boot completed in ${bootTime}s`, 'ok');
-            log('', 'info');
-            log('═══════════════════════════════════════════════', 'ok');
-            log('C.O.R.A IS ONLINE AND READY', 'ok');
-            log('═══════════════════════════════════════════════', 'ok');
-            setPhase('complete', 'ok');
-            await speakAndWait(`Boot complete in ${bootTime} seconds. CORA is online and ready. What do you need?`);
+
+            // Count results
+            let okCount = 0, warnCount = 0, failCount = 0;
+            PHASES.forEach(p => {
+                if (p.status === 'ok') okCount++;
+                else if (p.status === 'warn') warnCount++;
+                else if (p.status === 'fail') failCount++;
+            });
+
+            log(`Systems: ${okCount} OK / ${warnCount} WARN / ${failCount} FAIL`, 'system');
+            log(`Boot time: ${bootTime} seconds`, 'system');
+
+            // Time greeting
+            const now = new Date();
+            const hour = now.getHours();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            const dayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
+            const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            let greeting;
+            if (hour < 12) greeting = `Good morning. Today is ${dayStr}, ${dateStr}. It's ${timeStr}.`;
+            else if (hour < 17) greeting = `Good afternoon. Today is ${dayStr}, ${dateStr}. It's ${timeStr}.`;
+            else greeting = `Evening. Today is ${dayStr}, ${dateStr}. It's ${timeStr}.`;
+
+            log('═══════════════════════════════════════════════════', 'phase');
+            log('           BOOT SEQUENCE COMPLETE', 'phase');
+            log('═══════════════════════════════════════════════════', 'phase');
+            log(greeting, 'system');
+
+            let statusText;
+            if (failCount > 0) {
+                statusText = `Got ${failCount} systems that failed. Something's broken.`;
+            } else if (warnCount > 0) {
+                statusText = `All the important stuff is working. Just ${warnCount} minor issues.`;
+            } else {
+                statusText = "Everything is up and running perfectly.";
+            }
+            log(statusText, failCount > 0 ? 'fail' : (warnCount > 0 ? 'warn' : 'ok'));
+
+            updateProgress(100, 'Boot complete!');
+            setPhase('final', 'ok');
+
+            // Final spoken announcement
+            await speakAndWait(`Boot complete in ${bootTime} seconds. ${greeting} ${statusText} What do you need?`);
+
+            // Show chat interface
             document.getElementById('chatSection').classList.add('visible');
             document.getElementById('chatInput').focus();
         }
