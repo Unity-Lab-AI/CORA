@@ -1223,15 +1223,13 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // Simple prompt - system prompt handles personality, just give data and instruction
+                // System prompt handles personality - just give data
                 if (mode === 'quick') {
-                    // Quick = short acknowledgments (hardware, tools, modals, audio, location)
-                    prompt = `${result}\n\nRespond briefly. No offers to help.`;
+                    prompt = `${result}\n\nBe brief.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    // Full = detailed (intro, weather, news, vision, camera, images, screenshots)
-                    prompt = `${result}\n\nGive your full take. No offers to help.`;
+                    prompt = result;
                     temperature = 0.8;
                     maxTokens = 500;
                 }
