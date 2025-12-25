@@ -4000,22 +4000,14 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                 log('Search timeout, using default video', 'info');
             }
 
-            log(`Found: ${video.title}`, 'ok');
+            if (searchWorked) {
+                log(`YouTube search working - found: ${video.title}`, 'ok');
+            } else {
+                log('YouTube ready (search API down, will use direct links)', 'ok');
+            }
             setPhase('youtube', 'ok');
-
-            // SPEAK FIRST - before showing video (no audio overlap)
-            const ytResponse = await coraRespond('YouTube', `YouTube working. Playing "${video.title}".`, 'ok');
-            await speakAndWait(ytResponse);
-
-            // NOW show video after TTS is done
-            log('Embedding YouTube video...', 'info');
-            const videoModal = showVideoModal(video.id, `CORA - ${video.title}`);
-            log('Video playing in modal', 'ok');
-
-            // Let video play, then close
-            await sleep(8000);
-            videoModal.close();
-            log('YouTube test complete', 'info');
+            // Don't auto-play videos on boot - just verify the system works
+            // User can request music/videos anytime after boot
 
             // ================================================================
             // PHASE 4.3: MODAL WINDOWS - Show actual test modal!
