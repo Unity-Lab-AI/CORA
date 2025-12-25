@@ -1387,12 +1387,6 @@ WHEN RESPONDING:
             // Clear the timeout since audio arrived
             if (timeoutId) clearTimeout(timeoutId);
 
-            // NOW show the speech text and log - audio is about to play
-            if (text) {
-                document.getElementById('speechText').textContent = `"${text}"`;
-                log(`CORA: "${text}"`, 'cora');
-            }
-
             try {
                 // Resume audio context if suspended (browser requires user interaction)
                 if (audioContext.state === 'suspended') {
@@ -1403,15 +1397,8 @@ WHEN RESPONDING:
                 // Convert ArrayBuffer back to Float32Array
                 const float32Audio = new Float32Array(data.audio);
                 const sampleRate = data.sampleRate || 24000;
-
-                // Feed audio samples to waveform for visualization
-                // Downsample to ~100 samples for waveform display
-                const step = Math.max(1, Math.floor(float32Audio.length / 100));
-                const waveformSamples = [];
-                for (let i = 0; i < float32Audio.length; i += step) {
-                    waveformSamples.push(float32Audio[i]);
-                }
-                feedAudioChunk(waveformSamples);
+                const duration = float32Audio.length / sampleRate;
+                console.log(`[TTS] Audio ready: ${float32Audio.length} samples, ${duration.toFixed(1)}s duration`);
 
                 // Create audio buffer and play it
                 const audioBuffer = audioContext.createBuffer(1, float32Audio.length, sampleRate);
@@ -1437,19 +1424,36 @@ WHEN RESPONDING:
                     }
                 };
 
+                // ONLY log and show text AFTER audio actually starts
                 source.onended = () => {
                     cancelAnimationFrame(animFrame);
                     stopWaveform();
+                    console.log('[TTS] Audio finished playing');
                     resolve();
                 };
 
+                // Start audio FIRST, then show text
                 startWaveform();
                 source.start();
                 updateWaveform();
 
+                // NOW show the speech text - audio is playing
+                if (text) {
+                    document.getElementById('speechText').textContent = `"${text}"`;
+                    log(`CORA: "${text}"`, 'cora');
+                }
+                console.log('[TTS] Audio started playing');
+
             } catch (e) {
-                console.error('Audio playback error:', e);
+                console.error('[TTS] Audio playback error:', e);
+                // Show text anyway on error so user sees what CORA tried to say
+                if (text) {
+                    document.getElementById('speechText').textContent = `"${text}"`;
+                    log(`CORA: "${text}"`, 'cora');
+                }
                 stopWaveform();
+                // Wait a bit before resolving so boot doesn't race ahead
+                await new Promise(r => setTimeout(r, 500));
                 resolve();
             }
         }
