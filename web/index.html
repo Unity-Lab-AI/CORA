@@ -3566,10 +3566,11 @@ WHEN RESPONDING:
                 log(`CORA brain: ${CORA_MODEL}`, 'ok');
 
                 // CORA introduces herself - HARDCODED because AI can't be trusted to get it right
-                // Full about info: version, creators, website, discord, email, github
+                // Full about info: version, creators, website, discord, email, github - ALL FULL URLS
                 const coraIntro = "Alright, I'm online. CORA version 1.0.0, built by Unity AI Lab. " +
                     "Created by Hackall360, Sponge, and GFourteen. " +
-                    "Website unityailab.com, Discord discord.gg/D33Bk6Ay, email unityailabcontact@gmail.com. " +
+                    "Website https://www.unityailab.com, GitHub https://github.com/Unity-Lab-AI, " +
+                    "Discord https://discord.gg/D33Bk6Ay, email unityailabcontact@gmail.com. " +
                     "Now what the fuck do you want?";
                 log(`CORA: "${coraIntro}"`, 'cora');
                 await speakAndWait(coraIntro);
