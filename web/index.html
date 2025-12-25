@@ -1315,55 +1315,289 @@
         }
 
         // ============================================================
-        // Dynamic Modal System (matches desktop tkinter popups)
+        // Window Manager - Windows 11 style windows with drag/resize/z-level
+        // Matches desktop window_manager.py behavior
         // ============================================================
 
-        function createDynamicModal(title, width = 800, height = 600) {
-            // Remove any existing dynamic modal
-            const existing = document.getElementById('dynamicModal');
-            if (existing) existing.remove();
+        let windowZIndex = 2000;  // Track z-index for layering
+        const openWindows = {};   // Track open windows
 
+        function createDynamicModal(title, width = 800, height = 600) {
+            const windowId = 'window_' + Date.now();
+
+            // Semi-transparent overlay (click to unfocus, not close)
             const overlay = document.createElement('div');
-            overlay.id = 'dynamicModal';
+            overlay.id = windowId + '_overlay';
             overlay.style.cssText = `
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.9); z-index: 2000;
-                display: flex; align-items: center; justify-content: center;
+                background: rgba(0,0,0,0.5); z-index: ${windowZIndex - 1};
+                pointer-events: none;
             `;
 
+            // The window itself - positioned absolutely, not centered in flex
             const modal = document.createElement('div');
+            modal.id = windowId;
+            modal.className = 'cora-window';
             modal.style.cssText = `
-                background: #1a1a2e; border: 2px solid #ff00ff;
-                border-radius: 8px; width: ${width}px; max-width: 95vw;
-                max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+                position: fixed;
+                left: ${Math.max(50, (window.innerWidth - width) / 2)}px;
+                top: ${Math.max(50, (window.innerHeight - height) / 2)}px;
+                width: ${width}px;
+                height: ${height}px;
+                min-width: 300px;
+                min-height: 200px;
+                background: #1a1a2e;
+                border: 2px solid #ff00ff;
+                border-radius: 8px;
+                box-shadow: 0 10px 40px rgba(255,0,255,0.3);
+                display: flex;
+                flex-direction: column;
+                z-index: ${windowZIndex};
+                overflow: hidden;
             `;
 
+            // Title bar (draggable)
             const header = document.createElement('div');
+            header.className = 'window-titlebar';
             header.style.cssText = `
                 background: linear-gradient(135deg, #2d0040 0%, #1a0020 100%);
-                padding: 15px 20px; border-bottom: 1px solid #ff00ff;
-                display: flex; justify-content: space-between; align-items: center;
+                padding: 8px 10px;
+                border-bottom: 1px solid #ff00ff;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+                user-select: none;
             `;
-            header.innerHTML = `<span style="color: #ff00ff; font-weight: bold; font-size: 14px;">${title}</span>`;
+
+            const titleSpan = document.createElement('span');
+            titleSpan.style.cssText = 'color: #ff00ff; font-weight: bold; font-size: 13px;';
+            titleSpan.textContent = title;
+
+            // Window control buttons (minimize, maximize, close)
+            const controls = document.createElement('div');
+            controls.style.cssText = 'display: flex; gap: 5px;';
+
+            const minBtn = document.createElement('button');
+            minBtn.innerHTML = '─';
+            minBtn.title = 'Minimize';
+            minBtn.style.cssText = `
+                background: #444; border: none; color: white; width: 28px; height: 24px;
+                border-radius: 3px; cursor: pointer; font-size: 12px;
+            `;
+            minBtn.onmouseover = () => minBtn.style.background = '#666';
+            minBtn.onmouseout = () => minBtn.style.background = '#444';
+            minBtn.onclick = (e) => { e.stopPropagation(); minimizeWindow(modal); };
+
+            const maxBtn = document.createElement('button');
+            maxBtn.innerHTML = '☐';
+            maxBtn.title = 'Maximize';
+            maxBtn.style.cssText = `
+                background: #444; border: none; color: white; width: 28px; height: 24px;
+                border-radius: 3px; cursor: pointer; font-size: 12px;
+            `;
+            maxBtn.onmouseover = () => maxBtn.style.background = '#666';
+            maxBtn.onmouseout = () => maxBtn.style.background = '#444';
+            maxBtn.onclick = (e) => { e.stopPropagation(); toggleMaximize(modal, maxBtn); };
 
             const closeBtn = document.createElement('button');
-            closeBtn.textContent = 'X';
+            closeBtn.innerHTML = '✕';
+            closeBtn.title = 'Close';
             closeBtn.style.cssText = `
-                background: #ff4444; border: none; color: white; width: 30px; height: 30px;
-                border-radius: 4px; cursor: pointer; font-weight: bold;
+                background: #c42b1c; border: none; color: white; width: 28px; height: 24px;
+                border-radius: 3px; cursor: pointer; font-size: 12px;
             `;
-            closeBtn.onclick = () => overlay.remove();
-            header.appendChild(closeBtn);
+            closeBtn.onmouseover = () => closeBtn.style.background = '#e81123';
+            closeBtn.onmouseout = () => closeBtn.style.background = '#c42b1c';
+            closeBtn.onclick = (e) => { e.stopPropagation(); closeWindow(windowId); };
 
+            controls.appendChild(minBtn);
+            controls.appendChild(maxBtn);
+            controls.appendChild(closeBtn);
+
+            header.appendChild(titleSpan);
+            header.appendChild(controls);
+
+            // Content area
             const content = document.createElement('div');
             content.style.cssText = 'flex: 1; overflow: auto; padding: 15px;';
 
+            // Resize handles (8 directions)
+            const resizeHandles = createResizeHandles(modal);
+
             modal.appendChild(header);
             modal.appendChild(content);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
+            resizeHandles.forEach(h => modal.appendChild(h));
 
-            return { overlay, modal, content, close: () => overlay.remove() };
+            document.body.appendChild(overlay);
+            document.body.appendChild(modal);
+
+            // Enable dragging
+            enableDrag(modal, header);
+
+            // Click to bring to front
+            modal.addEventListener('mousedown', () => bringToFront(modal));
+
+            // Store window state
+            openWindows[windowId] = {
+                modal, overlay, isMaximized: false, isMinimized: false,
+                prevState: { left: modal.style.left, top: modal.style.top, width: modal.style.width, height: modal.style.height }
+            };
+
+            windowZIndex += 2;
+
+            return { overlay, modal, content, close: () => closeWindow(windowId) };
+        }
+
+        function createResizeHandles(modal) {
+            const handles = [];
+            const positions = [
+                { cursor: 'nw-resize', top: '-5px', left: '-5px', width: '15px', height: '15px' },
+                { cursor: 'n-resize', top: '-5px', left: '10px', right: '10px', height: '10px' },
+                { cursor: 'ne-resize', top: '-5px', right: '-5px', width: '15px', height: '15px' },
+                { cursor: 'e-resize', top: '10px', right: '-5px', bottom: '10px', width: '10px' },
+                { cursor: 'se-resize', bottom: '-5px', right: '-5px', width: '15px', height: '15px' },
+                { cursor: 's-resize', bottom: '-5px', left: '10px', right: '10px', height: '10px' },
+                { cursor: 'sw-resize', bottom: '-5px', left: '-5px', width: '15px', height: '15px' },
+                { cursor: 'w-resize', top: '10px', left: '-5px', bottom: '10px', width: '10px' }
+            ];
+
+            positions.forEach(pos => {
+                const handle = document.createElement('div');
+                handle.style.cssText = `position: absolute; cursor: ${pos.cursor}; z-index: 10;`;
+                if (pos.top) handle.style.top = pos.top;
+                if (pos.bottom) handle.style.bottom = pos.bottom;
+                if (pos.left) handle.style.left = pos.left;
+                if (pos.right) handle.style.right = pos.right;
+                if (pos.width) handle.style.width = pos.width;
+                if (pos.height) handle.style.height = pos.height;
+
+                enableResize(modal, handle, pos.cursor);
+                handles.push(handle);
+            });
+
+            return handles;
+        }
+
+        function enableDrag(modal, handle) {
+            let isDragging = false, startX, startY, startLeft, startTop;
+
+            handle.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                const win = openWindows[modal.id];
+                if (win && win.isMaximized) return;
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(modal.style.left);
+                startTop = parseInt(modal.style.top);
+                bringToFront(modal);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                modal.style.left = Math.max(0, startLeft + dx) + 'px';
+                modal.style.top = Math.max(0, startTop + dy) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => isDragging = false);
+        }
+
+        function enableResize(modal, handle, cursor) {
+            let isResizing = false, startX, startY, startW, startH, startL, startT;
+
+            handle.addEventListener('mousedown', (e) => {
+                const win = openWindows[modal.id];
+                if (win && win.isMaximized) return;
+
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startW = parseInt(modal.style.width);
+                startH = parseInt(modal.style.height);
+                startL = parseInt(modal.style.left);
+                startT = parseInt(modal.style.top);
+                e.preventDefault();
+                bringToFront(modal);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const minW = 300, minH = 200;
+
+                if (cursor.includes('e')) modal.style.width = Math.max(minW, startW + dx) + 'px';
+                if (cursor.includes('s')) modal.style.height = Math.max(minH, startH + dy) + 'px';
+                if (cursor.includes('w')) {
+                    const newW = Math.max(minW, startW - dx);
+                    modal.style.width = newW + 'px';
+                    modal.style.left = (startL + startW - newW) + 'px';
+                }
+                if (cursor.includes('n')) {
+                    const newH = Math.max(minH, startH - dy);
+                    modal.style.height = newH + 'px';
+                    modal.style.top = (startT + startH - newH) + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => isResizing = false);
+        }
+
+        function bringToFront(modal) {
+            windowZIndex += 2;
+            modal.style.zIndex = windowZIndex;
+            const win = openWindows[modal.id];
+            if (win) win.overlay.style.zIndex = windowZIndex - 1;
+        }
+
+        function minimizeWindow(modal) {
+            const win = openWindows[modal.id];
+            if (!win) return;
+            win.isMinimized = !win.isMinimized;
+            modal.style.display = win.isMinimized ? 'none' : 'flex';
+            win.overlay.style.display = win.isMinimized ? 'none' : 'block';
+        }
+
+        function toggleMaximize(modal, btn) {
+            const win = openWindows[modal.id];
+            if (!win) return;
+
+            if (win.isMaximized) {
+                // Restore
+                modal.style.left = win.prevState.left;
+                modal.style.top = win.prevState.top;
+                modal.style.width = win.prevState.width;
+                modal.style.height = win.prevState.height;
+                modal.style.borderRadius = '8px';
+                btn.innerHTML = '☐';
+                win.isMaximized = false;
+            } else {
+                // Save state and maximize
+                win.prevState = {
+                    left: modal.style.left, top: modal.style.top,
+                    width: modal.style.width, height: modal.style.height
+                };
+                modal.style.left = '0';
+                modal.style.top = '0';
+                modal.style.width = '100vw';
+                modal.style.height = '100vh';
+                modal.style.borderRadius = '0';
+                btn.innerHTML = '❐';
+                win.isMaximized = true;
+            }
+        }
+
+        function closeWindow(windowId) {
+            const win = openWindows[windowId];
+            if (win) {
+                win.modal.remove();
+                win.overlay.remove();
+                delete openWindows[windowId];
+            }
         }
 
         function showCodeModal(code, filename, language = 'python') {
