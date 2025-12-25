@@ -1355,9 +1355,10 @@ WHEN RESPONDING:
             const { resolve, startTime, text } = pendingCallbacks[id];
             delete pendingCallbacks[id];
 
-            // NOW show the speech text - audio is about to play
+            // NOW show the speech text and log - audio is about to play
             if (text) {
                 document.getElementById('speechText').textContent = `"${text}"`;
+                log(`CORA: "${text}"`, 'cora');
             }
 
             try {
@@ -1416,9 +1417,7 @@ WHEN RESPONDING:
         }
 
         function speak(text, callback) {
-            // DON'T show speech text yet - wait until audio actually starts playing
-            // Log is immediate but display waits for waveform
-            log(`CORA: "${text}"`, 'cora');
+            // DON'T show speech text or log yet - wait until audio actually starts playing
 
             if (kokoroReady && !useFallbackTTS) {
                 // Use Kokoro neural TTS
@@ -1452,9 +1451,10 @@ WHEN RESPONDING:
                     ) || voices[0];
                     if (femaleVoice) utterance.voice = femaleVoice;
 
-                    // Show text only when audio starts
+                    // Show text and log only when audio starts
                     utterance.onstart = () => {
                         document.getElementById('speechText').textContent = `"${text}"`;
+                        log(`CORA: "${text}"`, 'cora');
                         startWaveform();
                     };
                     utterance.onend = () => { stopWaveform(); if (callback) callback(); };
