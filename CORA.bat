@@ -288,6 +288,12 @@ echo.
 echo [LAUNCH] Starting C.O.R.A Boot Sequence...
 echo.
 
+:: Open Web UI in browser (for split view - terminal + browser side by side)
+echo [WEB UI] Opening web interface in browser...
+start "" "%~dp0web\index.html"
+echo         Arrange browser and this terminal side-by-side for split view
+echo.
+
 :: Launch boot sequence with dependency status
 python src\boot_sequence.py --mpv-missing=%MPV_MISSING%
 
