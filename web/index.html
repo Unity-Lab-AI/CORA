@@ -805,8 +805,12 @@
 
         // CORA generates her own responses using AI (EXACT match to desktop cora_respond)
         async function coraRespond(context, result, status = 'ok', mode = 'quick') {
-            if (!aiReady || !CORA_SYSTEM_PROMPT) {
-                // Fallback - AI not ready yet
+            if (!aiReady) {
+                console.log('[CORA] AI not ready yet, using raw result');
+                return result;
+            }
+            if (!CORA_SYSTEM_PROMPT) {
+                console.log('[CORA] No system prompt loaded, using raw result');
                 return result;
             }
 
@@ -836,9 +840,17 @@
                     })
                 });
 
+                console.log(`[CORA] API call for: "${result.substring(0, 50)}..."`);
+
                 if (res.ok) {
                     const d = await res.json();
                     let text = d.response?.trim().replace(/^["']|["']$/g, '') || result;
+                    console.log(`[CORA] Raw AI response: "${d.response?.substring(0, 100)}..."`);
+
+                    if (!text || text === result) {
+                        console.log('[CORA] AI returned empty or same as input');
+                        return result;
+                    }
 
                     // Clean up - EXACT match to desktop lines 263-272
                     if (text.toLowerCase().startsWith('cora:')) text = text.slice(5).trim();
@@ -851,21 +863,29 @@
                     text = text.replace(/\s+/g, ' ').trim();        // clean whitespace
 
                     // For quick mode, enforce length limit - if AI went crazy, use raw result
-                    if (mode === 'quick' && text.length > 100) {
+                    // Increased to 200 chars to allow CORA's personality through
+                    if (mode === 'quick' && text.length > 200) {
                         console.log(`[WARN] AI response too long (${text.length} chars), using raw result`);
                         return result;
                     }
 
-                    // Take only first sentence if multiple (quick mode)
-                    if (mode === 'quick' && text.includes('. ')) {
-                        text = text.split('. ')[0] + '.';
+                    // Take only first 2 sentences if too many (quick mode)
+                    if (mode === 'quick') {
+                        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+                        if (sentences.length > 2) {
+                            text = sentences.slice(0, 2).join(' ').trim();
+                        }
                     }
 
-                    return text.length > 10 ? text : result;
+                    console.log(`[CORA] Generated: "${text}"`);
+                    return text.length > 5 ? text : result;
+                } else {
+                    console.log(`[CORA] API returned status ${res.status}: ${res.statusText}`);
                 }
             } catch (e) {
-                console.log('[CORA] AI response failed:', e);
+                console.log('[CORA] AI response failed:', e.message);
             }
+            console.log('[CORA] Falling back to raw result');
             return result;
         }
 
