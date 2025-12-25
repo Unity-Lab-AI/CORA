@@ -2520,8 +2520,32 @@
                     await speakAndWait(camSkip);
                 } else {
                     log('Testing live camera feed...', 'info');
+
+                    // Try multiple camera devices like desktop (indices 0, 1, 2)
+                    let stream = null;
+                    let cameraError = null;
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                    log(`Found ${videoDevices.length} camera device(s)`, 'info');
+
+                    for (let i = 0; i < Math.max(videoDevices.length, 3); i++) {
+                        try {
+                            log(`Trying camera ${i}...`, 'info');
+                            const constraints = videoDevices[i]
+                                ? { video: { deviceId: { exact: videoDevices[i].deviceId } } }
+                                : { video: true };
+                            stream = await navigator.mediaDevices.getUserMedia(constraints);
+                            log(`Camera ${i} working!`, 'ok');
+                            break;
+                        } catch (e) {
+                            log(`Camera ${i}: ${e.message}`, 'warn');
+                            cameraError = e;
+                            await sleep(500);  // Brief delay before trying next
+                        }
+                    }
+
                     try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        if (!stream) throw cameraError || new Error('No camera available');
                         log('Live camera feed started', 'ok');
 
                         // Show camera in modal for 3 seconds like desktop
