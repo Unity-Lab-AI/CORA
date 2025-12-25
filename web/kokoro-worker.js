@@ -117,35 +117,108 @@ async function handleGenerate(id, data) {
     }
 }
 
+// Split long text into chunks at sentence boundaries
+function splitTextIntoChunks(text, maxChars = 400) {
+    if (text.length <= maxChars) return [text];
+
+    const chunks = [];
+    let remaining = text;
+
+    while (remaining.length > 0) {
+        if (remaining.length <= maxChars) {
+            chunks.push(remaining);
+            break;
+        }
+
+        // Find a good break point (end of sentence or clause)
+        let breakPoint = -1;
+        const breakChars = ['. ', '! ', '? ', ', ', '; ', ': ', ' - '];
+
+        for (const bc of breakChars) {
+            const lastIdx = remaining.lastIndexOf(bc, maxChars);
+            if (lastIdx > breakPoint && lastIdx > maxChars * 0.5) {
+                breakPoint = lastIdx + bc.length;
+            }
+        }
+
+        // If no good break point, break at space
+        if (breakPoint === -1) {
+            breakPoint = remaining.lastIndexOf(' ', maxChars);
+        }
+
+        // If still no break point, force break
+        if (breakPoint === -1 || breakPoint < maxChars * 0.3) {
+            breakPoint = maxChars;
+        }
+
+        chunks.push(remaining.substring(0, breakPoint).trim());
+        remaining = remaining.substring(breakPoint).trim();
+    }
+
+    console.log(`[WORKER] Split text into ${chunks.length} chunks: ${chunks.map(c => c.length).join(', ')} chars`);
+    return chunks;
+}
+
+// Concatenate multiple Float32Arrays
+function concatenateAudio(audioArrays, sampleRate) {
+    const totalLength = audioArrays.reduce((sum, arr) => sum + arr.length, 0);
+    const result = new Float32Array(totalLength);
+    let offset = 0;
+    for (const arr of audioArrays) {
+        result.set(arr, offset);
+        offset += arr.length;
+    }
+    return result;
+}
+
 async function doGenerate(id, data) {
     const { text, voice, speed } = data;
-    console.log(`[WORKER] Generating: text="${text?.substring(0, 50)}...", voice=${voice}, speed=${speed}`);
+    console.log(`[WORKER] Generating: text="${text?.substring(0, 50)}...", voice=${voice}, speed=${speed}, length=${text?.length}`);
 
     try {
         self.postMessage({ type: 'generating', id });
 
         const startTime = Date.now();
 
-        // Add timeout to prevent infinite hang
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Generation timeout (60s)')), 60000);
-        });
+        // Split long text into chunks to avoid kokoro-js truncation
+        const chunks = splitTextIntoChunks(text, 400);
+        const audioChunks = [];
+        let sampleRate = 24000;
 
-        const audio = await Promise.race([
-            tts.generate(text, {
-                voice: voice || DEFAULT_VOICE,
-                speed: speed || 1.0
-            }),
-            timeoutPromise
-        ]);
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            console.log(`[WORKER] Generating chunk ${i + 1}/${chunks.length}: ${chunk.length} chars`);
+
+            // Add timeout to prevent infinite hang (30s per chunk)
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`Chunk ${i + 1} timeout (30s)`)), 30000);
+            });
+
+            const audio = await Promise.race([
+                tts.generate(chunk, {
+                    voice: voice || DEFAULT_VOICE,
+                    speed: speed || 1.0
+                }),
+                timeoutPromise
+            ]);
+
+            if (audio && audio.audio) {
+                audioChunks.push(new Float32Array(audio.audio));
+                sampleRate = audio.sampling_rate || 24000;
+                console.log(`[WORKER] Chunk ${i + 1} done: ${audio.audio.length} samples`);
+            } else {
+                console.warn(`[WORKER] Chunk ${i + 1} produced no audio`);
+            }
+        }
 
         const genTime = Date.now() - startTime;
-        console.log(`[WORKER] Generation complete in ${genTime}ms, hasAudio=${!!audio}, hasAudioData=${!!(audio?.audio)}`);
+        console.log(`[WORKER] All chunks complete in ${genTime}ms, ${audioChunks.length} audio segments`);
 
-        if (audio && audio.audio) {
-            const audioBuffer = audio.audio.buffer.slice(0);
-            const sampleRate = audio.sampling_rate || 24000;
-            const duration = audioBuffer.byteLength / 4 / sampleRate;  // Float32 = 4 bytes
+        if (audioChunks.length > 0) {
+            // Concatenate all audio chunks
+            const fullAudio = concatenateAudio(audioChunks, sampleRate);
+            const audioBuffer = fullAudio.buffer.slice(0);
+            const duration = fullAudio.length / sampleRate;
 
             console.log(`[WORKER] Audio: ${audioBuffer.byteLength} bytes, ${sampleRate}Hz, ${duration.toFixed(2)}s`);
 
