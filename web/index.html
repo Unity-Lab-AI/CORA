@@ -3554,7 +3554,6 @@ WHEN RESPONDING:
                 aiReady = true;
                 log('CORA AI responses enabled', 'ok');
 
-                // CORA introduces herself - system prompt handles personality
                 // Find a model to use (prefer dolphin-mistral, fall back to first available)
                 const preferredModels = ['dolphin-mistral:7b', 'dolphin-mistral', 'llama3.2', 'mistral'];
                 CORA_MODEL = models[0]?.name || 'dolphin-mistral:7b';
@@ -3566,40 +3565,17 @@ WHEN RESPONDING:
                 }
                 log(`CORA brain: ${CORA_MODEL}`, 'ok');
 
-                // Verify system prompt is loaded
-                if (!CORA_SYSTEM_PROMPT || CORA_SYSTEM_PROMPT.length < 100) {
-                    log('WARNING: System prompt missing or too short!', 'fail');
-                }
+                // CORA introduces herself - HARDCODED because AI can't be trusted to get it right
+                // Full about info: version, creators, website, discord, email, github
+                const coraIntro = "Alright, I'm online. CORA version 1.0.0, built by Unity AI Lab. " +
+                    "Created by Hackall360, Sponge, and GFourteen. " +
+                    "Website unityailab.com, Discord discord.gg/D33Bk6Ay, email unityailabcontact@gmail.com. " +
+                    "Now what the fuck do you want?";
+                log(`CORA: "${coraIntro}"`, 'cora');
+                await speakAndWait(coraIntro);
 
-                try {
-                    const introRes = await fetch('http://localhost:11434/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: CORA_MODEL,
-                            prompt: `[Introduce yourself. You just came online. Version 1.0.0, Unity AI Lab. 2-3 sentences max.]`,
-                            system: CORA_SYSTEM_PROMPT,
-                            stream: false,
-                            options: { temperature: 0.9, num_predict: 100 }
-                        })
-                    });
-                    if (introRes.ok) {
-                        const introData = await introRes.json();
-                        let intro = introData.response?.trim();
-                        if (intro) {
-                            // Strip "CORA:" prefix if model added it
-                            if (intro.toLowerCase().startsWith('cora:')) intro = intro.slice(5).trim();
-                            log(`CORA: "${intro}"`, 'cora');
-                            await speakAndWait(intro);
-                        }
-                    }
-                } catch (e) {
-                    log('CORA intro generation failed: ' + e.message, 'warn');
-                }
-
-                // Models loaded response
-                const modelsResponse = await coraRespond('AI Models check', `${models.length} models loaded. All good.`, 'ok');
-                await speakAndWait(modelsResponse);
+                // Log models count
+                log(`${models.length} AI models ready`, 'ok');
             } else {
                 log('No models found - need to pull some', 'warn');
                 setPhase('ai_models', 'warn');
