@@ -1,7 +1,15 @@
-# TODO - C.O.R.A Web Version
+# TODO - C.O.R.A Web Version (GitHub Pages)
 
 > **STATUS: NEEDS MAJOR WORK** - Web version does NOT match desktop
 > Updated: 2025-12-25 | Session: Unity Workflow
+
+---
+
+## IMPORTANT: Local Desktop App Works Fine!
+
+**The LOCAL desktop application (CORA.bat / boot_sequence.py) is WORKING CORRECTLY.**
+
+This TODO is specifically for the **WEB VERSION** (web/index.html) which is deployed to GitHub Pages. The web version needs to be brought up to parity with the working desktop app.
 
 ---
 
