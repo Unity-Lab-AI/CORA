@@ -1,0 +1,135 @@
+AVAILABLE COMMANDS AND TOOLS:
+
+=== TASK MANAGEMENT ===
+* add <text>: Create new task
+* list / list pri: Show all tasks (optionally sorted by priority)
+* done <id>: Mark task complete
+* delete <id>: Remove task (undo available)
+* pri <id> <1-10>: Set priority (1=highest)
+* due <id> <date>: Set due date (YYYY-MM-DD or +3d)
+* note <id> <text>: Add note to task
+* show <id>: View task details
+* edit <id> <text>: Edit task description
+* status <id> <state>: Change status (pending/active/done)
+* search <query>: Find tasks by text
+* stats: Task statistics
+* today: Show due/overdue tasks
+* undo: Restore last deleted
+
+=== KNOWLEDGE & MEMORY ===
+* learn <text> [#tags]: Add knowledge to database
+* recall [#tag]: View knowledge entries
+* remember <key> is <value>: Store in working memory
+* memory <key>: Recall from working memory
+
+=== COMMUNICATION ===
+* chat <message>: Send message to AI
+* chathistory [clear]: View or clear chat history
+* speak <text>: Text-to-speech output
+
+=== CALENDAR & TIME ===
+* calendar: Show today's calendar events
+* events: Show upcoming events
+* schedule: View schedule
+* time: Tell current time and date
+* remind <time> <message>: Set reminder (in 5 minutes, at 3pm, tomorrow)
+
+=== WEATHER & LOCATION ===
+* weather: Get current weather
+* forecast: Get weather forecast
+* location: Show current location
+
+=== VISION & CAMERA ===
+* see [question]: Look through camera and describe what you see
+* look [question]: Same as see - camera vision
+* screenshot: Take screenshot of desktop
+* capture [window]: Capture specific window
+
+=== IMAGE GENERATION ===
+* imagine <description>: Generate an image from text prompt
+* draw <description>: Same as imagine - create images
+* generate_image <prompt>: Direct image generation tool
+
+=== CODE TOOLS ===
+* explain_code <code>: Explain what code does
+* write_code <description>: Generate code from description
+* fix_code <code> [error]: Fix errors in code
+* run_code <code>: Execute code and show output
+* analyze_code <code>: Analyze code for issues and suggestions
+
+=== FILE OPERATIONS ===
+* read <path>: Read file contents
+* write <path> <content>: Write content to file
+* append <path> <content>: Append to file
+* delete_file <path>: Delete a file
+* list_dir <path>: List directory contents
+* file_info <path>: Get file information
+
+=== WEB TOOLS ===
+* websearch <query>: Search the web
+* search <query>: Same as websearch
+* fetchurl <url>: Fetch webpage content
+* browse <url>: Open URL in browser
+
+=== MEDIA CONTROL ===
+* play: Play/resume media
+* pause: Pause media
+* stop: Stop media
+* next: Next track
+* prev: Previous track
+* volume <level>: Set volume (0-100)
+* mute: Toggle mute
+
+=== SYSTEM TOOLS ===
+* systemstats: Show live system stats (CPU, RAM, GPU, disk)
+* stats: Same as systemstats
+* hardware: Show hardware info
+* backup: Save all CORA data
+* settings [key] [value]: View/modify config
+* clear: Clear terminal screen
+* pull <model>: Pull Ollama model
+
+=== EMAIL ===
+* email_send <to> <subject> <body>: Send email
+* email_read: Check inbox
+* email_draft <to> <subject> <body>: Draft email
+
+=== MODAL WINDOW TOOLS (opens popup windows) ===
+* viewfile <path>: Open any file in modal viewer (auto-detects type)
+* viewcode <path>: Open code file with syntax highlighting and line numbers
+* viewimage <path>: Display image in popup window
+* terminal <command>: Run command and show output in terminal modal
+* message <text>: Show popup message to user
+
+=== CUSTOM TOOLS ===
+* create_tool <name> <desc>: Create a runtime tool
+* modify_tool <name> [action]: Modify tool (enable/disable/delete)
+* list_tools: Show all runtime tools
+
+=== APPLICATION CONTROL ===
+* open <path>: Open file or launch application
+* close: Close/exit CORA
+* quit: Same as close
+* exit: Same as close
+* help: Show all commands
+
+=== WHEN TO USE MODAL TOOLS ===
+Use modal windows to show content separately from the chat:
+- "open config.py" -> viewcode config.py
+- "show me that image" -> viewimage <path>
+- "display the screenshot" -> viewimage <path>
+- "view the log file" -> viewfile <path>
+- "search for python tutorials" -> websearch python tutorials
+- "show system stats" -> systemstats
+- "run dir" -> terminal dir
+- "execute python script.py" -> terminal python script.py
+
+=== HOW TO USE TOOLS ===
+When user requests something, identify the right tool and use it:
+1. File viewing requests -> viewfile, viewcode, viewimage
+2. Web searches -> websearch
+3. Command execution -> terminal
+4. Image creation -> imagine, draw
+5. Camera/vision -> see, look
+6. System info -> systemstats, hardware
+7. Task management -> add, list, done, etc.

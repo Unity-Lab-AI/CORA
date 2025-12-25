@@ -50,7 +50,7 @@ _system_prompt_cache = None
 
 
 def get_system_prompt() -> str:
-    """Load CORA's full system prompt from config/system_prompt.txt."""
+    """Load CORA's personality-only system prompt from config/system_prompt.txt."""
     global _system_prompt_cache
     if _system_prompt_cache is not None:
         return _system_prompt_cache
@@ -62,6 +62,34 @@ def get_system_prompt() -> str:
     else:
         _system_prompt_cache = ""
     return _system_prompt_cache
+
+
+# Separate cache for tools prompt
+_tools_prompt_cache = None
+
+
+def get_tools_prompt() -> str:
+    """Load CORA's tools/commands from config/tools_prompt.txt.
+
+    This is kept separate from personality so it can be sent after boot
+    and doesn't bleed into boot phase responses.
+    """
+    global _tools_prompt_cache
+    if _tools_prompt_cache is not None:
+        return _tools_prompt_cache
+
+    tools_prompt_path = PROJECT_DIR / 'config' / 'tools_prompt.txt'
+    if tools_prompt_path.exists():
+        with open(tools_prompt_path, 'r', encoding='utf-8') as f:
+            _tools_prompt_cache = f.read()
+    else:
+        _tools_prompt_cache = ""
+    return _tools_prompt_cache
+
+
+def get_full_prompt() -> str:
+    """Get combined system prompt + tools prompt for post-boot use."""
+    return get_system_prompt() + "\n\n" + get_tools_prompt()
 
 
 def init_tts():
@@ -1536,15 +1564,26 @@ Just tell me what you need.
 """
 
     display_log("─── CORA's Abilities ───", "info")
-    # Have CORA announce abilities - just give her the data, system prompt handles personality
-    abilities_data = "voice chat, vision/screenshots/camera, image generation, reminders/calendar/tasks, web search, file management, code help, email"
-    abilities_response = cora_respond("Abilities announcement", f"Boot is done. Tell the user what you can do: {abilities_data}. Ask what they want.", "ok")
+
+    # NOW load and send the tools prompt (separate from personality)
+    # This only happens AFTER boot is complete
+    tools_prompt = get_tools_prompt()
+    display_log("Tools and commands loaded", "ok")
+
+    # Have CORA announce abilities - summarize what she can do
+    abilities_summary = "voice chat, vision, screenshots, camera, image generation, reminders, calendar, tasks, web search, file viewing, code help, email, system stats, terminal commands"
+    abilities_response = cora_respond("Abilities announcement", f"Boot is done. Tell the user what you can do: {abilities_summary}. Ask what they want.", "ok")
     speak(abilities_response)
 
-    # Also print the abilities to the console
-    for line in abilities_list.strip().split('\n'):
-        if line.strip():
-            display_log(line.strip(), "info")
+    # Print categorized abilities to console
+    display_log("Vision: see, look, screenshot, camera", "info")
+    display_log("Images: imagine, draw, generate", "info")
+    display_log("Files: viewfile, viewcode, viewimage", "info")
+    display_log("Web: websearch, fetchurl, browse", "info")
+    display_log("System: stats, terminal, settings", "info")
+    display_log("Tasks: add, list, done, remind", "info")
+    display_log("Media: play, pause, volume", "info")
+    display_log("Code: explain, write, fix, run", "info")
 
     # Stop the display update thread so mainloop can take over
     global _boot_complete
