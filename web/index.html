@@ -653,70 +653,68 @@
             statusEl.textContent = '~';
             statusEl.className = 'api-status checking';
 
-            try {
-                // Pollinations validation - generate a tiny 64x64 test image
-                // This is how CORA tests it - actual image generation
-                const testPrompt = encodeURIComponent('test');
-                const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}`;
+            // Pollinations validation - generate a tiny test image and verify it loads
+            // This matches how CORA's Python code validates: actual image generation
+            const testPrompt = 'solid%20blue%20square';  // Simple test prompt
+            const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}&seed=12345`;
 
-                log('Testing Pollinations key with 64x64 image generation...', 'info');
+            log('Testing Pollinations API key...', 'info');
+            log(`Generating 64x64 test image...`, 'info');
 
-                const response = await fetch(testUrl, {
-                    method: 'GET',
-                    // No CORS mode - we just need to see if it returns an image
-                });
+            return new Promise((resolve) => {
+                const img = new Image();
+                let resolved = false;
 
-                // Check if we got an image back (content-type contains image)
-                const contentType = response.headers.get('content-type') || '';
-
-                if (response.ok && contentType.includes('image')) {
-                    statusEl.textContent = '✓';
-                    statusEl.className = 'api-status valid';
-                    inputEl.className = 'valid';
-                    log('Pollinations test image generated successfully', 'ok');
-                    return true;
-                }
-
-                // If response is ok but not image, might still work
-                if (response.ok) {
-                    statusEl.textContent = '✓';
-                    statusEl.className = 'api-status valid';
-                    inputEl.className = 'valid';
-                    return true;
-                }
-            } catch (e) {
-                // CORS will block us from reading the response, but if the request went through
-                // and we can load the image via img tag, it works
-                // Try loading as an image element instead
-                try {
-                    const testPrompt = encodeURIComponent('test');
-                    const testUrl = `${CONFIG.pollinationsImageUrl}/${testPrompt}?width=64&height=64&nologo=true&key=${encodeURIComponent(key)}`;
-
-                    const imgTest = await new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.onload = () => resolve(true);
-                        img.onerror = () => reject(false);
-                        // Add timeout
-                        setTimeout(() => reject(false), 30000);
-                        img.src = testUrl;
-                    });
-
-                    if (imgTest) {
-                        statusEl.textContent = '✓';
+                // Timeout after 45 seconds (image generation can take time)
+                const timeout = setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        log('Pollinations test timed out (45s) - key may still be valid', 'warn');
+                        // Accept anyway if it didn't explicitly fail
+                        statusEl.textContent = '?';
                         statusEl.className = 'api-status valid';
                         inputEl.className = 'valid';
-                        log('Pollinations test image loaded successfully', 'ok');
-                        return true;
+                        resolve(true);
                     }
-                } catch (imgErr) {
-                    console.error('Image load test failed:', imgErr);
-                }
-            }
+                }, 45000);
 
-            statusEl.textContent = '✗';
-            statusEl.className = 'api-status invalid';
-            inputEl.className = 'invalid';
-            return false;
+                img.onload = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        // Verify the image has actual dimensions (not a broken image)
+                        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                            log(`Pollinations test image loaded: ${img.naturalWidth}x${img.naturalHeight}`, 'ok');
+                            statusEl.textContent = '✓';
+                            statusEl.className = 'api-status valid';
+                            inputEl.className = 'valid';
+                            resolve(true);
+                        } else {
+                            log('Pollinations returned invalid image', 'warn');
+                            statusEl.textContent = '✗';
+                            statusEl.className = 'api-status invalid';
+                            inputEl.className = 'invalid';
+                            resolve(false);
+                        }
+                    }
+                };
+
+                img.onerror = (e) => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        log('Pollinations test image failed to load', 'fail');
+                        console.error('Pollinations image error:', e);
+                        statusEl.textContent = '✗';
+                        statusEl.className = 'api-status invalid';
+                        inputEl.className = 'invalid';
+                        resolve(false);
+                    }
+                };
+
+                // Start loading the test image
+                img.src = testUrl;
+            });
         }
 
         async function validateGithubKey(key) {
