@@ -6,6 +6,8 @@ Separate popup windows for tool outputs so user can see both
 CORA chat and tool results simultaneously.
 
 Each modal is non-blocking and can be interacted with independently.
+
+Uses centralized window_manager for consistent z-layering.
 """
 
 import tkinter as tk
@@ -13,6 +15,9 @@ from tkinter import ttk, scrolledtext
 from typing import Optional, Callable, Dict, Any
 from pathlib import Path
 import threading
+
+# Import centralized window manager
+from ui.window_manager import create_modal as wm_create_modal, bring_to_front
 
 # Track all open modals
 _open_modals: Dict[str, tk.Toplevel] = {}
@@ -27,19 +32,6 @@ def set_main_window(window: tk.Tk):
     _main_window = window
 
 
-def _get_modal_position(width: int, height: int) -> tuple:
-    """Calculate position for new modal (offset from main window or center screen)."""
-    if _main_window:
-        try:
-            x = _main_window.winfo_x() + 50
-            y = _main_window.winfo_y() + 50
-            return (x, y)
-        except:
-            pass
-    # Fallback to center screen
-    return (100, 100)
-
-
 def _create_base_modal(
     title: str,
     width: int = 800,
@@ -47,42 +39,17 @@ def _create_base_modal(
     resizable: bool = True,
     on_close: Optional[Callable] = None
 ) -> tk.Toplevel:
-    """Create a base modal window with CORA styling."""
+    """Create a base modal window with CORA styling using window manager."""
 
-    # Create toplevel window
-    if _main_window:
-        modal = tk.Toplevel(_main_window)
-    else:
-        # Create temporary root if needed
-        modal = tk.Toplevel()
-
-    modal.title(f"CORA - {title}")
-    modal.configure(bg='#1a1a2e')
-
-    # Size and position
-    x, y = _get_modal_position(width, height)
-    modal.geometry(f"{width}x{height}+{x}+{y}")
-
-    if resizable:
-        modal.resizable(True, True)
-        modal.minsize(400, 300)
-    else:
-        modal.resizable(False, False)
-
-    # Keep on top initially
-    modal.attributes('-topmost', True)
-    modal.after(100, lambda: modal.attributes('-topmost', False))
-
-    # Handle close
-    def handle_close():
-        modal_id = modal.winfo_id()
-        if str(modal_id) in _open_modals:
-            del _open_modals[str(modal_id)]
-        if on_close:
-            on_close()
-        modal.destroy()
-
-    modal.protocol("WM_DELETE_WINDOW", handle_close)
+    # Use centralized window manager for proper z-layering
+    modal = wm_create_modal(
+        title=f"CORA - {title}",
+        width=width,
+        height=height,
+        bg='#1a1a2e',
+        parent=_main_window,
+        on_close=on_close
+    )
 
     # Track modal
     _open_modals[str(modal.winfo_id())] = modal

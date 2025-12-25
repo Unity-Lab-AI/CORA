@@ -123,9 +123,10 @@ class QueryPanel(tk.Toplevel):
 
     def _setup_window(self):
         """Configure window properties."""
+        from ui.window_manager import bring_to_front
+
         self.title("CORA Query")
         self.configure(bg=BG_COLOR)
-        self.attributes("-topmost", True)
         self.resizable(True, True)
 
         # Center on screen
@@ -135,6 +136,9 @@ class QueryPanel(tk.Toplevel):
         x = (screen_w - width) // 2
         y = (screen_h - height) // 2
         self.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Use window manager for proper z-layering
+        bring_to_front(self)
 
         # Handle close
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)

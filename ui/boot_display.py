@@ -89,6 +89,15 @@ def clear_audio_data():
     with _audio_buffer_lock:
         buf['active'] = False
         buf['data'] = None
+        buf['current_chunk'] = None
+
+
+def set_audio_chunk(chunk):
+    """Set the current audio chunk being played RIGHT NOW (called from TTS callback)."""
+    buf = get_audio_buffer()
+    with _audio_buffer_lock:
+        buf['current_chunk'] = chunk
+        buf['chunk_time'] = time.time()
 
 
 class AudioWaveform(tk.Canvas):
@@ -107,16 +116,14 @@ class AudioWaveform(tk.Canvas):
         self.audio_data = [0] * self.num_bars
         self.target_heights = [0] * self.num_bars
         self.current_heights = [0.0] * self.num_bars
-        self.smoothing = 0.3  # Smoothing factor for animation
+        self.smoothing = 0.5  # Higher = snappier response to audio
         self.sample_rate = 24000  # Kokoro TTS sample rate
         self.samples_per_frame = self.sample_rate // 30  # ~30 FPS
-        self.phase_offset = 0.8  # Phase offset for wave-like motion
-        self.frame_count = 0  # Frame counter for phase animation
 
-        # Colors - goth/cyberpunk gradient
-        self.color_low = (50, 0, 80)      # Dark purple
-        self.color_mid = (180, 0, 180)    # Magenta
-        self.color_high = (255, 50, 150)  # Hot pink
+        # Colors - goth/cyberpunk gradient (brighter for visibility)
+        self.color_low = (100, 0, 150)     # Purple
+        self.color_mid = (200, 0, 200)     # Bright magenta
+        self.color_high = (255, 100, 200)  # Hot pink
 
         self._create_bars()
 
@@ -131,9 +138,9 @@ class AudioWaveform(tk.Canvas):
         for i in range(self.num_bars):
             x = start_x + i * (self.bar_width + gap)
             bar = self.create_rectangle(
-                x, self.height // 2 - 1,
-                x + self.bar_width, self.height // 2 + 1,
-                fill='#1a0a2a', outline=''
+                x, self.height // 2 - 2,
+                x + self.bar_width, self.height // 2 + 2,
+                fill='#400060', outline=''  # More visible purple
             )
             self.bars.append(bar)
 
@@ -156,6 +163,7 @@ class AudioWaveform(tk.Canvas):
     def start(self):
         """Start the waveform animation."""
         self.is_playing = True
+        print("[WAVEFORM] Animation started")
         self._animate()
 
     def stop(self):
@@ -189,78 +197,47 @@ class AudioWaveform(tk.Canvas):
             self.after(30, self._fade_out)
 
     def _animate(self):
-        """Animate the waveform using real audio data from TTS."""
+        """Animate the waveform using real-time audio chunks from TTS callback."""
         if not self.is_playing:
             return
 
-        self.frame_count += 1
         center_y = self.height // 2
-        max_height = (self.height // 2) - 5
+        max_height = (self.height // 2) - 3
 
-        # Try to get real audio data from shared buffer
-        has_real_audio = False
-        buf = get_audio_buffer()
+        # Get the CURRENT audio chunk being played right now
+        try:
+            buf = get_audio_buffer()
+            with _audio_buffer_lock:
+                chunk = buf.get('current_chunk')
+                chunk_time = buf.get('chunk_time', 0)
 
-        if buf['active'] and buf['data'] is not None:
-            try:
-                with _audio_buffer_lock:
-                    audio = buf['data']
-                    start_time = buf['start_time']
-                    sample_rate = buf.get('sample_rate', 24000)
+                # Only use chunk if it's fresh (within last 100ms)
+                if chunk is not None and len(chunk) > 0 and (time.time() - chunk_time) < 0.1:
+                    samples_per_bar = max(1, len(chunk) // self.num_bars)
 
-                    if audio is not None and len(audio) > 0:
-                        # Calculate current position based on elapsed time (synced to playback)
-                        elapsed = time.time() - start_time
-                        current_sample = int(elapsed * sample_rate)
-
-                        # Get samples around current playback position
-                        samples_per_frame = sample_rate // 20  # More samples for smoother viz
-                        start_pos = max(0, current_sample - samples_per_frame // 2)
-                        end_pos = min(len(audio), current_sample + samples_per_frame // 2)
-
-                        if start_pos < len(audio) and end_pos > start_pos:
-                            chunk = audio[start_pos:end_pos]
-
-                            if len(chunk) > 0:
-                                has_real_audio = True
-                                # Split chunk into bars
-                                samples_per_bar = max(1, len(chunk) // self.num_bars)
-
-                                for i in range(self.num_bars):
-                                    bar_start = i * samples_per_bar
-                                    bar_end = min(bar_start + samples_per_bar, len(chunk))
-                                    if bar_start < len(chunk):
-                                        bar_chunk = chunk[bar_start:bar_end]
-                                        # RMS amplitude - audio is typically -1 to 1 or -32768 to 32767
-                                        if HAS_NUMPY:
-                                            # Normalize if needed (Kokoro outputs float32 -1 to 1)
-                                            rms = float(np.sqrt(np.mean(np.abs(bar_chunk)**2)))
-                                            # Much higher sensitivity for speech audio
-                                            self.target_heights[i] = min(1.0, rms * 3.0)
-                                        else:
-                                            rms = sum(abs(float(x)) for x in bar_chunk) / len(bar_chunk)
-                                            self.target_heights[i] = min(1.0, rms * 3.0)
-                                    else:
-                                        self.target_heights[i] = 0
-            except Exception as e:
-                # Debug: print error
-                print(f"[WAVEFORM] Error: {e}")
-                has_real_audio = False
-
-        # If no real audio data, show flat/idle state (not fake waves)
-        if not has_real_audio:
+                    for i in range(self.num_bars):
+                        bar_start = i * samples_per_bar
+                        bar_end = min(bar_start + samples_per_bar, len(chunk))
+                        if bar_end > bar_start:
+                            bar_chunk = chunk[bar_start:bar_end]
+                            if HAS_NUMPY:
+                                peak = float(np.max(np.abs(bar_chunk)))
+                                self.target_heights[i] = min(1.0, peak * 2.5)
+                            else:
+                                peak = max(abs(float(x)) for x in bar_chunk)
+                                self.target_heights[i] = min(1.0, peak * 2.5)
+                else:
+                    # No fresh audio - flatten bars
+                    for i in range(self.num_bars):
+                        self.target_heights[i] = 0
+        except Exception as e:
             for i in range(self.num_bars):
-                self.target_heights[i] = 0.02  # Nearly flat when not speaking
+                self.target_heights[i] = 0
 
-        # Smooth animation towards target with phase wave effect
+        # Animate bars towards target heights
         for i, bar in enumerate(self.bars):
-            # Add phase offset to create wave-like motion across bars
-            phase = (self.frame_count * 0.15 + i * self.phase_offset) % (2 * math.pi)
-            wave_mod = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))  # 0.3 to 1.0
-
-            # Smooth interpolation with wave modulation
-            target = self.target_heights[i] * wave_mod
-            self.current_heights[i] += (target - self.current_heights[i]) * self.smoothing
+            # Smooth interpolation (faster response)
+            self.current_heights[i] += (self.target_heights[i] - self.current_heights[i]) * 0.6
 
             height = int(self.current_heights[i] * max_height)
             height = max(2, height)
@@ -268,12 +245,11 @@ class AudioWaveform(tk.Canvas):
             x1, _, x2, _ = self.coords(bar)
             self.coords(bar, x1, center_y - height, x2, center_y + height)
 
-            # Color based on height
-            intensity = self.current_heights[i]
-            color = self._get_color(intensity)
+            # Color based on intensity
+            color = self._get_color(self.current_heights[i])
             self.itemconfig(bar, fill=color)
 
-        self.animation_id = self.after(33, self._animate)  # ~30 FPS
+        self.animation_id = self.after(25, self._animate)  # ~40 FPS for smoother animation
 
 
 class BootDisplay:
@@ -327,63 +303,90 @@ class BootDisplay:
         self.root = tk.Tk()
         self.root.title("C.O.R.A - Boot Sequence")
         self.root.configure(bg=self.bg_color)
-        # Don't set topmost - let user put other windows in front
-        # self.root.attributes('-topmost', True)
 
-        # Larger window to fit log panel
-        width, height = 1200, 800
+        # Handle window close - exit entire application
+        def on_close():
+            """When GUI window is closed, exit the entire application."""
+            print("[CORA] Window closed - shutting down...")
+            self.close()
+            import os
+            os._exit(0)  # Force exit everything including console
+
+        self.root.protocol("WM_DELETE_WINDOW", on_close)
+
+        # Window size and position
+        self.base_width = 1200
+        self.base_height = 800
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
-        x = (screen_w - width) // 2
-        y = (screen_h - height) // 2
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        x = (screen_w - self.base_width) // 2
+        y = (screen_h - self.base_height) // 2
+        self.root.geometry(f"{self.base_width}x{self.base_height}+{x}+{y}")
 
-        # Keep window decorations so user can minimize/move/resize
-        # self.root.overrideredirect(True)
+        # Enable proper Windows behavior - maximize, resize, minimize all work
+        self.root.resizable(True, True)
+        self.root.minsize(800, 600)
+
+        # Use window manager for proper z-layering
+        try:
+            from ui.window_manager import bring_to_front
+            bring_to_front(self.root)
+        except:
+            self.root.lift()
+            self.root.focus_force()
+
+        # Track widgets that need scaling
+        self._scalable_widgets = []
+
+        # Bind resize event for scaling
+        self.root.bind('<Configure>', self._on_window_resize)
+        self._last_resize_time = 0  # Debounce resize events
 
         # Main container with two columns
         main_frame = tk.Frame(self.root, bg=self.bg_color)
         main_frame.pack(fill='both', expand=True, padx=15, pady=15)
 
-        # LEFT COLUMN - Status and phases
-        left_frame = tk.Frame(main_frame, bg=self.bg_color, width=500)
-        left_frame.pack(side='left', fill='both', padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # LEFT COLUMN - Status and phases (use weight for proper resizing)
+        left_frame = tk.Frame(main_frame, bg=self.bg_color)
+        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
 
         # Header
-        header = tk.Label(
+        self.header = tk.Label(
             left_frame,
             text="C.O.R.A",
             font=('Consolas', 42, 'bold'),
             fg=self.accent_color,
             bg=self.bg_color
         )
-        header.pack(pady=(5, 0))
+        self.header.pack(pady=(5, 0))
+        self._scalable_widgets.append((self.header, 42, 'Consolas', 'bold'))
 
-        subtitle = tk.Label(
+        self.subtitle = tk.Label(
             left_frame,
             text="Cognitive Operations & Reasoning Assistant",
             font=('Consolas', 10),
             fg=self.accent2_color,
             bg=self.bg_color
         )
-        subtitle.pack(pady=(0, 10))
+        self.subtitle.pack(pady=(0, 10))
+        self._scalable_widgets.append((self.subtitle, 10, 'Consolas', ''))
 
         # Waveform visualization
         wave_frame = tk.Frame(left_frame, bg=self.bg_color)
         wave_frame.pack(fill='x', pady=5)
 
-        wave_label = tk.Label(
+        self.wave_label = tk.Label(
             wave_frame,
             text="▶ VOICE SYNTHESIS",
             font=('Consolas', 9),
             fg='#666666',
             bg=self.bg_color
         )
-        wave_label.pack()
+        self.wave_label.pack()
+        self._scalable_widgets.append((self.wave_label, 9, 'Consolas', ''))
 
         self.waveform = AudioWaveform(wave_frame, width=480, height=50)
-        self.waveform.pack(pady=3)
+        self.waveform.pack(pady=3, fill='x')
 
         # Current speech text (what CORA is saying)
         self.current_text = tk.Label(
@@ -392,10 +395,10 @@ class BootDisplay:
             font=('Consolas', 10, 'italic'),
             fg=self.accent_color,
             bg=self.bg_color,
-            wraplength=470,
-            height=3
+            wraplength=470
         )
-        self.current_text.pack(pady=5)
+        self.current_text.pack(pady=5, fill='x')
+        self._scalable_widgets.append((self.current_text, 10, 'Consolas', 'italic'))
 
         # Progress bar
         style = ttk.Style()
@@ -419,11 +422,20 @@ class BootDisplay:
         )
         progress.pack(pady=8)
 
-        # Phase indicators frame - fixed height, don't expand so stats stay visible
-        phases_frame = tk.Frame(left_frame, bg=self.bg_color, height=250)
-        phases_frame.pack(fill='x', pady=5)
-        phases_frame.pack_propagate(False)  # Keep fixed height
-        self.phases_container = phases_frame
+        # Phase indicators frame - 2 columns to save vertical space
+        self.phases_outer = tk.Frame(left_frame, bg=self.bg_color, height=180)
+        self.phases_outer.pack(fill='x', pady=5)
+        self.phases_outer.pack_propagate(False)  # Keep fixed height
+
+        # Container for 2-column phase layout
+        self.phases_container = tk.Frame(self.phases_outer, bg=self.bg_color)
+        self.phases_container.pack(fill='both', expand=True)
+
+        # Left and right columns for phases
+        self.phases_col_left = tk.Frame(self.phases_container, bg=self.bg_color)
+        self.phases_col_left.pack(side='left', fill='both', expand=True)
+        self.phases_col_right = tk.Frame(self.phases_container, bg=self.bg_color)
+        self.phases_col_right.pack(side='left', fill='both', expand=True)
 
         # Status label
         self.status_label = tk.Label(
@@ -434,6 +446,7 @@ class BootDisplay:
             bg=self.bg_color
         )
         self.status_label.pack(pady=8)
+        self._scalable_widgets.append((self.status_label, 12, 'Consolas', 'bold'))
 
         # LIVE SYSTEM STATS PANEL
         self.stats_frame = tk.Frame(left_frame, bg='#111111', bd=1, relief='groove')
@@ -519,6 +532,7 @@ class BootDisplay:
         )
         self.log_text.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=self.log_text.yview)
+        self._scalable_widgets.append((self.log_text, 9, 'Consolas', ''))
 
         # Configure text tags for colored log entries
         self.log_text.tag_configure('timestamp', foreground='#666666')
@@ -538,8 +552,9 @@ class BootDisplay:
         # Make log read-only but allow selection
         self.log_text.config(state='disabled')
 
-        # Close button (subtle)
-        close_btn = tk.Button(
+        # Close button (subtle) - use pack instead of place for better resize handling
+        # Since we have native window decorations, this is a secondary close button
+        self.close_btn = tk.Button(
             main_frame,
             text="×",
             font=('Arial', 18, 'bold'),
@@ -550,7 +565,8 @@ class BootDisplay:
             bd=0,
             command=self.close
         )
-        close_btn.place(x=1160, y=5)
+        self.close_btn.place(relx=0.98, y=5, anchor='ne')
+        self._scalable_widgets.append((self.close_btn, 18, 'Arial', 'bold'))
 
         # No hotkey bindings - user can close via X button only
 
@@ -635,6 +651,7 @@ class BootDisplay:
         self.chat_input.bind('<FocusIn>', self._on_input_focus)
         self.chat_input.bind('<FocusOut>', self._on_input_unfocus)
         self.chat_input.bind('<Return>', self._on_send)
+        self._scalable_widgets.append((self.chat_input, 11, 'Consolas', ''))
 
         # Send button
         self.send_button = tk.Button(
@@ -651,6 +668,7 @@ class BootDisplay:
             command=self._on_send
         )
         self.send_button.pack(side='right')
+        self._scalable_widgets.append((self.send_button, 10, 'Consolas', 'bold'))
 
     def _on_input_focus(self, event=None):
         """Clear placeholder when focused."""
@@ -1000,42 +1018,57 @@ class BootDisplay:
         self._log_entry(f"💭 {text}", 'thinking')
 
     def set_phases(self, phase_names: List[str]):
-        """Set up the phase indicators."""
+        """Set up the phase indicators in 2 columns."""
         # Clear existing
-        for widget in self.phases_container.winfo_children():
+        for widget in self.phases_col_left.winfo_children():
             widget.destroy()
+        for widget in self.phases_col_right.winfo_children():
+            widget.destroy()
+
+        # Remove old phase widgets from scalable list
+        self._scalable_widgets = [w for w in self._scalable_widgets
+                                   if w[0] not in list(self.phase_labels.values()) + list(self.phase_indicators.values())]
 
         self.phases = [BootPhase(name=name) for name in phase_names]
         self.phase_labels = {}
         self.phase_indicators = {}
 
-        for i, phase in enumerate(self.phases):
-            frame = tk.Frame(self.phases_container, bg=self.bg_color)
-            frame.pack(fill='x', pady=2)
+        # Split phases into 2 columns
+        half = (len(self.phases) + 1) // 2  # First column gets extra if odd
 
-            # Status indicator (circle)
+        for i, phase in enumerate(self.phases):
+            # Choose column - first half goes left, second half goes right
+            parent = self.phases_col_left if i < half else self.phases_col_right
+
+            frame = tk.Frame(parent, bg=self.bg_color)
+            frame.pack(fill='x', pady=0)  # Tight packing
+
+            # Status indicator (circle) - smaller font
             indicator = tk.Label(
                 frame,
                 text="○",
-                font=('Consolas', 14),
+                font=('Consolas', 8),
                 fg=self.pending_color,
                 bg=self.bg_color,
-                width=3
+                width=2
             )
             indicator.pack(side='left')
             self.phase_indicators[phase.name] = indicator
+            self._scalable_widgets.append((indicator, 8, 'Consolas', ''))
 
-            # Phase name
+            # Phase name - smaller font, truncate if needed
+            display_name = phase.name[:18] if len(phase.name) > 18 else phase.name
             label = tk.Label(
                 frame,
-                text=phase.name,
-                font=('Consolas', 11),
+                text=display_name,
+                font=('Consolas', 8),
                 fg='#888888',
                 bg=self.bg_color,
                 anchor='w'
             )
-            label.pack(side='left', padx=10)
+            label.pack(side='left', padx=2)
             self.phase_labels[phase.name] = label
+            self._scalable_widgets.append((label, 8, 'Consolas', ''))
 
     def update_phase(self, phase_name: str, status: str, message: str = ""):
         """Update a phase status."""
@@ -1081,6 +1114,150 @@ class BootDisplay:
             self.status_label.config(text=text)
             if self.root:
                 self.root.update()
+
+    def switch_to_operational_mode(self):
+        """Switch from boot phases view to operational monitoring mode."""
+        if not self.phases_outer:
+            return
+
+        # Clear the phases display
+        for widget in self.phases_container.winfo_children():
+            widget.destroy()
+
+        # Create operational monitoring panel
+        self.phases_container.pack_forget()
+
+        # Operational status frame
+        op_frame = tk.Frame(self.phases_outer, bg=self.bg_color)
+        op_frame.pack(fill='both', expand=True)
+
+        # Header
+        header = tk.Label(
+            op_frame,
+            text="── OPERATIONAL STATUS ──",
+            font=('Consolas', 9, 'bold'),
+            fg=self.accent2_color,
+            bg=self.bg_color
+        )
+        header.pack(pady=(5, 3))
+        self._scalable_widgets.append((header, 9, 'Consolas', 'bold'))
+
+        # Current activity label
+        activity_frame = tk.Frame(op_frame, bg='#111111', bd=1, relief='groove')
+        activity_frame.pack(fill='x', padx=5, pady=2)
+
+        status_lbl = tk.Label(
+            activity_frame,
+            text="STATUS:",
+            font=('Consolas', 8),
+            fg='#888888',
+            bg='#111111'
+        )
+        status_lbl.pack(side='left', padx=5)
+        self._scalable_widgets.append((status_lbl, 8, 'Consolas', ''))
+
+        self.activity_label = tk.Label(
+            activity_frame,
+            text="Ready - Awaiting commands",
+            font=('Consolas', 9, 'bold'),
+            fg=self.ok_color,
+            bg='#111111'
+        )
+        self.activity_label.pack(side='left', padx=5, pady=3)
+        self._scalable_widgets.append((self.activity_label, 9, 'Consolas', 'bold'))
+
+        # Systems status grid
+        systems_frame = tk.Frame(op_frame, bg='#111111', bd=1, relief='groove')
+        systems_frame.pack(fill='x', padx=5, pady=2)
+
+        systems_grid = tk.Frame(systems_frame, bg='#111111')
+        systems_grid.pack(fill='x', padx=5, pady=3)
+
+        # System indicators (2 columns)
+        systems = [
+            ('Voice', 'voice_status'),
+            ('AI', 'ai_status'),
+            ('Tools', 'tools_status'),
+            ('Memory', 'memory_status'),
+        ]
+
+        self.system_status_labels = {}
+        for i, (name, key) in enumerate(systems):
+            row = i // 2
+            col = (i % 2) * 2
+
+            name_lbl = tk.Label(
+                systems_grid,
+                text=f"{name}:",
+                font=('Consolas', 8),
+                fg='#888888',
+                bg='#111111',
+                width=8,
+                anchor='e'
+            )
+            name_lbl.grid(row=row, column=col, sticky='e', padx=(5, 2))
+            self._scalable_widgets.append((name_lbl, 8, 'Consolas', ''))
+
+            status_label = tk.Label(
+                systems_grid,
+                text="●",
+                font=('Consolas', 10),
+                fg=self.ok_color,
+                bg='#111111',
+                width=3
+            )
+            status_label.grid(row=row, column=col + 1, sticky='w')
+            self.system_status_labels[key] = status_label
+            self._scalable_widgets.append((status_label, 10, 'Consolas', ''))
+
+        # Last action frame
+        action_frame = tk.Frame(op_frame, bg='#111111', bd=1, relief='groove')
+        action_frame.pack(fill='x', padx=5, pady=2)
+
+        last_lbl = tk.Label(
+            action_frame,
+            text="LAST:",
+            font=('Consolas', 8),
+            fg='#888888',
+            bg='#111111'
+        )
+        last_lbl.pack(side='left', padx=5)
+        self._scalable_widgets.append((last_lbl, 8, 'Consolas', ''))
+
+        self.last_action_label = tk.Label(
+            action_frame,
+            text="Boot complete",
+            font=('Consolas', 8),
+            fg='#aaaaaa',
+            bg='#111111'
+        )
+        self.last_action_label.pack(side='left', padx=5, pady=3)
+        self._scalable_widgets.append((self.last_action_label, 8, 'Consolas', ''))
+
+        if self.root:
+            self.root.update()
+
+    def update_operational_status(self, activity: str = None, last_action: str = None, systems: dict = None):
+        """Update the operational monitoring display."""
+        try:
+            if activity and hasattr(self, 'activity_label'):
+                self.activity_label.config(text=activity)
+
+            if last_action and hasattr(self, 'last_action_label'):
+                # Truncate if too long
+                display_action = last_action[:40] + "..." if len(last_action) > 40 else last_action
+                self.last_action_label.config(text=display_action)
+
+            if systems and hasattr(self, 'system_status_labels'):
+                for key, status in systems.items():
+                    if key in self.system_status_labels:
+                        color = self.ok_color if status == 'ok' else (self.warn_color if status == 'warn' else self.fail_color)
+                        self.system_status_labels[key].config(fg=color)
+
+            if self.root:
+                self.root.update()
+        except:
+            pass
 
     def _start_stats_update(self):
         """Start the live stats update loop."""
@@ -1232,9 +1409,12 @@ class BootDisplay:
             # Log the full speech to the console
             self.log_speech(text)
             if self.waveform:
+                print(f"[WAVEFORM] Calling waveform.start()")
                 self.waveform.start()
-        except:
-            pass
+            else:
+                print(f"[WAVEFORM] No waveform object!")
+        except Exception as e:
+            print(f"[WAVEFORM] start_speaking error: {e}")
 
     def stop_speaking(self):
         """Stop waveform animation."""
@@ -1268,6 +1448,61 @@ class BootDisplay:
         if self.root:
             self.root.destroy()
             self.root = None
+
+    def _on_window_resize(self, event):
+        """Handle window resize - scale fonts and UI elements."""
+        # Only respond to root window resize events
+        if event.widget != self.root:
+            return
+
+        # Debounce resize events (only update every 100ms)
+        current_time = time.time()
+        if current_time - self._last_resize_time < 0.1:
+            return
+        self._last_resize_time = current_time
+
+        # Calculate scale factor based on window size vs base size
+        width_scale = event.width / self.base_width
+        height_scale = event.height / self.base_height
+        scale = (width_scale + height_scale) / 2
+
+        # Clamp scale factor between 0.6 and 1.8
+        scale = max(0.6, min(1.8, scale))
+
+        # Update all registered scalable widgets
+        for widget, base_size, font_family, font_weight in self._scalable_widgets:
+            try:
+                new_size = max(8, int(base_size * scale))  # Minimum font size of 8
+                if font_weight:
+                    widget.configure(font=(font_family, new_size, font_weight))
+                else:
+                    widget.configure(font=(font_family, new_size))
+            except tk.TclError:
+                pass  # Widget may have been destroyed
+            except Exception:
+                pass
+
+        # Also update waveform dimensions if it exists
+        if self.waveform and hasattr(self.waveform, 'width'):
+            try:
+                new_width = max(300, int(480 * width_scale))
+                new_height = max(40, int(50 * height_scale))
+                self.waveform.configure(width=new_width, height=new_height)
+                self.waveform.width = new_width
+                self.waveform.height = new_height
+                # Recalculate bar dimensions
+                self.waveform.bar_width = max(2, (new_width - 20) // self.waveform.num_bars)
+                self.waveform._create_bars()
+            except:
+                pass
+
+        # Update wraplength for current_text label
+        if self.current_text:
+            try:
+                new_wrap = max(300, int(470 * width_scale))
+                self.current_text.configure(wraplength=new_wrap)
+            except:
+                pass
 
     def run(self):
         """Run the tkinter mainloop."""

@@ -43,10 +43,18 @@ class SplashScreen(ctk.CTkToplevel):
         self._current_msg_idx = 0
         self._is_running = True
 
-        # Window setup - fullscreen
+        # Window setup - maximized with normal z-layering
         self.title("C.O.R.A")
-        self.attributes('-fullscreen', True)
+        self.state('zoomed')  # Maximized instead of fullscreen
         self.configure(fg_color="#0a0a0a")  # Near black
+
+        # Use window manager for proper z-layering
+        try:
+            from ui.window_manager import bring_to_front
+            bring_to_front(self)
+        except:
+            self.lift()
+            self.focus_force()
 
         # Bind escape to exit fullscreen
         self.bind("<Escape>", lambda e: self._skip_splash())

@@ -89,7 +89,7 @@
 ### Advanced Skills
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| ClaudeColab Sync | Intermediate | TODO | Collab integration |
+| GitHub Sync | Intermediate | DONE | Git/GitHub integration |
 | API Communication | Advanced | TODO | External API calls |
 | Plugin System | Advanced | FUTURE | Extensibility |
 
@@ -121,7 +121,7 @@ HIGH PRIORITY (P1-P3)          MEDIUM (P4-P6)           LOW (P7-P10)
 Create Task                    Priority Sorting         Plugin System
 List Tasks                     Due Date Tracking        API Communication
 Parse Commands                 Context Tracking         Semantic Search
-Help System                    ClaudeColab Sync         Auto-Tagging
+Help System                    GitHub Sync              Auto-Tagging
 File I/O                       Export Knowledge         Decision Support
 ```
 
@@ -143,7 +143,7 @@ File I/O                       Export Knowledge         Decision Support
 3. **Phase 3 - Enhancement**
    - Priority management
    - Search functionality
-   - ClaudeColab integration
+   - GitHub integration
 
 4. **Phase 4 - Advanced**
    - Reasoning capabilities

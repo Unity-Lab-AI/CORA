@@ -10,7 +10,6 @@
 .env.*
 secrets.json
 credentials.json
-collab_config.json
 *_config.json
 *.secret
 
@@ -104,6 +103,11 @@ tests/__pycache__/
 *.ipynb_checkpoints
 
 # ============ SPECIFIC TO CORA ============
+# GitHub token storage (stored in user home, but just in case)
+github_token.json
+**/github_token.json
+.cora/
+
 # Sensitive config files
 config/settings.json
 config/personality.json

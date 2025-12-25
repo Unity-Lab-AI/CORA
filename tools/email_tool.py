@@ -8,7 +8,7 @@
 #
 # C.O.R.A Email Module
 # ================================================================
-# Version: 2.3.0
+# Version: 2.4.0
 # Unity AI Lab
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI
@@ -16,166 +16,324 @@
 # Creators: Hackall360, Sponge, GFourteen
 # ================================================================
 #
-# Send emails via SMTP (Gmail, Outlook, etc.)
-# Requires email credentials in config.
+# Opens default email app (Outlook, etc.) for sending emails.
+# Supports contact lookup by name.
 #
 # ================================================================
 """
 
-import smtplib
+import os
 import json
+import subprocess
+import webbrowser
 from pathlib import Path
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from urllib.parse import quote
+from typing import Optional, Dict, Any
 
+# Config paths
+PROJECT_DIR = Path(__file__).parent.parent
+CONFIG_DIR = PROJECT_DIR / 'config'
+DATA_DIR = PROJECT_DIR / 'data'
+CONTACTS_FILE = DATA_DIR / 'contacts.json'
 
-# Default config location
-CONFIG_DIR = Path(__file__).parent.parent / 'config'
-EMAIL_CONFIG_FILE = CONFIG_DIR / 'email_config.json'
-
-
-def load_email_config() -> dict:
-    """Load email configuration from file.
-
-    Config file should contain:
-    {
-        "smtp_server": "smtp.gmail.com",
-        "smtp_port": 465,
-        "email_address": "your@email.com",
-        "app_password": "your-app-password"
-    }
-    """
-    if EMAIL_CONFIG_FILE.exists():
+# Load user name from settings
+def get_user_name() -> str:
+    """Get user's name from settings."""
+    settings_file = CONFIG_DIR / 'settings.json'
+    if settings_file.exists():
         try:
-            with open(EMAIL_CONFIG_FILE, 'r') as f:
+            with open(settings_file, 'r') as f:
+                settings = json.load(f)
+                return settings.get('user_name', 'Your friend')
+        except:
+            pass
+    return 'Your friend'
+
+
+def load_contacts() -> Dict[str, str]:
+    """Load contacts from file.
+
+    Returns dict of name -> email address
+    """
+    if CONTACTS_FILE.exists():
+        try:
+            with open(CONTACTS_FILE, 'r') as f:
                 return json.load(f)
-        except Exception:
+        except:
             pass
     return {}
 
 
-def send_email(
-    to: str,
-    subject: str,
-    body: str,
-    html: bool = False,
-    config: dict = None
-) -> dict:
-    """
-    Send an email via SMTP.
-
-    Args:
-        to: Recipient email address
-        subject: Email subject line
-        body: Email body (plain text or HTML)
-        html: If True, body is treated as HTML
-        config: Optional config dict with smtp_server, smtp_port, email_address, app_password
-
-    Returns:
-        dict with 'success', 'message', and optional 'error'
-    """
-    if config is None:
-        config = load_email_config()
-
-    # Validate config
-    required = ['smtp_server', 'smtp_port', 'email_address', 'app_password']
-    missing = [k for k in required if not config.get(k)]
-
-    if missing:
-        return {
-            'success': False,
-            'error': f'Missing email config: {", ".join(missing)}',
-            'hint': f'Create {EMAIL_CONFIG_FILE} with smtp_server, smtp_port, email_address, app_password'
-        }
-
+def save_contacts(contacts: Dict[str, str]) -> bool:
+    """Save contacts to file."""
     try:
-        smtp_server = config['smtp_server']
-        smtp_port = int(config['smtp_port'])
-        sender = config['email_address']
-        password = config['app_password']
-
-        # Create message
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to
-
-        if html:
-            msg.attach(MIMEText(body, "html"))
-        else:
-            msg.attach(MIMEText(body, "plain"))
-
-        # Send via SMTP SSL (with 30 second timeout)
-        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as server:
-            server.login(sender, password)
-            server.sendmail(sender, to, msg.as_string())
-
-        return {
-            'success': True,
-            'message': f'Email sent to {to}',
-            'subject': subject
-        }
-
-    except smtplib.SMTPAuthenticationError:
-        return {
-            'success': False,
-            'error': 'SMTP authentication failed. Check email_address and app_password.'
-        }
-    except smtplib.SMTPException as e:
-        return {
-            'success': False,
-            'error': f'SMTP error: {e}'
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f'Email error: {e}'
-        }
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CONTACTS_FILE, 'w') as f:
+            json.dump(contacts, f, indent=2)
+        return True
+    except:
+        return False
 
 
-def create_email_config(
-    email_address: str,
-    app_password: str,
-    smtp_server: str = "smtp.gmail.com",
-    smtp_port: int = 465
-) -> dict:
-    """
-    Create email configuration file.
+def add_contact(name: str, email: str) -> Dict[str, Any]:
+    """Add a contact to the address book.
 
     Args:
-        email_address: Your email address
-        app_password: App-specific password (NOT your regular password)
-        smtp_server: SMTP server (default: Gmail)
-        smtp_port: SMTP port (default: 465 for SSL)
+        name: Contact name (e.g., "Karen", "Mom", "Boss")
+        email: Email address
 
     Returns:
         dict with success status
     """
-    config = {
-        'smtp_server': smtp_server,
-        'smtp_port': smtp_port,
-        'email_address': email_address,
-        'app_password': app_password
+    contacts = load_contacts()
+    name_lower = name.lower().strip()
+    contacts[name_lower] = email.strip()
+
+    if save_contacts(contacts):
+        return {
+            'success': True,
+            'message': f'Added {name} ({email}) to contacts'
+        }
+    return {
+        'success': False,
+        'error': 'Failed to save contact'
     }
 
+
+def get_contact_email(name: str) -> Optional[str]:
+    """Look up email address by contact name.
+
+    Args:
+        name: Contact name to look up
+
+    Returns:
+        Email address or None if not found
+    """
+    contacts = load_contacts()
+    name_lower = name.lower().strip()
+
+    # Exact match
+    if name_lower in contacts:
+        return contacts[name_lower]
+
+    # Partial match
+    for contact_name, email in contacts.items():
+        if name_lower in contact_name or contact_name in name_lower:
+            return email
+
+    return None
+
+
+def list_contacts() -> Dict[str, Any]:
+    """List all saved contacts."""
+    contacts = load_contacts()
+    if contacts:
+        return {
+            'success': True,
+            'contacts': contacts,
+            'count': len(contacts)
+        }
+    return {
+        'success': True,
+        'contacts': {},
+        'count': 0,
+        'message': 'No contacts saved. Add contacts with: add_contact("name", "email@example.com")'
+    }
+
+
+def send_email(
+    to: str,
+    message: str,
+    subject: str = None
+) -> Dict[str, Any]:
+    """
+    Open default email app with pre-filled email.
+
+    Args:
+        to: Recipient name or email address
+        message: Message body
+        subject: Optional subject (auto-generated if not provided)
+
+    Returns:
+        dict with success status
+    """
+    user_name = get_user_name()
+
+    # Check if 'to' is a name (look up in contacts)
+    recipient_email = to
+    recipient_name = to
+
+    if '@' not in to:
+        # It's a name, look up email
+        email_lookup = get_contact_email(to)
+        if email_lookup:
+            recipient_email = email_lookup
+            recipient_name = to.title()
+        else:
+            return {
+                'success': False,
+                'error': f'No email address found for "{to}"',
+                'hint': f'Add contact with: add_contact("{to}", "email@example.com")'
+            }
+
+    # Auto-generate subject if not provided
+    if not subject:
+        subject = f"Message from {user_name} via CORA"
+
+    # Format the message body
+    full_body = f'{user_name} says:\n\n"{message}"\n\n---\nSent via C.O.R.A - Cognitive Operations & Reasoning Assistant'
+
+    # Try Windows mailto with Outlook first
     try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(EMAIL_CONFIG_FILE, 'w') as f:
-            json.dump(config, f, indent=2)
-        return {'success': True, 'message': f'Config saved to {EMAIL_CONFIG_FILE}'}
+        # Build mailto URL
+        mailto_url = f"mailto:{quote(recipient_email)}"
+        mailto_url += f"?subject={quote(subject)}"
+        mailto_url += f"&body={quote(full_body)}"
+
+        # Open default mail app
+        webbrowser.open(mailto_url)
+
+        return {
+            'success': True,
+            'message': f'Opening email to {recipient_name} ({recipient_email})',
+            'to': recipient_email,
+            'subject': subject
+        }
+
     except Exception as e:
-        return {'success': False, 'error': str(e)}
+        return {
+            'success': False,
+            'error': f'Failed to open email app: {e}'
+        }
 
 
-# CLI-friendly wrapper
-def email(to: str, subject: str, body: str) -> str:
-    """Send an email. Returns status message."""
-    result = send_email(to, subject, body)
+def draft_email(
+    to: str,
+    message: str,
+    subject: str = None
+) -> Dict[str, Any]:
+    """Alias for send_email - opens email app with draft."""
+    return send_email(to, message, subject)
+
+
+def read_emails() -> Dict[str, Any]:
+    """Open default email app to check emails."""
+    try:
+        # Try to open Outlook specifically on Windows
+        if os.name == 'nt':
+            try:
+                # Try to open Outlook inbox
+                subprocess.Popen(
+                    ['start', 'outlook', '/select', 'outlook:inbox'],
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                return {
+                    'success': True,
+                    'message': 'Opening Outlook inbox'
+                }
+            except:
+                pass
+
+        # Fallback: open default mail app
+        webbrowser.open('mailto:')
+        return {
+            'success': True,
+            'message': 'Opening email app'
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Failed to open email app: {e}'
+        }
+
+
+def check_email() -> Dict[str, Any]:
+    """Alias for read_emails."""
+    return read_emails()
+
+
+# ============ CLI-Friendly Wrappers ============
+
+def email_send(to: str, message: str, subject: str = None) -> str:
+    """Send an email (opens default mail app)."""
+    result = send_email(to, message, subject)
     if result['success']:
         return f"[+] {result['message']}"
     else:
-        return f"[!] {result['error']}"
+        error = result.get('error', 'Unknown error')
+        hint = result.get('hint', '')
+        return f"[!] {error}" + (f"\n    {hint}" if hint else "")
+
+
+def email_read() -> str:
+    """Open email app to check emails."""
+    result = read_emails()
+    if result['success']:
+        return f"[+] {result['message']}"
+    return f"[!] {result['error']}"
+
+
+def email_draft(to: str, message: str, subject: str = None) -> str:
+    """Create email draft (opens default mail app)."""
+    return email_send(to, message, subject)
+
+
+# ============ Voice Command Helpers ============
+
+def parse_email_command(text: str) -> Dict[str, Any]:
+    """
+    Parse natural language email command.
+
+    Examples:
+        "send email to karen saying hi"
+        "email mom and say I'll be late"
+        "send a message to john@example.com saying thanks"
+
+    Returns:
+        dict with 'to', 'message', or 'error'
+    """
+    text = text.lower().strip()
+
+    # Common patterns
+    patterns = [
+        # "send email to X saying Y"
+        ('send email to ', ' saying '),
+        ('send an email to ', ' saying '),
+        ('email ', ' saying '),
+        ('email ', ' and say '),
+        ('send message to ', ' saying '),
+        ('send a message to ', ' saying '),
+        # "tell X that Y"
+        ('tell ', ' that '),
+        ('message ', ' that '),
+    ]
+
+    for start_pattern, mid_pattern in patterns:
+        if start_pattern in text and mid_pattern in text:
+            try:
+                start_idx = text.index(start_pattern) + len(start_pattern)
+                mid_idx = text.index(mid_pattern, start_idx)
+
+                recipient = text[start_idx:mid_idx].strip()
+                message = text[mid_idx + len(mid_pattern):].strip()
+
+                if recipient and message:
+                    return {
+                        'success': True,
+                        'to': recipient,
+                        'message': message
+                    }
+            except:
+                continue
+
+    return {
+        'success': False,
+        'error': 'Could not parse email command',
+        'hint': 'Try: "send email to [name] saying [message]"'
+    }
 
 
 # Module test
@@ -185,11 +343,23 @@ if __name__ == "__main__":
     print("  Unity AI Lab")
     print("=" * 50)
 
-    config = load_email_config()
-    if config:
-        print(f"[+] Config loaded from {EMAIL_CONFIG_FILE}")
-        print(f"    SMTP: {config.get('smtp_server')}:{config.get('smtp_port')}")
-        print(f"    From: {config.get('email_address')}")
-    else:
-        print(f"[!] No config found at {EMAIL_CONFIG_FILE}")
-        print("    Create config with create_email_config() or manually")
+    # Test contact management
+    print("\n[Testing Contacts]")
+    contacts = load_contacts()
+    print(f"  Loaded {len(contacts)} contacts")
+
+    # Test parsing
+    print("\n[Testing Command Parsing]")
+    test_commands = [
+        "send email to karen saying hi how are you",
+        "email mom saying I'll be home late",
+        "send a message to john@test.com saying thanks for the help"
+    ]
+
+    for cmd in test_commands:
+        result = parse_email_command(cmd)
+        if result['success']:
+            print(f"  ✓ '{cmd[:40]}...'")
+            print(f"    To: {result['to']}, Message: {result['message'][:30]}...")
+        else:
+            print(f"  ✗ '{cmd[:40]}...' - {result['error']}")

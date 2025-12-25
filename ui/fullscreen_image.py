@@ -54,11 +54,13 @@ class FullscreenImageWindow:
             return False
 
         try:
-            # Create window
-            self.root = tk.Toplevel() if tk._default_root else tk.Tk()
-            self.root.title("CORA")
-            self.root.attributes('-fullscreen', True)
-            self.root.configure(bg='black')
+            from ui.window_manager import create_image_window
+
+            # Use window manager for proper z-layering
+            self.root = create_image_window(
+                title="CORA",
+                maximized=True
+            )
 
             # Get screen dimensions
             screen_width = self.root.winfo_screenwidth()

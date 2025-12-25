@@ -3,6 +3,9 @@ chcp 437 >nul
 title C.O.R.A - Cognitive Operations & Reasoning Assistant
 color 0D
 
+:: Change to the script's directory (handles spaces in path)
+cd /d "%~dp0"
+
 echo.
 echo   +=========================================+
 echo   :   ____  ___  ____   _                   :
@@ -53,19 +56,19 @@ echo.
 echo [CHECK] AI Models...
 echo.
 
-:: Check llama3.2 (chat model)
-ollama list | findstr /i "llama3.2" >nul 2>&1
+:: Check dolphin-mistral (main chat model - uncensored, follows instructions)
+ollama list | findstr /i "dolphin-mistral" >nul 2>&1
 if errorlevel 1 (
-    echo [DOWNLOAD] llama3.2 ^(chat model - ~2GB^)...
-    echo          This may take a few minutes...
-    ollama pull llama3.2
+    echo [DOWNLOAD] dolphin-mistral:7b ^(main chat model - ~4.1GB^)...
+    echo          This is CORA's brain - may take several minutes...
+    ollama pull dolphin-mistral:7b
     if errorlevel 1 (
-        echo [WARN] Failed to download llama3.2
+        echo [WARN] Failed to download dolphin-mistral:7b
     ) else (
-        echo [OK] llama3.2 ready
+        echo [OK] dolphin-mistral:7b ready
     )
 ) else (
-    echo         llama3.2 - OK
+    echo         dolphin-mistral - OK
 )
 
 :: Check llava (vision model)
@@ -81,6 +84,21 @@ if errorlevel 1 (
     )
 ) else (
     echo         llava - OK
+)
+
+:: Check qwen2.5-coder (coding model - best for 2024)
+ollama list | findstr /i "qwen2.5-coder" >nul 2>&1
+if errorlevel 1 (
+    echo [DOWNLOAD] qwen2.5-coder:7b ^(coding model - ~4.4GB^)...
+    echo          This is for code writing/editing...
+    ollama pull qwen2.5-coder:7b
+    if errorlevel 1 (
+        echo [WARN] Failed to download qwen2.5-coder
+    ) else (
+        echo [OK] qwen2.5-coder ready
+    )
+) else (
+    echo         qwen2.5-coder - OK
 )
 echo.
 

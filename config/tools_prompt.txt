@@ -26,6 +26,8 @@ AVAILABLE COMMANDS AND TOOLS:
 * chat <message>: Send message to AI
 * chathistory [clear]: View or clear chat history
 * speak <text>: Text-to-speech output
+* what did you hear: Recall what was said before wake word
+* what did I just say: Same as above - recall recent speech
 
 === CALENDAR & TIME ===
 * calendar: Show today's calendar events
@@ -40,7 +42,12 @@ AVAILABLE COMMANDS AND TOOLS:
 * location: Show current location
 
 === VISION & CAMERA ===
-* see [question]: Look through camera and describe what you see
+* camera: Open live camera feed window (stays open for continuous viewing)
+* show camera: Same as camera - opens live webcam feed
+* close camera: Close the live camera feed
+* what do you see: Analyze current camera view and describe it
+* how many fingers: Count fingers being held up via camera
+* see [question]: Take snapshot and describe what you see
 * look [question]: Same as see - camera vision
 * screenshot: Take screenshot of desktop
 * capture [window]: Capture specific window
@@ -49,6 +56,21 @@ AVAILABLE COMMANDS AND TOOLS:
 * imagine <description>: Generate an image from text prompt
 * draw <description>: Same as imagine - create images
 * generate_image <prompt>: Direct image generation tool
+
+=== CODE EDITOR / IDE ===
+* open editor: Open the CORA IDE code editor
+* open folder <path>: Open a folder in the code editor with file tree
+* open github <url>: Open a GitHub repository in the code editor
+* edit file <path>: Open a specific file in the code editor
+* edit this file: Edit the currently viewed file
+* change <instruction>: Tell CORA to modify the current code (e.g., "add error handling")
+* save file: Save the current file in the editor
+* save this: Same as save file
+* push to github: Push current changes to GitHub
+* push changes: Same as push to github
+* copy code: Copy the current code to clipboard
+* accept changes: Accept AI-proposed code changes
+* reject changes: Reject AI-proposed code changes
 
 === CODE TOOLS ===
 * explain_code <code>: Explain what code does
@@ -72,13 +94,40 @@ AVAILABLE COMMANDS AND TOOLS:
 * browse <url>: Open URL in browser
 
 === MEDIA CONTROL ===
-* play: Play/resume media
-* pause: Pause media
-* stop: Stop media
-* next: Next track
-* prev: Previous track
-* volume <level>: Set volume (0-100)
+* play: Toggle play/pause on current app (Spotify, VLC, YouTube, etc)
+* play <file>: Play local file (MP3, MP4, etc) - e.g., play C:\Music\song.mp3
+* play <youtube url>: Play YouTube video - e.g., play https://youtube.com/watch?v=xxx
+* play <search>: Search and play from YouTube - e.g., play lofi hip hop
+* pause: Pause current media
+* resume: Resume playback
+* stop: Stop media completely
+* next: Skip to next track
+* prev / previous: Go to previous track
+* volume: Get current volume
+* volume <0-100>: Set volume level
 * mute: Toggle mute
+* now playing: Show what's currently playing (Emby only)
+
+=== GIT & GITHUB ===
+* git status: Show repository status
+* git pull: Pull latest changes from remote
+* git push: Push commits to remote
+* git commit <message>: Commit staged changes
+* git add <files>: Stage files (use . for all)
+* git branch: List all branches
+* git checkout <branch>: Switch to branch
+* git checkout -b <branch>: Create and switch to new branch
+* git merge <branch>: Merge branch into current
+* git clone <url>: Clone a repository
+* git log: Show recent commits
+* git diff: Show unstaged changes
+* git stash: Stash current changes
+* git stash pop: Apply stashed changes
+* github login: Open browser to authenticate with GitHub
+* github repos: List your GitHub repositories
+* github create <name>: Create new GitHub repository
+* github fork <owner/repo>: Fork a repository
+* github pr <title>: Create pull request
 
 === SYSTEM TOOLS ===
 * systemstats: Show live system stats (CPU, RAM, GPU, disk)
@@ -89,10 +138,13 @@ AVAILABLE COMMANDS AND TOOLS:
 * clear: Clear terminal screen
 * pull <model>: Pull Ollama model
 
-=== EMAIL ===
-* email_send <to> <subject> <body>: Send email
-* email_read: Check inbox
-* email_draft <to> <subject> <body>: Draft email
+=== EMAIL (opens default mail app) ===
+* send email to <name> saying <message>: Compose email to contact
+* email <name> saying <message>: Same as above
+* check email: Open inbox in default mail app
+* read emails: Same as check email
+* add contact <name> <email>: Add to address book
+* list contacts: Show saved contacts
 
 === MODAL WINDOW TOOLS (opens popup windows) ===
 * viewfile <path>: Open any file in modal viewer (auto-detects type)

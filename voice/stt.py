@@ -144,19 +144,23 @@ class SpeechRecognizer:
             import sounddevice as sd
             import time
 
+            # Reset recognizer to clear any buffered audio from wake word
+            self.recognizer.Reset()
+
             # Collect audio for the duration
             audio_data = []
             start_time = time.time()
+            has_speech = [False]  # Track if we've heard speech
 
             def audio_callback(indata, frames, time_info, status):
                 if status:
                     pass  # Ignore status messages
                 audio_data.append(bytes(indata))
 
-            # Record audio
+            # Record audio - start immediately
             with sd.RawInputStream(
                 samplerate=self.sample_rate,
-                blocksize=8000,
+                blocksize=4000,  # Smaller blocks for faster response
                 dtype='int16',
                 channels=1,
                 callback=audio_callback
@@ -164,7 +168,7 @@ class SpeechRecognizer:
                 # Wait for timeout or phrase_limit (whichever is shorter)
                 listen_time = min(timeout, phrase_limit)
                 while time.time() - start_time < listen_time:
-                    time.sleep(0.1)
+                    time.sleep(0.05)  # Check more frequently
 
             # Process collected audio
             if not audio_data:
@@ -220,6 +224,15 @@ class SpeechRecognizer:
 class WakeWordDetector:
     """Detect wake word in audio stream."""
 
+    # Class-level buffer of recent transcripts (shared across instances)
+    _recent_transcripts = []
+    _max_transcripts = 20  # Keep last 20 phrases
+    _transcript_lock = threading.Lock()
+
+    # Callbacks for when new transcripts are added (for ambient awareness)
+    _transcript_callbacks = []
+    _callback_lock = threading.Lock()
+
     def __init__(self, wake_word=None, sensitivity=None):
         """Initialize wake word detector.
 
@@ -244,7 +257,24 @@ class WakeWordDetector:
             return
 
         def check_wake(text):
-            if self.wake_word in text.lower():
+            text_lower = text.lower().strip()
+
+            # Store all transcripts in buffer (before checking for wake word)
+            if text_lower and text_lower != self.wake_word:
+                with WakeWordDetector._transcript_lock:
+                    import time
+                    WakeWordDetector._recent_transcripts.append({
+                        'text': text,
+                        'time': time.time()
+                    })
+                    # Keep only recent transcripts
+                    if len(WakeWordDetector._recent_transcripts) > WakeWordDetector._max_transcripts:
+                        WakeWordDetector._recent_transcripts.pop(0)
+
+                # Notify ambient awareness and other listeners
+                WakeWordDetector._notify_transcript_callbacks(text)
+
+            if self.wake_word in text_lower:
                 on_wake()
 
         self.recognizer.start_listening(check_wake)
@@ -252,6 +282,78 @@ class WakeWordDetector:
     def stop(self):
         """Stop listening for wake word."""
         self.recognizer.stop_listening()
+
+    @classmethod
+    def get_recent_transcripts(cls, seconds: float = 30.0) -> list:
+        """Get transcripts from the last N seconds before wake word.
+
+        Args:
+            seconds: How far back to look (default 30 seconds)
+
+        Returns:
+            list of transcript strings
+        """
+        import time
+        cutoff = time.time() - seconds
+
+        with cls._transcript_lock:
+            recent = [t['text'] for t in cls._recent_transcripts if t['time'] > cutoff]
+            return recent
+
+    @classmethod
+    def get_last_heard(cls) -> str:
+        """Get a summary of what was heard recently.
+
+        Returns:
+            str: Summary of recent speech or "nothing" if buffer is empty
+        """
+        transcripts = cls.get_recent_transcripts(seconds=30.0)
+        if transcripts:
+            # Join recent transcripts, remove duplicates
+            seen = set()
+            unique = []
+            for t in transcripts:
+                t_clean = t.strip().lower()
+                if t_clean and t_clean not in seen:
+                    seen.add(t_clean)
+                    unique.append(t.strip())
+            if unique:
+                return ' '.join(unique[-5:])  # Last 5 unique phrases
+        return ""
+
+    @classmethod
+    def clear_transcripts(cls):
+        """Clear the transcript buffer."""
+        with cls._transcript_lock:
+            cls._recent_transcripts.clear()
+
+    @classmethod
+    def add_transcript_callback(cls, callback):
+        """Register a callback to be notified when new transcripts are added.
+
+        Args:
+            callback: Function that takes (text: str) as argument
+        """
+        with cls._callback_lock:
+            cls._transcript_callbacks.append(callback)
+
+    @classmethod
+    def remove_transcript_callback(cls, callback):
+        """Remove a transcript callback."""
+        with cls._callback_lock:
+            if callback in cls._transcript_callbacks:
+                cls._transcript_callbacks.remove(callback)
+
+    @classmethod
+    def _notify_transcript_callbacks(cls, text: str):
+        """Notify all registered callbacks of new transcript."""
+        with cls._callback_lock:
+            callbacks = list(cls._transcript_callbacks)
+        for callback in callbacks:
+            try:
+                callback(text)
+            except Exception as e:
+                print(f"[!] Transcript callback error: {e}")
 
 
 def transcribe_file(audio_file, model_path=None):

@@ -134,12 +134,8 @@ def desktop(
         if return_base64:
             result.base64 = image_to_base64(save_path)
 
-        # Show screenshot in modal
-        try:
-            from ui.modals import show_image_modal, show_modal_threadsafe
-            show_modal_threadsafe(show_image_modal, str(save_path), "Screenshot", f"Desktop {screenshot.width}x{screenshot.height}")
-        except Exception:
-            pass
+        # Note: Don't auto-show modal here - let caller decide whether to display
+        # This prevents double popups when boot_sequence also shows the image
 
         return result
 

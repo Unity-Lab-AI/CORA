@@ -38,12 +38,7 @@
 
 | ID | Task | File | Issue |
 |----|------|------|-------|
-| SEC-001 | Remove hardcoded ClaudeColab API key | `.claude/collab/collab_config.json:2` | Key exposed |
-| SEC-002 | Remove hardcoded ClaudeColab API key | `.claude/collab/heartbeat.py:32` | Same key in source |
-| SEC-003 | Remove hardcoded Supabase JWT token | `.claude/collab/claude_colab.py:35` | Full JWT exposed |
-| SEC-004 | Remove hardcoded Supabase JWT token | `.claude/collab/shared_brain.py:33` | Duplicate exposure |
-| SEC-005 | Remove hardcoded Supabase JWT token | `.claude/collab/shared_tasks.py:31` | Duplicate exposure |
-| SEC-006 | Remove hardcoded Pollinations API key | `tools/image_gen.py:26` | API key exposed |
+| SEC-001 | Move Pollinations API key to .env | `tools/image_gen.py:26` | API key exposed |
 | SEC-007 | Create .gitignore file | Root directory | Prevent secret commits |
 | SEC-008 | Move ALL credentials to environment vars | Multiple files | Use os.environ.get() |
 
@@ -74,7 +69,6 @@
 |----|------|------|-------|
 | SEC-009 | Fix PowerShell command injection | `tools/system.py:300` | Unescaped input |
 | SEC-010 | Replace shell=True with argument lists | `tools/system.py:537-587` | Dangerous pattern |
-| SEC-011 | Fix Supabase query injection | `.claude/collab/shared_brain.py:158` | URL params unescaped |
 
 ---
 
@@ -174,11 +168,9 @@
 | AI | ⚠️ PARTIAL | Missing aiohttp |
 | Services | ✅ WORKING | Minor issues |
 | UI | ✅ WORKING | Untested |
-| Collab | ❌ INSECURE | Credentials exposed |
 | Memory | ⚠️ PARTIAL | Module orphaned |
 
 ---
 
-*Unity AI Lab - C.O.R.A v2.3.0*
-*Synced with ClaudeColab project: cora-2*
-*Last Updated: 2025-12-23 (10-Agent Scan)*
+*Unity AI Lab - C.O.R.A v2.4.0*
+*Last Updated: 2025-12-24*

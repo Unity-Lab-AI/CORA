@@ -132,9 +132,47 @@ class KokoroTTS(TTSEngine):
                     except Exception as e:
                         print(f"[DEBUG] Waveform audio share failed: {e}")
 
-                    # Play audio at 24kHz sample rate
-                    self.sd.play(result.audio, samplerate=24000)
-                    self.sd.wait()  # Block until audio finishes
+                    # Play audio with real-time level reporting for waveform
+                    audio_data = result.audio
+                    sample_rate = 24000
+                    position = [0]  # Track playback position
+
+                    def audio_callback(outdata, frames, time_info, status):
+                        """Callback that plays audio and reports levels to waveform."""
+                        nonlocal position
+                        start = position[0]
+                        end = start + frames
+
+                        if end <= len(audio_data):
+                            outdata[:, 0] = audio_data[start:end]
+                        elif start < len(audio_data):
+                            # Partial data at end
+                            valid = len(audio_data) - start
+                            outdata[:valid, 0] = audio_data[start:]
+                            outdata[valid:, 0] = 0
+                        else:
+                            outdata.fill(0)
+                            raise self.sd.CallbackStop()
+
+                        # Send current audio chunk to waveform visualizer
+                        try:
+                            from ui.boot_display import set_audio_chunk
+                            chunk = audio_data[start:end] if end <= len(audio_data) else audio_data[start:]
+                            set_audio_chunk(chunk)
+                        except:
+                            pass
+
+                        position[0] = end
+
+                    # Use OutputStream with callback for real-time level reporting
+                    with self.sd.OutputStream(
+                        samplerate=sample_rate,
+                        channels=1,
+                        callback=audio_callback,
+                        blocksize=1024
+                    ):
+                        while position[0] < len(audio_data):
+                            self.sd.sleep(10)
 
                     # Clear audio data AFTER playback is done
                     try:

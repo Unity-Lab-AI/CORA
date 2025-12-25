@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Ollama API Configuration
 OLLAMA_BASE_URL = "http://localhost:11434"
-DEFAULT_MODEL = "llama3.2:3b"
+DEFAULT_MODEL = "dolphin-mistral:7b"  # Uncensored model that follows instructions
 DEFAULT_TIMEOUT = 120  # seconds
 
 

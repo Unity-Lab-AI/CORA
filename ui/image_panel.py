@@ -278,14 +278,18 @@ class FullscreenImage(tk.Toplevel):
 
     def _setup_window(self):
         """Configure window."""
+        from ui.window_manager import bring_to_front
+
         self.title("Image Viewer")
         self.configure(bg="black")
-        self.attributes("-topmost", True)
 
-        # Get screen size
+        # Get screen size - maximized window
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
         self.geometry(f"{screen_w}x{screen_h}+0+0")
+
+        # Use window manager for proper z-layering
+        bring_to_front(self)
 
         # Close on click or Escape
         self.bind("<Button-1>", lambda e: self.destroy())

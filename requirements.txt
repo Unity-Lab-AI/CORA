@@ -29,6 +29,7 @@ Pillow~=10.2.0
 
 # Utilities
 python-dateutil~=2.8.2
+python-dotenv~=1.0.0
 
 # Screenshot/Window tools
 pygetwindow~=0.0.9

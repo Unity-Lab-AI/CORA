@@ -21,11 +21,14 @@ from datetime import datetime
 PROJECT_DIR = Path(__file__).parent.parent
 IMAGES_DIR = PROJECT_DIR / 'data' / 'images'
 
+# Load .env file for API keys
+from dotenv import load_dotenv
+load_dotenv(PROJECT_DIR / '.env')
+
 # Pollinations.AI API settings
 IMAGE_API = "https://gen.pollinations.ai/image"
-# API key - uses Unity AI Lab public key by default
-# Can override with POLLINATIONS_API_KEY environment variable
-API_KEY = os.environ.get("POLLINATIONS_API_KEY", "pk_YBwckBxhiFxxCMbk")
+# API key from .env file (POLLINATIONS_API_KEY)
+API_KEY = os.environ.get("POLLINATIONS_API_KEY", "")
 
 
 def encode_prompt(prompt: str) -> str:
@@ -135,12 +138,8 @@ def generate_image(
             "size_bytes": len(response.content)
         }
 
-        # Show image in modal window (non-blocking)
-        try:
-            from ui.modals import show_image_modal, show_modal_threadsafe
-            show_modal_threadsafe(show_image_modal, str(output_path), "Generated Image", prompt)
-        except Exception as e:
-            print(f"[DEBUG] Modal display skipped: {e}")
+        # Note: Don't auto-show modal here - let caller decide whether to display
+        # This prevents double popups when boot_sequence also shows the image
 
         return result
 
@@ -208,11 +207,18 @@ def show_fullscreen_image(image_path: str) -> bool:
             print(f"[!] Image not found: {image_path}")
             return False
 
-        # Create fullscreen window
-        root = tk.Toplevel() if tk._default_root else tk.Tk()
-        root.title("CORA")
-        root.attributes('-fullscreen', True)
-        root.configure(bg='black')
+        # Use window manager for proper z-layering
+        try:
+            from ui.window_manager import create_image_window
+            root = create_image_window(title="CORA", maximized=True)
+        except:
+            # Fallback if window manager not available
+            root = tk.Toplevel() if tk._default_root else tk.Tk()
+            root.title("CORA")
+            root.state('zoomed')
+            root.configure(bg='black')
+            root.lift()
+            root.focus_force()
 
         # Get screen dimensions
         screen_width = root.winfo_screenwidth()

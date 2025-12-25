@@ -12,6 +12,9 @@ Created by: Unity AI Lab
 import sys
 import os
 import time
+import signal
+import atexit
+import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -21,6 +24,26 @@ PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent
 sys.path.insert(0, str(PROJECT_DIR))
 sys.path.insert(0, str(PROJECT_DIR / 'src'))
 sys.path.insert(0, str(PROJECT_DIR / 'ui'))
+
+
+def shutdown_handler(*args):
+    """Handle shutdown signals - close everything cleanly."""
+    print("\n[CORA] Shutting down...")
+    global _boot_display
+    if _boot_display:
+        try:
+            _boot_display.close()
+        except:
+            pass
+    os._exit(0)
+
+
+# Register shutdown handlers
+atexit.register(shutdown_handler)
+signal.signal(signal.SIGINT, shutdown_handler)  # Ctrl+C
+signal.signal(signal.SIGTERM, shutdown_handler)  # Termination
+if sys.platform == 'win32':
+    signal.signal(signal.SIGBREAK, shutdown_handler)  # Ctrl+Break on Windows
 
 # Visual boot display
 _boot_display = None
@@ -47,6 +70,20 @@ _tts_engine = None
 
 # Cache for system prompt
 _system_prompt_cache = None
+
+
+def responsive_sleep(seconds: float):
+    """Sleep while keeping the UI responsive (allows window dragging)."""
+    global _boot_display
+    end_time = time.time() + seconds
+    while time.time() < end_time:
+        if _boot_display and _boot_display.root:
+            try:
+                _boot_display.root.update_idletasks()
+                _boot_display.root.update()
+            except tk.TclError:
+                break
+        time.sleep(0.01)  # 100 FPS update rate
 
 
 def get_system_prompt() -> str:
@@ -110,7 +147,7 @@ def init_tts():
 
             # FIRST THING USER HEARS - TTS announcing itself
             speak("Voice synthesis online. Kokoro TTS loaded and ready.")
-            time.sleep(0.3)
+            responsive_sleep(0.3)
             return True
         else:
             print("[BOOT] [FAIL] Kokoro TTS failed to initialize")
@@ -176,34 +213,60 @@ def speak(text: str, blocking: bool = True):
     tts_thread = threading.Thread(target=do_speak, daemon=True)
     tts_thread.start()
 
-    # If blocking, wait for thread to finish
-    # Don't call root.update() - let tkinter mainloop handle it
+    # If blocking, wait for thread to finish while keeping Tkinter responsive
     if blocking:
-        tts_thread.join()
+        while tts_thread.is_alive():
+            if _boot_display and _boot_display.root:
+                try:
+                    # Process ALL pending events including mouse drags
+                    for _ in range(10):  # Process multiple events per cycle
+                        _boot_display.root.update()
+                except tk.TclError:
+                    break  # Window was closed
+            # Minimal sleep - just yield to other threads
+            time.sleep(0.001)
+        tts_thread.join()  # Clean up thread
 
 
-def cora_respond(context: str, result: str, status: str = "ok") -> str:
+def cora_respond(context: str, result: str, status: str = "ok", mode: str = "quick") -> str:
     """
     CORA generates a unique response for each boot phase.
-    ALL responses come from AI using system prompt - no hardcoded templates.
+
+    Args:
+        context: What phase this is (e.g., "AI Engine", "Camera")
+        result: The data/result to announce
+        status: "ok", "warn", or "fail"
+        mode: "quick" for short status readouts, "full" for news/weather/longer content
     """
     import re
 
     try:
         from ai.ollama import generate
 
-        # Load CORA's full system prompt
-        system_prompt = get_system_prompt()
+        if mode == "quick":
+            # Use full system prompt but constrain the output
+            system_prompt = get_system_prompt()
 
-        # Simple, direct prompt - system prompt handles personality
-        # MUST include exact numbers/data, not paraphrase
-        prompt = f"Say this in ONE sentence, include the EXACT numbers and data, don't paraphrase: {result}"
+            # Add boot constraint to the prompt itself - 1-2 sentences, include all the data
+            prompt = f"""[BOOT ANNOUNCEMENT - say this in 1-2 sentences with your usual attitude. Include ALL the data/numbers.]
+{result}"""
 
-        response = generate(
-            prompt=prompt,
-            system=system_prompt,
-            temperature=0.7
-        )
+            response = generate(
+                prompt=prompt,
+                system=system_prompt,
+                temperature=0.9
+            )
+
+        else:
+            # Full mode - news, weather, descriptions use full personality
+            system_prompt = get_system_prompt()
+            prompt = f"Announce this naturally in 1-2 sentences: {result}"
+
+            response = generate(
+                prompt=prompt,
+                system=system_prompt,
+                temperature=0.7
+            )
 
         if response.content:
             text = response.content.strip().strip('"\'')
@@ -218,6 +281,15 @@ def cora_respond(context: str, result: str, status: str = "ok") -> str:
             text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # # headers
             text = re.sub(r'\n+', ' ', text)  # newlines to spaces
             text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
+
+            # For quick mode, enforce length limit - if AI went crazy, use raw result
+            if mode == "quick" and len(text) > 100:
+                print(f"[WARN] AI response too long ({len(text)} chars), using raw result")
+                return result
+
+            # Take only first sentence if multiple
+            if mode == "quick" and '. ' in text:
+                text = text.split('. ')[0] + '.'
 
             if len(text) > 10:
                 return text
@@ -237,6 +309,10 @@ def _safe_ui_call(func, *args):
             _boot_display.root.after(0, lambda: func(*args))
         except:
             pass
+
+
+# Import centralized window manager
+from ui.window_manager import create_window, create_popup, create_image_window, create_code_window, bring_to_front
 
 
 def display_log(text: str, level: str = 'info'):
@@ -448,9 +524,111 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         print("[BOOT] Using pre-initialized visual display")
 
     # ================================================================
+    # PHASE 0.8: WAVEFORM INITIALIZATION
+    # ================================================================
+    display_phase("0.8 Waveform Init", "running")
+    display_log("PHASE 0.8: WAVEFORM VISUAL", "phase")
+    print("\n[PHASE 0.8] Waveform Visual Initialization")
+    print("=" * 50)
+
+    waveform_ok = False
+    waveform_errors = []
+
+    try:
+        from ui.boot_display import AudioWaveform, get_audio_buffer, set_audio_data, clear_audio_data, _audio_buffer_lock
+        print("  [OK] AudioWaveform module loaded")
+        display_log("AudioWaveform module loaded", "ok")
+
+        # Check 1: Boot display exists
+        if not _boot_display:
+            waveform_errors.append("Boot display not initialized")
+            print("  [FAIL] Boot display not initialized")
+            display_log("Boot display not initialized", "fail")
+        else:
+            print("  [OK] Boot display exists")
+            display_log("Boot display exists", "ok")
+
+            # Check 2: Waveform widget exists
+            if not _boot_display.waveform:
+                waveform_errors.append("Waveform widget is None")
+                print("  [FAIL] Waveform widget is None")
+                display_log("Waveform widget is None", "fail")
+            else:
+                print("  [OK] Waveform widget created")
+                display_log("Waveform widget created", "ok")
+
+                # Check 3: Audio buffer works
+                try:
+                    buf = get_audio_buffer()
+                    print(f"  [OK] Audio buffer initialized (active={buf['active']})")
+                    display_log("Audio buffer initialized", "ok")
+                except Exception as e:
+                    waveform_errors.append(f"Audio buffer error: {e}")
+                    print(f"  [FAIL] Audio buffer error: {e}")
+                    display_log(f"Audio buffer error: {e}", "fail")
+
+                # Check 4: Test setting audio data
+                try:
+                    import numpy as np
+                    # Create a test sine wave
+                    test_samples = np.sin(np.linspace(0, 10 * np.pi, 2400)).astype(np.float32)
+                    set_audio_data(test_samples, sample_rate=24000)
+                    buf = get_audio_buffer()
+                    if buf['active'] and buf['data'] is not None:
+                        print(f"  [OK] Audio data injection works ({len(buf['data'])} samples)")
+                        display_log("Audio data injection works", "ok")
+                    else:
+                        waveform_errors.append("Audio data not received by buffer")
+                        print("  [FAIL] Audio data not received by buffer")
+                        display_log("Audio data not received", "fail")
+                except Exception as e:
+                    waveform_errors.append(f"Audio injection error: {e}")
+                    print(f"  [FAIL] Audio injection error: {e}")
+                    display_log(f"Audio injection error: {e}", "fail")
+
+                # Check 5: Test waveform animation with audio data
+                print("  Testing waveform animation with audio...")
+                display_log("Testing waveform animation", "info")
+                try:
+                    _boot_display.waveform.start()
+                    # Let it animate for 1 second with our test data
+                    for _ in range(10):
+                        time.sleep(0.1)
+                        if _boot_display.root:
+                            _boot_display.root.update()
+                    _boot_display.waveform.stop()
+                    clear_audio_data()
+                    print("  [OK] Waveform animation test passed")
+                    display_log("Waveform animation working", "ok")
+                    waveform_ok = True
+                except Exception as e:
+                    waveform_errors.append(f"Animation error: {e}")
+                    print(f"  [FAIL] Animation error: {e}")
+                    display_log(f"Animation error: {e}", "fail")
+
+        # Summary
+        if waveform_ok:
+            print("  [OK] All waveform checks passed")
+            display_log("All waveform checks passed", "ok")
+            BOOT_STATUS['systems'].append({'name': 'Waveform Visual', 'status': 'OK'})
+            display_phase("0.8 Waveform Init", "ok")
+        else:
+            error_summary = "; ".join(waveform_errors) if waveform_errors else "Unknown error"
+            print(f"  [WARN] Waveform issues: {error_summary}")
+            display_log(f"Issues: {error_summary}", "warn")
+            BOOT_STATUS['systems'].append({'name': 'Waveform Visual', 'status': 'WARN'})
+            display_phase("0.8 Waveform Init", "warn")
+
+    except Exception as e:
+        print(f"  [FAIL] Waveform init exception: {e}")
+        display_log(f"Waveform exception: {e}", "fail")
+        BOOT_STATUS['systems'].append({'name': 'Waveform Visual', 'status': 'FAIL'})
+        display_phase("0.8 Waveform Init", "fail")
+
+    # ================================================================
     # PHASE 0.9: ABOUT CORA (Introduction)
     # ================================================================
-    display_phase("About CORA", "running")
+    display_phase("0.9 About CORA", "running")
     display_log("PHASE 0.9: ABOUT CORA", "phase")
     print("\n[PHASE 0.9] About CORA")
     print("=" * 50)
@@ -471,12 +649,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     BOOT_STATUS['version'] = '2.4.0'
     BOOT_STATUS['creators'] = 'Hackall360, Sponge, GFourteen'
-    display_phase("About CORA", "ok")
+    display_phase("0.9 About CORA", "ok")
 
     # ================================================================
     # PHASE 1: VOICE SYNTHESIS (FIRST - so user can hear everything)
     # ================================================================
-    display_phase("Voice Synthesis", "running")
+    display_phase("1.0 Voice Synthesis", "running")
     display_log("PHASE 1: VOICE SYNTHESIS", "phase")
 
     if not skip_tts:
@@ -484,16 +662,16 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         if tts_ok:
             BOOT_STATUS['systems'].append({'name': 'Voice TTS (Kokoro)', 'status': 'OK'})
             display_log("Kokoro TTS initialized - Voice: af_bella", "ok")
-            display_phase("Voice Synthesis", "ok")
+            display_phase("1.0 Voice Synthesis", "ok")
         else:
             BOOT_STATUS['systems'].append({'name': 'Voice TTS (Kokoro)', 'status': 'FAIL'})
             display_log("Kokoro TTS failed to initialize", "fail")
-            display_phase("Voice Synthesis", "fail")
+            display_phase("1.0 Voice Synthesis", "fail")
     else:
         print("[BOOT] TTS skipped (silent mode)")
         display_log("TTS skipped (silent mode)", "warn")
         _tts_engine = None
-        display_phase("Voice Synthesis", "warn")
+        display_phase("1.0 Voice Synthesis", "warn")
 
     # Opening announcement - CORA generates her own intro dynamically
     about_data = {
@@ -512,12 +690,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         "ok"
     )
     speak(response)
-    time.sleep(0.3)
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 2: AI ENGINE (Critical - the brain)
     # ================================================================
-    display_phase("AI Engine", "running")
+    display_phase("2.0 AI Engine", "running")
     display_log("PHASE 2: AI ENGINE", "phase")
     print("\n[PHASE 2] AI Engine Initialization")
     print("=" * 50)
@@ -540,16 +718,16 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             print(f"  [OK] AI Engine online - {ai_model}")
             display_log(f"AI Engine online - Model: {ai_model}", "ok")
             BOOT_STATUS['systems'].append({'name': f'AI Engine ({ai_model})', 'status': 'OK'})
-            display_phase("AI Engine", "ok")
-            # CORA generates her own response
-            response = cora_respond("AI Brain/Ollama", f"My brain is online. Running on {ai_model} and ready to think", "ok")
+            display_phase("2.0 AI Engine", "ok")
+            # CORA announces AI status - just the data
+            response = cora_respond("AI Brain/Ollama", f"AI engine online. Model: {ai_model}", "ok")
             speak(response)
         else:
             print("  [WARN] AI Engine not responding")
             display_log("AI Engine not responding", "warn")
             BOOT_STATUS['systems'].append({'name': 'AI Engine', 'status': 'WARN'})
-            display_phase("AI Engine", "warn")
-            response = cora_respond("AI Brain/Ollama", "My brain isn't responding. Ollama might be down or not running", "warn")
+            display_phase("2.0 AI Engine", "warn")
+            response = cora_respond("AI Brain/Ollama", "AI engine not responding. Ollama may be down.", "warn")
             speak(response)
 
     except Exception as e:
@@ -557,15 +735,80 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"AI Engine error: {e}", "warn")
         BOOT_STATUS['systems'].append({'name': 'AI Engine', 'status': 'WARN'})
         display_phase("AI Engine", "warn")
-        response = cora_respond("AI Brain/Ollama", f"Something went wrong with my brain. Got an error: {e}", "fail")
+        response = cora_respond("AI Brain/Ollama", f"AI engine error: {e}", "fail")
         speak(response)
 
-    time.sleep(0.3)
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 2.1: AI MODELS CHECK
+    # ================================================================
+    display_phase("2.1 AI Models", "running")
+    display_log("PHASE 2.1: AI MODELS CHECK", "phase")
+    print("\n[PHASE 2.1] AI Models Check")
+    print("=" * 50)
+
+    # Required models for CORA
+    REQUIRED_MODELS = {
+        'dolphin-mistral': 'Chat/Response model (CORA\'s personality)',
+        'llava': 'Vision model (see/look commands)',
+        'qwen2.5-coder': 'Coding model (write/fix code)',
+    }
+
+    models_ok = 0
+    models_missing = []
+
+    try:
+        from ai.ollama import list_models
+        installed_models = list_models()
+        installed_names = [m.get('name', '').lower() for m in installed_models]
+
+        print(f"  Found {len(installed_models)} models installed")
+        display_log(f"Found {len(installed_models)} models installed", "info")
+
+        for model_key, model_desc in REQUIRED_MODELS.items():
+            # Check if model is installed (partial match)
+            found = any(model_key.lower() in name for name in installed_names)
+            if found:
+                print(f"  [OK] {model_key} - {model_desc}")
+                display_log(f"{model_key} - OK", "ok")
+                models_ok += 1
+            else:
+                print(f"  [MISSING] {model_key} - {model_desc}")
+                display_log(f"{model_key} - MISSING", "warn")
+                models_missing.append(model_key)
+
+        BOOT_STATUS['models_installed'] = len(installed_models)
+        BOOT_STATUS['models_required'] = len(REQUIRED_MODELS)
+        BOOT_STATUS['models_ok'] = models_ok
+
+        if models_ok == len(REQUIRED_MODELS):
+            display_phase("2.1 AI Models", "ok")
+            BOOT_STATUS['systems'].append({'name': 'AI Models', 'status': 'OK'})
+            response = cora_respond("AI Models check", f"{models_ok} of {len(REQUIRED_MODELS)} models loaded. All good.", "ok")
+        elif models_ok > 0:
+            display_phase("2.1 AI Models", "warn")
+            BOOT_STATUS['systems'].append({'name': 'AI Models', 'status': 'WARN'})
+            missing_str = ", ".join(models_missing)
+            response = cora_respond("AI Models check", f"{models_ok} of {len(REQUIRED_MODELS)} models. Missing: {missing_str}", "warn")
+        else:
+            display_phase("2.1 AI Models", "fail")
+            BOOT_STATUS['systems'].append({'name': 'AI Models', 'status': 'FAIL'})
+            response = cora_respond("AI Models check", "No models found. Need to install them.", "fail")
+        speak(response)
+
+    except Exception as e:
+        print(f"  [WARN] Model check failed: {e}")
+        display_log(f"Model check error: {e}", "warn")
+        BOOT_STATUS['systems'].append({'name': 'AI Models', 'status': 'WARN'})
+        display_phase("2.1 AI Models", "warn")
+
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 3: PC HARDWARE CHECK
     # ================================================================
-    display_phase("Hardware Check", "running")
+    display_phase("3.0 Hardware Check", "running")
     display_log("PHASE 3: HARDWARE CHECK", "phase")
     print("\n[PHASE 3] Hardware Status Check")
     print("=" * 50)
@@ -628,23 +871,127 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log(f"Running Processes: {stats['process_count']}", "info")
 
     BOOT_STATUS['systems'].append({'name': 'Hardware Check', 'status': 'OK'})
-    display_phase("Hardware Check", "ok")
+    display_phase("3.0 Hardware Check", "ok")
 
-    # CORA generates her own hardware summary response - natural speech
-    hw_data = f"CPU is running at {cpu:.0f} percent, memory is at {mem:.0f} percent, and disk usage is {disk:.0f} percent"
+    # Hardware summary - just the stats
+    hw_data = f"CPU {cpu:.0f}%, RAM {mem:.0f}%, Disk {disk:.0f}%"
     if BOOT_STATUS['gpu_available']:
-        hw_data += f". Got a {stats['gpu_name']} running at {stats['gpu']:.0f} percent load with {stats.get('gpu_memory', 0):.0f} percent VRAM used"
+        hw_data += f", GPU {stats['gpu_name']} at {stats['gpu']:.0f}%"
     else:
-        hw_data += ". No GPU detected"
+        hw_data += ", no GPU"
     response = cora_respond("PC Hardware scan", hw_data, "ok")
     speak(response)
 
-    time.sleep(0.3)
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 3.1: LIVE CAMERA FEED TEST
+    # ================================================================
+    display_phase("3.1 Camera Feed", "running")
+    display_log("PHASE 3.1: LIVE CAMERA FEED TEST", "phase")
+    print("\n[PHASE 3.1] Live Camera Feed Test")
+    print("=" * 50)
+
+    try:
+        import cv2
+        from ui.camera_feed import open_live_camera, close_live_camera, capture_from_live_camera
+
+        print("  Testing live camera feed...")
+        display_tool("Live Camera", "Opening camera feed")
+        display_action("Starting live video stream...")
+
+        # Open live camera
+        parent = _boot_display.root if _boot_display else None
+        camera = open_live_camera(parent=parent)
+
+        if camera and camera.is_active():
+            print("  [OK] Live camera feed started")
+            display_result("Live camera feed is active")
+            BOOT_STATUS['tools_tested'].append({'name': 'Live Camera Feed', 'status': 'OK'})
+            BOOT_STATUS['live_camera_available'] = True
+
+            # Let it run for 3 seconds
+            display_action("Showing live feed for 3 seconds...")
+            responsive_sleep(3)
+
+            # Take a test snapshot and analyze
+            display_action("Taking snapshot for AI analysis...")
+            frame_path = capture_from_live_camera()
+
+            if frame_path:
+                print(f"  [OK] Snapshot captured: {frame_path}")
+                display_result("Snapshot captured successfully")
+
+                # Analyze with AI vision
+                try:
+                    from ai.ollama import generate_with_image
+                    display_action("Analyzing camera view with AI vision...")
+
+                    vision_result = generate_with_image(
+                        prompt="What do you see through this camera? Describe the scene briefly.",
+                        image_path=str(frame_path),
+                        model="llava"
+                    )
+
+                    if vision_result and vision_result.content:
+                        import re
+                        camera_desc = vision_result.content.strip()
+                        camera_desc = re.sub(r'\*\*([^*]+)\*\*', r'\1', camera_desc)
+                        camera_desc = re.sub(r'\*([^*]+)\*', r'\1', camera_desc)
+                        camera_desc = re.sub(r'\n+', ' ', camera_desc)
+                        camera_desc = re.sub(r'\s+', ' ', camera_desc).strip()
+
+                        print(f"  CORA sees: {camera_desc[:100]}...")
+                        display_result(f"Vision: {camera_desc[:80]}...")
+                        BOOT_STATUS['camera_description'] = camera_desc
+
+                        # CORA announces camera + what she sees
+                        response = cora_respond("Live Camera", f"Camera online. I see: {camera_desc[:80]}", "ok")
+                        speak(response)
+                    else:
+                        response = cora_respond("Live Camera", "Camera online but vision analysis failed.", "warn")
+                        speak(response)
+                except Exception as e:
+                    print(f"  [INFO] Vision analysis skipped: {e}")
+                    response = cora_respond("Live Camera", "Camera online. Vision skipped.", "ok")
+                    speak(response)
+            else:
+                response = cora_respond("Live Camera", "Camera online.", "ok")
+                speak(response)
+
+            # Close camera after test
+            display_action("Closing test camera feed...")
+            close_live_camera()
+            print("  [OK] Camera feed closed")
+
+            display_phase("3.1 Camera Feed", "ok")
+        else:
+            print("  [WARN] Live camera not available")
+            display_log("Live camera not available", "warn")
+            BOOT_STATUS['tools_tested'].append({'name': 'Live Camera Feed', 'status': 'WARN'})
+            BOOT_STATUS['live_camera_available'] = False
+            display_phase("3.1 Camera Feed", "warn")
+
+            response = cora_respond("Live Camera", "Camera not available.", "warn")
+            speak(response)
+
+    except ImportError as e:
+        print(f"  [WARN] Camera dependencies missing: {e}")
+        display_log(f"Camera dependencies: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Live Camera Feed', 'status': 'WARN'})
+        display_phase("3.1 Camera Feed", "warn")
+    except Exception as e:
+        print(f"  [WARN] Live camera test: {e}")
+        display_log(f"Live camera error: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Live Camera Feed', 'status': 'WARN'})
+        display_phase("3.1 Camera Feed", "warn")
+
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 4: CORE TOOLS TEST
     # ================================================================
-    display_phase("Core Tools", "running")
+    display_phase("4.0 Core Tools", "running")
     display_log("PHASE 4: CORE TOOLS TEST", "phase")
     print("\n[PHASE 4] Core Tools Test")
     print("=" * 50)
@@ -775,23 +1122,580 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Code Analysis: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Code Analysis', 'status': 'WARN'})
 
-    display_phase("Core Tools", "ok")
-    # CORA generates her own response about tools - natural speech
-    if tools_ok == tools_total:
-        tools_result = f"All {tools_total} tools loaded and ready to go"
-    elif tools_ok >= tools_total - 2:
-        tools_result = f"Got {tools_ok} out of {tools_total} tools working. Close enough"
-    else:
-        tools_result = f"Only {tools_ok} out of {tools_total} tools loaded. Some shit is broken"
+    # Media Control
+    tools_total += 1
+    try:
+        from tools.media import MediaController
+        print("  [OK] Media Control")
+        display_log("Media Control loaded", "ok")
+        BOOT_STATUS['tools_tested'].append({'name': 'Media Control', 'status': 'OK'})
+        tools_ok += 1
+    except Exception as e:
+        print(f"  [WARN] Media Control: {e}")
+        display_log(f"Media Control: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Media Control', 'status': 'WARN'})
+
+    display_phase("4.0 Core Tools", "ok")
+    # Tools summary - just the numbers
+    tools_result = f"{tools_ok} of {tools_total} tools loaded."
     tools_status = "ok" if tools_ok >= tools_total - 2 else ("warn" if tools_ok >= tools_total // 2 else "fail")
     response = cora_respond("Core Tools check", tools_result, tools_status)
     speak(response)
-    time.sleep(0.3)
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 4.1: CODE IMPORT TEST - Fetch real code from GitHub
+    # ================================================================
+    display_phase("4.1 Code Import", "running")
+    display_log("PHASE 4.1: CODE IMPORT FROM GITHUB", "phase")
+    print("\n[PHASE 4.1] Code Import from GitHub")
+    print("=" * 50)
+
+    try:
+        import random
+        import urllib.request
+        import json
+        import base64
+        import os
+
+        # Try to use GitHub token from .env to fetch from user's repos
+        github_token = os.environ.get('GITHUB_TOKEN', '')
+        fetched_from_user_repo = False
+        url = None
+        code_name = None
+        lang = "python"
+        repo_name = None
+
+        if github_token:
+            try:
+                # Get user's repos via GitHub API
+                api_url = "https://api.github.com/user/repos?per_page=100&sort=updated"
+                req = urllib.request.Request(api_url, headers={
+                    'Authorization': f'token {github_token}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'CORA-Bot/1.0'
+                })
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    repos = json.loads(response.read().decode('utf-8'))
+
+                # Filter for repos with Python code
+                python_repos = [r for r in repos if r.get('language') == 'Python' and not r.get('fork')]
+                if python_repos:
+                    # Pick a random repo
+                    chosen_repo = random.choice(python_repos)
+                    repo_name = chosen_repo['full_name']
+                    print(f"  Using your repo: {repo_name}")
+
+                    # Get contents of repo root
+                    contents_url = f"https://api.github.com/repos/{repo_name}/contents"
+                    req = urllib.request.Request(contents_url, headers={
+                        'Authorization': f'token {github_token}',
+                        'Accept': 'application/vnd.github.v3+json',
+                        'User-Agent': 'CORA-Bot/1.0'
+                    })
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        contents = json.loads(response.read().decode('utf-8'))
+
+                    # Find Python files (check root and common dirs)
+                    py_files = [f for f in contents if f['name'].endswith('.py') and f['type'] == 'file' and f['size'] < 50000]
+
+                    # Also check src/, tools/, utils/ directories if they exist
+                    for subdir in ['src', 'tools', 'utils', 'lib']:
+                        subdir_entry = next((f for f in contents if f['name'] == subdir and f['type'] == 'dir'), None)
+                        if subdir_entry:
+                            try:
+                                req = urllib.request.Request(subdir_entry['url'], headers={
+                                    'Authorization': f'token {github_token}',
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'User-Agent': 'CORA-Bot/1.0'
+                                })
+                                with urllib.request.urlopen(req, timeout=5) as response:
+                                    subdir_contents = json.loads(response.read().decode('utf-8'))
+                                    py_files.extend([f for f in subdir_contents if f['name'].endswith('.py') and f['type'] == 'file' and f['size'] < 50000])
+                            except:
+                                pass
+
+                    if py_files:
+                        # Pick a random Python file
+                        chosen_file = random.choice(py_files)
+                        url = chosen_file['download_url']
+                        code_name = f"{chosen_file['name']} (from {repo_name.split('/')[-1]})"
+                        fetched_from_user_repo = True
+                        print(f"  Selected: {chosen_file['name']}")
+
+            except Exception as e:
+                print(f"  [INFO] GitHub API access failed: {e}, falling back to public repos")
+
+        # Fallback to public repos if no user repo available
+        if not url:
+            # Use GitHub API to find public Python repos dynamically
+            fallback_repos = ["TheAlgorithms/Python", "geekcomputers/Python", "realpython/python-basics-exercises"]
+            fallback_dirs = ["maths", "strings", "conversions", "searches", "sorts", "src", ""]
+
+            for fallback_repo in fallback_repos:
+                if url:
+                    break
+                try:
+                    # Get repo contents
+                    for check_dir in fallback_dirs:
+                        if url:
+                            break
+                        try:
+                            api_path = f"/repos/{fallback_repo}/contents/{check_dir}" if check_dir else f"/repos/{fallback_repo}/contents"
+                            api_url = f"https://api.github.com{api_path}"
+                            headers = {'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'CORA-Bot/1.0'}
+                            if github_token:
+                                headers['Authorization'] = f'token {github_token}'
+                            req = urllib.request.Request(api_url, headers=headers)
+                            with urllib.request.urlopen(req, timeout=8) as response:
+                                contents = json.loads(response.read().decode('utf-8'))
+
+                            # Find Python files under 30KB
+                            py_files = [f for f in contents if isinstance(f, dict) and f.get('name', '').endswith('.py') and f.get('type') == 'file' and f.get('size', 0) < 30000]
+                            if py_files:
+                                chosen = random.choice(py_files)
+                                url = chosen.get('download_url')
+                                code_name = f"{chosen['name']} (from {fallback_repo.split('/')[-1]})"
+                                print(f"  Found: {chosen['name']} in {fallback_repo}")
+                        except:
+                            continue
+                except:
+                    continue
+
+            # Ultimate fallback - just try to get any Python file from the CORA project itself
+            if not url:
+                try:
+                    # Use local file as last resort
+                    local_files = list(Path(__file__).parent.glob("*.py"))
+                    if local_files:
+                        chosen_local = random.choice(local_files)
+                        with open(chosen_local, 'r', encoding='utf-8') as f:
+                            fetched_code = f.read()
+                        code_name = f"{chosen_local.name} (local CORA)"
+                        url = "local"
+                        print(f"  Using local file: {chosen_local.name}")
+                except:
+                    pass
+
+        print(f"  Fetching: {code_name}")
+        display_tool("Code Import", f"GitHub - {code_name}")
+        display_action(f"Importing code from GitHub...")
+
+        # Show code modal popup
+        code_window = None
+        code_text = None
+        try:
+            import tkinter as tk
+
+            parent = _boot_display.root if _boot_display else None
+            code_window = create_code_window(
+                title=f"CORA - Code Import: {code_name}",
+                width=900, height=600,
+                parent=parent
+            )
+
+            # Header
+            header = tk.Label(
+                code_window,
+                text=f"Importing: {code_name}",
+                font=('Consolas', 12, 'bold'),
+                fg='#00ff88',
+                bg='#1e1e1e',
+                pady=10
+            )
+            header.pack(fill='x')
+
+            # Source URL
+            source_text = "Source: Local CORA file" if url == "local" else f"Source: GitHub API"
+            url_label = tk.Label(
+                code_window,
+                text=source_text,
+                font=('Consolas', 9),
+                fg='#888888',
+                bg='#1e1e1e'
+            )
+            url_label.pack(fill='x', padx=10)
+
+            # Code display area with scrollbar
+            code_frame = tk.Frame(code_window, bg='#1e1e1e')
+            code_frame.pack(fill='both', expand=True, padx=10, pady=5)
+
+            scrollbar = tk.Scrollbar(code_frame)
+            scrollbar.pack(side='right', fill='y')
+
+            code_text = tk.Text(
+                code_frame,
+                font=('Consolas', 10),
+                fg='#d4d4d4',
+                bg='#1e1e2e',
+                insertbackground='white',
+                padx=10,
+                pady=10,
+                wrap='none',
+                yscrollcommand=scrollbar.set
+            )
+            code_text.pack(fill='both', expand=True, side='left')
+            scrollbar.config(command=code_text.yview)
+
+            code_text.insert('1.0', f"Fetching code...\n\nSource: {'Local' if url == 'local' else 'GitHub API'}\n\nPlease wait...")
+            code_text.config(state='disabled')
+            code_window.update()
+
+        except Exception as e:
+            print(f"  [INFO] Code modal creation failed: {e}")
+            code_window = None
+
+        # Fetch the actual code (skip if already loaded from local)
+        try:
+            if url != "local":
+                req = urllib.request.Request(url, headers={'User-Agent': 'CORA-Bot/1.0'})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    fetched_code = response.read().decode('utf-8')
+
+            # Limit to first 100 lines for display
+            code_lines = fetched_code.split('\n')
+            display_code = '\n'.join(code_lines[:100])
+            if len(code_lines) > 100:
+                display_code += f"\n\n... [{len(code_lines) - 100} more lines] ..."
+
+            print(f"  [OK] Fetched {len(code_lines)} lines of {lang} code")
+            display_result(f"Imported {len(code_lines)} lines from GitHub")
+            BOOT_STATUS['tools_tested'].append({'name': 'Code Import', 'status': 'OK'})
+
+            # Update modal with actual code
+            if code_window and code_text:
+                try:
+                    source_info = "Local CORA project" if url == "local" else "GitHub API"
+                    code_text.config(state='normal')
+                    code_text.delete('1.0', 'end')
+                    code_text.insert('1.0', f"# {code_name}\n# Source: {source_info}\n# Lines: {len(code_lines)}\n\n{display_code}")
+                    code_text.config(state='disabled')
+                    code_window.update()
+                except:
+                    pass
+
+            # CORA announces code import - just the data
+            if fetched_from_user_repo:
+                response = cora_respond("Code Import", f"Pulled {len(code_lines)} lines from your GitHub.", "ok")
+            else:
+                response = cora_respond("Code Import", f"Pulled {len(code_lines)} lines of {code_name} from GitHub.", "ok")
+            speak(response)
+
+            display_phase("4.1 Code Import", "ok")
+
+        except Exception as fetch_error:
+            print(f"  [WARN] GitHub fetch failed: {fetch_error}")
+            display_log(f"GitHub fetch failed: {fetch_error}", "warn")
+            BOOT_STATUS['tools_tested'].append({'name': 'Code Import', 'status': 'WARN'})
+            display_phase("4.1 Code Import", "warn")
+
+            response = cora_respond("Code Import", "GitHub unreachable.", "warn")
+            speak(response)
+
+        # Close code window after speaking
+        if code_window:
+            try:
+                code_window.destroy()
+            except:
+                pass
+
+    except Exception as e:
+        print(f"  [WARN] Code import test: {e}")
+        display_log(f"Code import error: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Code Import', 'status': 'WARN'})
+        display_phase("4.1 Code Import", "warn")
+
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 4.2: YOUTUBE VIDEO TEST - Search and play a wild video
+    # ================================================================
+    display_phase("4.2 YouTube Test", "running")
+    display_log("PHASE 4.2: YOUTUBE VIDEO TEST", "phase")
+    print("\n[PHASE 4.2] YouTube Video Test")
+    print("=" * 50)
+
+    try:
+        import random
+        import subprocess
+        import threading
+
+        # Wild and crazy search terms for random videos
+        wild_searches = [
+            "most insane parkour fails",
+            "crazy car stunts compilation",
+            "extreme sports fails 2024",
+            "funny cat videos compilation",
+            "satisfying domino chain reaction",
+            "best magic tricks revealed",
+            "insane drone racing",
+            "extreme skateboard tricks",
+            "world record attempts gone wrong",
+            "crazy science experiments",
+            "best beatbox battles",
+            "amazing street performers",
+        ]
+
+        search_term = random.choice(wild_searches)
+        print(f"  Searching YouTube: {search_term}")
+        display_tool("YouTube", f"Searching: {search_term}")
+        display_action(f"Finding a wild video...")
+
+        # Show video info modal
+        video_window = None
+        status_text = None
+        try:
+            import tkinter as tk
+
+            parent = _boot_display.root if _boot_display else None
+            video_window = create_popup(
+                title="CORA - YouTube Video Test",
+                width=700, height=450,
+                bg='#1a1a2e',
+                parent=parent
+            )
+
+            # Header
+            header = tk.Label(
+                video_window,
+                text=f"🎬 YouTube: {search_term}",
+                font=('Segoe UI', 14, 'bold'),
+                fg='#ff0000',
+                bg='#1a1a2e',
+                pady=15
+            )
+            header.pack(fill='x')
+
+            # Video info display
+            status_text = tk.Text(
+                video_window,
+                font=('Consolas', 11),
+                fg='#ffffff',
+                bg='#16213e',
+                height=15,
+                padx=15,
+                pady=15,
+                wrap='word'
+            )
+            status_text.pack(fill='both', expand=True, padx=15, pady=10)
+            status_text.insert('1.0', f"🔍 Searching YouTube for:\n   \"{search_term}\"\n\nPlease wait...")
+            status_text.config(state='disabled')
+            video_window.update()
+
+        except Exception as e:
+            print(f"  [INFO] Video modal creation failed: {e}")
+            video_window = None
+
+        # Try to find and play video using yt-dlp
+        video_title = None
+        video_url = None
+        played_ok = False
+
+        try:
+            # Use yt-dlp to search and get video info
+            search_cmd = ['yt-dlp', '--get-title', '--get-id', '-f', 'best', f'ytsearch1:{search_term}']
+            result = subprocess.run(search_cmd, capture_output=True, text=True, timeout=15)
+
+            if result.returncode == 0 and result.stdout.strip():
+                lines = result.stdout.strip().split('\n')
+                if len(lines) >= 2:
+                    video_title = lines[0]
+                    video_id = lines[1]
+                    video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+                    print(f"  [OK] Found: {video_title[:50]}...")
+                    display_result(f"Found: {video_title[:40]}...")
+
+                    # Update modal with video info
+                    if video_window and status_text:
+                        try:
+                            status_text.config(state='normal')
+                            status_text.delete('1.0', 'end')
+                            status_text.insert('1.0', f"🎬 FOUND VIDEO:\n\n")
+                            status_text.insert('end', f"Title: {video_title}\n\n")
+                            status_text.insert('end', f"URL: {video_url}\n\n")
+                            status_text.insert('end', f"Search: {search_term}\n\n")
+                            status_text.insert('end', "▶ Playing with mpv in background...\n")
+                            status_text.config(state='disabled')
+                            video_window.update()
+                        except:
+                            pass
+
+                    # Play the video using mpv WITH video in a window (10 seconds)
+                    def play_video():
+                        try:
+                            # Play 10 seconds WITH video in mpv window
+                            subprocess.run(
+                                ['mpv',
+                                 '--length=10',           # Play 10 seconds
+                                 '--geometry=640x360',    # Small window
+                                 '--title=CORA YouTube Test',
+                                 '--ontop',               # Keep on top during test
+                                 '--no-terminal',
+                                 video_url],
+                                capture_output=True, timeout=20
+                            )
+                        except:
+                            pass
+
+                    play_thread = threading.Thread(target=play_video, daemon=True)
+                    play_thread.start()
+                    played_ok = True
+
+                    # Give mpv a moment to start
+                    responsive_sleep(1)
+
+        except subprocess.TimeoutExpired:
+            print("  [WARN] yt-dlp search timed out")
+        except FileNotFoundError:
+            print("  [WARN] yt-dlp not installed")
+        except Exception as e:
+            print(f"  [WARN] Video search error: {e}")
+
+        if played_ok:
+            BOOT_STATUS['tools_tested'].append({'name': 'YouTube Playback', 'status': 'OK'})
+            display_phase("4.2 YouTube Test", "ok")
+
+            # CORA announces YouTube - just the result
+            response = cora_respond("YouTube Test", f"Found: {video_title[:40] if video_title else 'video'}. Playing sample.", "ok")
+            speak(response)
+        else:
+            # Update modal with fallback info
+            if video_window and status_text:
+                try:
+                    status_text.config(state='normal')
+                    status_text.delete('1.0', 'end')
+                    status_text.insert('1.0', f"⚠ YouTube Search: {search_term}\n\n")
+                    status_text.insert('end', "Could not play video directly.\n")
+                    status_text.insert('end', "yt-dlp or mpv might not be installed.\n\n")
+                    status_text.insert('end', "YouTube features available:\n")
+                    status_text.insert('end', "  • 'play <search>' - Search and play\n")
+                    status_text.insert('end', "  • 'play <youtube url>' - Direct URL\n")
+                    status_text.config(state='disabled')
+                    video_window.update()
+                except:
+                    pass
+
+            BOOT_STATUS['tools_tested'].append({'name': 'YouTube Playback', 'status': 'WARN'})
+            display_phase("4.2 YouTube Test", "warn")
+
+            response = cora_respond("YouTube Test", "YouTube search works. Playback needs yt-dlp and mpv.", "warn")
+            speak(response)
+
+        # Close video window after speaking
+        if video_window:
+            try:
+                video_window.destroy()
+            except:
+                pass
+
+    except Exception as e:
+        print(f"  [WARN] YouTube test: {e}")
+        display_log(f"YouTube test error: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'YouTube Test', 'status': 'WARN'})
+        display_phase("4.2 YouTube Test", "warn")
+
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 4.3: MODAL WINDOWS TEST
+    # ================================================================
+    display_phase("4.3 Modal Windows", "running")
+    display_log("PHASE 4.3: MODAL WINDOWS TEST", "phase")
+    print("\n[PHASE 4.3] Modal Windows Test")
+    print("=" * 50)
+
+    try:
+        import tkinter as tk
+        import random
+
+        # Random modal content for variety
+        modal_quotes = [
+            "The only way to do great work is to love what you do. - Steve Jobs",
+            "Innovation distinguishes between a leader and a follower. - Steve Jobs",
+            "Stay hungry, stay foolish. - Steve Jobs",
+            "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+            "It does not matter how slowly you go as long as you do not stop. - Confucius",
+            "The best way to predict the future is to invent it. - Alan Kay",
+            "Code is like humor. When you have to explain it, it's bad. - Cory House",
+            "First, solve the problem. Then, write the code. - John Johnson",
+        ]
+
+        quote = random.choice(modal_quotes)
+
+        # Test message modal
+        print("  Testing message modal...")
+        display_action("Opening test message modal...")
+
+        # Use window manager for proper z-layering
+        parent = _boot_display.root if _boot_display else None
+        msg_window = create_popup(
+            title="CORA - Modal Test",
+            width=500, height=300,
+            bg='#2d2d2d',
+            parent=parent
+        )
+
+        # Content
+        title_label = tk.Label(
+            msg_window,
+            text="Modal Window Test",
+            font=('Segoe UI', 14, 'bold'),
+            fg='#00ff88',
+            bg='#2d2d2d',
+            pady=15
+        )
+        title_label.pack(fill='x')
+
+        quote_label = tk.Label(
+            msg_window,
+            text=quote,
+            font=('Segoe UI', 11),
+            fg='#ffffff',
+            bg='#2d2d2d',
+            wraplength=450,
+            pady=20
+        )
+        quote_label.pack(fill='x', padx=20)
+
+        status_label = tk.Label(
+            msg_window,
+            text="Modal Types Available:\n- Message popups\n- Code viewer with syntax highlighting\n- Image viewer\n- Terminal output\n- File viewer",
+            font=('Consolas', 10),
+            fg='#888888',
+            bg='#2d2d2d',
+            justify='left'
+        )
+        status_label.pack(fill='x', padx=20, pady=10)
+
+        msg_window.update()
+
+        print("  [OK] Message modal displayed")
+        display_result("Modal windows working correctly")
+        BOOT_STATUS['tools_tested'].append({'name': 'Modal Windows', 'status': 'OK'})
+        display_phase("4.3 Modal Windows", "ok")
+
+        response = cora_respond("Modal Windows", "Modal windows working.", "ok")
+        speak(response)
+
+        # Close modal after speaking
+        try:
+            msg_window.destroy()
+        except:
+            pass
+
+    except Exception as e:
+        print(f"  [WARN] Modal windows test: {e}")
+        display_log(f"Modal windows error: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Modal Windows', 'status': 'WARN'})
+        display_phase("4.3 Modal Windows", "warn")
+
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 5: VOICE SYSTEMS
     # ================================================================
-    display_phase("Voice Systems", "running")
+    display_phase("5.0 Voice Systems", "running")
     display_log("PHASE 5: VOICE SYSTEMS", "phase")
     print("\n[PHASE 5] Voice Systems")
     print("=" * 50)
@@ -829,17 +1733,17 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Wake Word: {e}", "info")
         BOOT_STATUS['systems'].append({'name': 'Wake Word', 'status': 'INFO'})
 
-    display_phase("Voice Systems", "ok")
-    # CORA generates her own response about voice systems - natural speech
-    voice_result = "Voice systems are up. I can hear you, filter out my own echo, and respond to my wake word"
+    display_phase("5.0 Voice Systems", "ok")
+    # Voice summary - just status
+    voice_result = "Voice systems online. Wake word active."
     response = cora_respond("Voice Systems check", voice_result, "ok")
     speak(response)
-    time.sleep(0.3)
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 6: EXTERNAL SERVICES
     # ================================================================
-    display_phase("External Services", "running")
+    display_phase("6.0 External APIs", "running")
     display_log("PHASE 6: EXTERNAL SERVICES", "phase")
     print("\n[PHASE 6] External Services")
     print("=" * 50)
@@ -865,8 +1769,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 display_result(f"We're in {location_str}")
                 BOOT_STATUS['location'] = loc
                 BOOT_STATUS['systems'].append({'name': 'Location', 'status': 'OK'})
-                # CORA announces location in her own words
-                response = cora_respond("Location check", f"We're currently in {location_str}", "ok")
+                # CORA announces location
+                response = cora_respond("Location check", f"Location: {location_str}", "ok")
                 speak(response)
             else:
                 print("  [WARN] Location data incomplete")
@@ -952,7 +1856,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Hotkeys: {e}", "warn")
         BOOT_STATUS['systems'].append({'name': 'Hotkeys', 'status': 'WARN'})
 
-    display_phase("External Services", "ok")
+    display_phase("6.0 External APIs", "ok")
 
     # Helper to convert temp like "61F" to "61 degrees fahrenheit"
     def speak_temp(temp_str):
@@ -995,14 +1899,119 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     else:
         weather_report += "Weather unavailable."
 
-    response = cora_respond("Location and Weather", weather_report, "ok" if weather_data else "warn")
+    response = cora_respond("Location and Weather", weather_report, "ok" if weather_data else "warn", mode="full")
     speak(response)
-    time.sleep(0.3)
+    responsive_sleep(0.3)
+
+    # ================================================================
+    # PHASE 6.1: YOUTUBE/AUDIO PLAYBACK TEST
+    # ================================================================
+    display_phase("6.1 Audio Test", "running")
+    display_log("PHASE 6.1: AUDIO PLAYBACK TEST", "phase")
+    print("\n[PHASE 6.1] Audio Playback Test")
+    print("=" * 50)
+
+    try:
+        import subprocess
+        import random
+
+        # Random audio test options
+        audio_tests = [
+            {"query": "lofi hip hop beats", "name": "Lofi Hip Hop"},
+            {"query": "synthwave music", "name": "Synthwave"},
+            {"query": "ambient space music", "name": "Ambient Space"},
+            {"query": "jazz piano relaxing", "name": "Jazz Piano"},
+            {"query": "classical piano beautiful", "name": "Classical Piano"},
+            {"query": "cyberpunk music mix", "name": "Cyberpunk Mix"},
+        ]
+
+        test = random.choice(audio_tests)
+        test_name = test['name']
+        test_query = test['query']
+
+        print(f"  Testing audio playback: {test_name}")
+        display_tool("Audio Playback", f"Testing: {test_name}")
+        display_action(f"Searching YouTube for: {test_query}")
+
+        # Use yt-dlp to search and get video URL, then play with mpv
+        video_url = None
+        mpv_process = None
+
+        try:
+            # Search with yt-dlp
+            result = subprocess.run(
+                ['yt-dlp', '--get-url', '--format', 'bestaudio', f'ytsearch1:{test_query}'],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                video_url = result.stdout.strip().split('\n')[0]
+                print(f"  Found audio stream URL")
+        except FileNotFoundError:
+            print(f"  [WARN] yt-dlp not installed")
+            display_log("yt-dlp not installed - skipping audio test", "warn")
+        except Exception as e:
+            print(f"  [WARN] yt-dlp search failed: {e}")
+
+        if video_url:
+            try:
+                # Play audio with mpv (no video, 8 second limit)
+                print(f"  Playing with mpv...")
+                display_result(f"Playing: {test_name}")
+
+                mpv_process = subprocess.Popen(
+                    ['mpv', '--no-video', '--length=8', '--really-quiet', '--no-terminal', video_url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+                BOOT_STATUS['tools_tested'].append({'name': 'Audio Playback', 'status': 'OK'})
+                BOOT_STATUS['audio_test'] = test_name
+
+                # Let it play for a bit, then speak while it's playing
+                responsive_sleep(2)
+
+                response = cora_respond("Audio Playback", f"Audio working. Playing {test_name}.", "ok")
+                speak(response)
+
+                # Wait for mpv to finish (max 8 sec total)
+                try:
+                    mpv_process.wait(timeout=6)
+                except subprocess.TimeoutExpired:
+                    mpv_process.terminate()
+
+                display_phase("6.1 Audio Test", "ok")
+
+            except FileNotFoundError:
+                print(f"  [WARN] mpv not installed")
+                display_log("mpv not installed - skipping audio test", "warn")
+                BOOT_STATUS['tools_tested'].append({'name': 'Audio Playback', 'status': 'WARN'})
+                display_phase("6.1 Audio Test", "warn")
+            except Exception as e:
+                print(f"  [WARN] mpv playback failed: {e}")
+                display_log(f"mpv playback failed: {e}", "warn")
+                BOOT_STATUS['tools_tested'].append({'name': 'Audio Playback', 'status': 'WARN'})
+                display_phase("6.1 Audio Test", "warn")
+        else:
+            print(f"  [WARN] Could not find audio to play")
+            display_log("Could not find audio stream", "warn")
+            BOOT_STATUS['tools_tested'].append({'name': 'Audio Playback', 'status': 'WARN'})
+            display_phase("6.1 Audio Test", "warn")
+
+            response = cora_respond("Audio Playback", "Audio skipped. Need yt-dlp and mpv.", "warn")
+            speak(response)
+
+    except Exception as e:
+        print(f"  [WARN] Audio playback test: {e}")
+        display_log(f"Audio playback error: {e}", "warn")
+        BOOT_STATUS['tools_tested'].append({'name': 'Audio Playback', 'status': 'WARN'})
+        display_phase("6.1 Audio Test", "warn")
+
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 7: NEWS HEADLINES
     # ================================================================
-    display_phase("News Headlines", "running")
+    display_phase("7.0 News Headlines", "running")
     display_log("PHASE 7: NEWS HEADLINES", "phase")
     print("\n[PHASE 7] News Headlines")
     print("=" * 50)
@@ -1045,7 +2054,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
             # Announce top 3-4 headlines
             if headlines:
-                display_phase("News Headlines", "ok")
+                display_phase("7.0 News Headlines", "ok")
                 # Clean headlines for speech
                 clean_headlines = []
                 for hl in headlines[:4]:
@@ -1054,36 +2063,36 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                         clean = clean[:97] + "..."
                     clean_headlines.append(clean)
 
-                # Let CORA announce the news in her own style
-                news_data = "Here are today's top headlines: " + ". ".join(clean_headlines)
-                response = cora_respond("News Headlines", news_data, "ok")
+                # News - full mode for longer content
+                news_data = "Top headlines: " + ". ".join(clean_headlines)
+                response = cora_respond("News Headlines", news_data, "ok", mode="full")
                 speak(response)
             else:
-                display_phase("News Headlines", "warn")
-                response = cora_respond("News Headlines", "Couldn't get any news headlines. The feed came back empty", "warn")
+                display_phase("7.0 News Headlines", "warn")
+                response = cora_respond("News Headlines", "No headlines found.", "warn")
                 speak(response)
         else:
             print("  [WARN] News fetch failed")
             display_log(f"News fetch failed (HTTP {resp.status_code})", "warn")
             BOOT_STATUS['tools_tested'].append({'name': 'News Headlines', 'status': 'WARN'})
-            display_phase("News Headlines", "warn")
-            response = cora_respond("News Headlines", f"News fetch failed with a {resp.status_code} error", "fail")
+            display_phase("7.0 News Headlines", "warn")
+            response = cora_respond("News Headlines", f"News failed. HTTP {resp.status_code}.", "fail")
             speak(response)
 
     except Exception as e:
         print(f"  [WARN] News fetch: {e}")
         display_log(f"News fetch error: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Web Search', 'status': 'WARN'})
-        display_phase("News Headlines", "warn")
-        response = cora_respond("News Headlines", f"Something went wrong fetching the news", "fail")
+        display_phase("7.0 News Headlines", "warn")
+        response = cora_respond("News Headlines", "News fetch error.", "fail")
         speak(response)
 
-    time.sleep(0.3)
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 8: VISION TEST (Screenshot + Camera)
     # ================================================================
-    display_phase("Vision Test", "running")
+    display_phase("8.0 Vision Test", "running")
     display_log("PHASE 8: VISION TEST", "phase")
     print("\n[PHASE 8] Vision System Test")
     print("=" * 50)
@@ -1103,6 +2112,33 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             display_action(f"Saved to: {result.path}")
             BOOT_STATUS['tools_tested'].append({'name': 'Screenshot Capture', 'status': 'OK'})
             BOOT_STATUS['screenshot_path'] = result.path
+
+            # Show screenshot popup (5 seconds like image gen)
+            try:
+                import tkinter as tk
+                from PIL import Image, ImageTk
+
+                # Use window manager for proper z-layering
+                parent = _boot_display.root if _boot_display else None
+                ss_window = create_image_window(
+                    title="CORA - Screenshot Capture",
+                    width=1280, height=720,
+                    parent=parent
+                )
+
+                # Load and display screenshot
+                img = Image.open(result.path)
+                img = img.resize((1280, 720), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img, master=ss_window)
+
+                label = tk.Label(ss_window, image=photo, bg='black')
+                label.image = photo
+                label.pack(fill='both', expand=True)
+                ss_window.update()
+                display_action("Showing screenshot for 5 seconds...")
+            except Exception as e:
+                print(f"  [INFO] Screenshot popup failed: {e}")
+                ss_window = None
 
             # Use AI vision to describe what CORA sees on screen
             screen_description = None
@@ -1132,8 +2168,15 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             if screen_description:
                 speak(screen_description)
             else:
-                response = cora_respond("Screenshot capture", f"Screenshot captured at {result.width} by {result.height} pixels but I couldn't analyze it", "warn")
+                response = cora_respond("Screenshot capture", f"Screenshot {result.width}x{result.height}. Vision failed.", "warn")
                 speak(response)
+
+            # Close screenshot popup after speaking
+            if ss_window:
+                try:
+                    ss_window.destroy()
+                except:
+                    pass
         else:
             print(f"  [WARN] Screenshot failed: {result.error}")
             display_log(f"Screenshot failed: {result.error}", "warn")
@@ -1170,6 +2213,34 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 display_result("Camera frame saved successfully")
                 BOOT_STATUS['camera_path'] = str(cam_path)
 
+                # Show camera popup (like screenshot and image gen)
+                cam_window = None
+                try:
+                    import tkinter as tk
+                    from PIL import Image, ImageTk
+
+                    # Use window manager for proper z-layering
+                    parent = _boot_display.root if _boot_display else None
+                    cam_window = create_image_window(
+                        title="CORA - Camera View",
+                        width=1280, height=720,
+                        parent=parent
+                    )
+
+                    # Load and display camera image
+                    img = Image.open(cam_path)
+                    img = img.resize((1280, 720), Image.Resampling.LANCZOS)
+                    photo = ImageTk.PhotoImage(img, master=cam_window)
+
+                    label = tk.Label(cam_window, image=photo, bg='black')
+                    label.image = photo
+                    label.pack(fill='both', expand=True)
+                    cam_window.update()
+                    display_action("Showing camera view for 5 seconds...")
+                except Exception as e:
+                    print(f"  [INFO] Camera popup failed: {e}")
+                    cam_window = None
+
                 # Use AI vision to describe what CORA sees through camera
                 camera_description = None
                 try:
@@ -1198,8 +2269,15 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 if camera_description:
                     speak(camera_description)
                 else:
-                    response = cora_respond("Camera system", f"Camera is working but I couldn't analyze the image", "warn")
+                    response = cora_respond("Camera system", "Camera working. Vision failed.", "warn")
                     speak(response)
+
+                # Close camera popup after speaking
+                if cam_window:
+                    try:
+                        cam_window.destroy()
+                    except:
+                        pass
             else:
                 print("  [WARN] Camera opened but no frame")
                 display_log("Camera opened but no frame captured", "warn")
@@ -1220,26 +2298,26 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Camera error: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'WARN'})
 
-    display_phase("Vision Test", "ok")
+    display_phase("8.0 Vision Test", "ok")
     # CORA generates her own overall vision response - natural speech
     screenshot_ok = any(t['name'] == 'Screenshot Capture' and t['status'] == 'OK' for t in BOOT_STATUS['tools_tested'])
     camera_ok = BOOT_STATUS.get('camera_available', False)
     if screenshot_ok and camera_ok:
-        vision_result = "Vision systems are fully online. I can see your screen and your camera is working"
+        vision_result = "Screenshot and camera both online."
     elif screenshot_ok:
-        vision_result = "I can capture your screen but no camera detected"
+        vision_result = "Screenshot working, no camera."
     elif camera_ok:
-        vision_result = "Camera is working but screenshot capture failed"
+        vision_result = "Camera working, screenshot failed."
     else:
-        vision_result = "Vision systems aren't working properly"
+        vision_result = "Vision systems failed."
     response = cora_respond("Vision Systems summary", vision_result, "ok")
     speak(response)
-    time.sleep(0.3)
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 9: IMAGE GENERATION TEST
     # ================================================================
-    display_phase("Image Generation", "running")
+    display_phase("9.0 Image Gen", "running")
     display_log("PHASE 9: IMAGE GENERATION", "phase")
     print("\n[PHASE 9] Image Generation Test")
     print("=" * 50)
@@ -1311,34 +2389,22 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             display_action(f"Saving to: {img_path}")
             BOOT_STATUS['boot_image'] = img_path
 
-            # Display the image
-            # CORA generates her own response about successful generation - natural speech
-            response = cora_respond("Image Generation complete", f"Done. That took {gen_time:.1f} seconds. Let me show you what I made", "ok")
-            speak(response)
-            print("  Displaying image (click or wait 8 seconds to close)...")
+            print("  Displaying image...")
             display_action("Opening image display window...")
 
-            # Show image in a window - use Toplevel if boot display exists
+            # Show image in a window
+            img_window = None
             try:
                 import tkinter as tk
                 from PIL import Image, ImageTk
 
-                # Use Toplevel if we have an existing root (boot display)
-                if _boot_display and _boot_display.root:
-                    img_window = tk.Toplevel(_boot_display.root)
-                else:
-                    img_window = tk.Tk()
-
-                img_window.title("CORA - Image Generation Test")
-                img_window.attributes('-topmost', True)
-                img_window.configure(bg='black')
-
-                # Center window
-                screen_w = img_window.winfo_screenwidth()
-                screen_h = img_window.winfo_screenheight()
-                x = (screen_w - 1280) // 2
-                y = (screen_h - 720) // 2
-                img_window.geometry(f"1280x720+{x}+{y}")
+                # Use window manager for proper z-layering
+                parent = _boot_display.root if _boot_display else None
+                img_window = create_image_window(
+                    title="CORA - Image Generation Test",
+                    width=1280, height=720,
+                    parent=parent
+                )
 
                 # Load and display image
                 img = Image.open(img_path)
@@ -1349,53 +2415,74 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 label.image = photo  # Keep reference
                 label.pack(fill='both', expand=True)
 
-                # Show for 5 seconds, then auto-close (blocking wait during boot)
                 img_window.update()
                 display_result("Image displayed successfully")
-
-                # Wait 5 seconds while updating window, then destroy
-                for _ in range(50):  # 50 x 0.1s = 5 seconds
-                    try:
-                        img_window.update()
-                        time.sleep(0.1)
-                    except:
-                        break  # Window was closed manually
-
-                try:
-                    img_window.destroy()
-                except:
-                    pass  # Already closed
 
             except Exception as e:
                 print(f"  [INFO] Image display skipped: {e}")
                 display_log(f"Image display skipped: {e}", "info")
+                img_window = None
 
-            display_phase("Image Generation", "ok")
-            # CORA generates final image gen summary - natural speech
-            response = cora_respond("Image Generation test", f"Image generation is working. Created that in {gen_time:.1f} seconds", "ok")
-            speak(response)
+            # Use AI vision to describe what CORA actually generated
+            image_description = None
+            try:
+                from ai.ollama import generate_with_image
+                display_action("Analyzing generated image with AI vision...")
+                vision_result = generate_with_image(
+                    prompt="Describe this image in detail. What do you see? Be specific about the scene, objects, colors, mood, and style.",
+                    image_path=img_path,
+                    system=get_system_prompt(),
+                    model="llava"
+                )
+                if vision_result and vision_result.content:
+                    image_description = vision_result.content.strip()
+                    # Clean markdown
+                    image_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', image_description)
+                    image_description = re.sub(r'\*([^*]+)\*', r'\1', image_description)
+                    image_description = re.sub(r'\n+', ' ', image_description)
+                    image_description = re.sub(r'\s+', ' ', image_description).strip()
+                    print(f"  CORA sees: {image_description[:100]}...")
+                    display_result(f"Vision: {image_description[:80]}...")
+                    BOOT_STATUS['generated_image_description'] = image_description
+            except Exception as e:
+                print(f"  [INFO] Image vision analysis skipped: {e}")
+
+            # CORA speaks what she sees in the generated image
+            display_phase("9.0 Image Gen", "ok")
+            if image_description:
+                speak(image_description)
+            else:
+                response = cora_respond("Image Generation", f"Image generated in {gen_time:.1f}s. Vision failed.", "warn")
+                speak(response)
+
+            # Close image window after speaking
+            if img_window:
+                try:
+                    img_window.destroy()
+                except:
+                    pass
         else:
             error = result.get('error', 'Unknown error')
             print(f"  [WARN] Image generation failed: {error}")
             display_log(f"Image generation failed: {error}", "warn")
             BOOT_STATUS['tools_tested'].append({'name': 'Image Gen Test', 'status': 'WARN'})
-            display_phase("Image Generation", "warn")
-            # CORA generates her own response about failure - natural speech
-            response = cora_respond("Image Generation", f"Image generation failed. Got this error: {error}", "fail")
+            display_phase("9.0 Image Gen", "warn")
+            # Image gen failed
+            response = cora_respond("Image Generation", f"Image gen failed: {error[:50]}", "fail")
             speak(response)
 
     except Exception as e:
         print(f"  [WARN] Image generation: {e}")
         display_log(f"Image generation error: {e}", "warn")
         BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'WARN'})
-        display_phase("Image Generation", "warn")
+        display_phase("9.0 Image Gen", "warn")
 
-    time.sleep(0.3)
+    responsive_sleep(0.3)
 
     # ================================================================
     # PHASE 10: FINAL SYSTEM CHECK
     # ================================================================
-    display_phase("Final Check", "running")
+    display_phase("10.0 Final Check", "running")
     display_log("PHASE 10: FINAL CHECK", "phase")
     print("\n[PHASE 10] Final System Check")
     print("=" * 50)
@@ -1491,22 +2578,21 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         status_text = "Everything is up and running perfectly."
         display_log(status_text, "ok")
 
-    # Hardware warnings - natural speech
+    # Hardware warnings
     hw_warning = ""
     if BOOT_STATUS['cpu_percent'] > 70:
-        hw_warning = f"Heads up, your CPU is running hot at {BOOT_STATUS['cpu_percent']:.0f} percent."
+        hw_warning = f"CPU at {BOOT_STATUS['cpu_percent']:.0f}%."
         display_log(hw_warning, "warn")
     elif BOOT_STATUS['memory_percent'] > 80:
-        hw_warning = f"Memory is getting tight at {BOOT_STATUS['memory_percent']:.0f} percent used."
+        hw_warning = f"RAM at {BOOT_STATUS['memory_percent']:.0f}%."
         display_log(hw_warning, "warn")
 
-    # Build final summary data and let CORA speak it her way
-    summary_data = f"Boot complete. {greeting} {status_text}"
+    # Boot complete summary - just the facts
+    summary_data = f"Boot complete. {greeting}"
     if hw_warning:
-        summary_data += f" {hw_warning}"
-    summary_data += " Ready to go."
+        summary_data += f" Warning: {hw_warning}"
 
-    display_phase("Final Check", "ok")
+    display_phase("10.0 Final Check", "ok")
     response = cora_respond("Boot Complete", summary_data, "ok")
     speak(response)
 
@@ -1570,9 +2656,9 @@ Just tell me what you need.
     tools_prompt = get_tools_prompt()
     display_log("Tools and commands loaded", "ok")
 
-    # Have CORA announce abilities - summarize what she can do
-    abilities_summary = "voice chat, vision, screenshots, camera, image generation, reminders, calendar, tasks, web search, file viewing, code help, email, system stats, terminal commands"
-    abilities_response = cora_respond("Abilities announcement", f"Boot is done. Tell the user what you can do: {abilities_summary}. Ask what they want.", "ok")
+    # CORA announces she's ready - full mode for personality
+    abilities_summary = "voice, vision, camera, image gen, reminders, tasks, web search, code help, email, system stats"
+    abilities_response = cora_respond("Abilities announcement", f"I'm online. I can do: {abilities_summary}. What do you need?", "ok", mode="full")
     speak(abilities_response)
 
     # Print categorized abilities to console
@@ -1645,6 +2731,10 @@ if __name__ == "__main__":
                 total_tools = len(result.get('tools_tested', []))
                 print(f"\n[BOOT COMPLETE] Systems: {ok}/{total} | Tools: {tools}/{total_tools}")
 
+            # Switch to operational monitoring mode
+            if _boot_display:
+                _safe_ui_call(lambda: _boot_display.switch_to_operational_mode())
+
             # Start STT after boot
             start_stt()
 
@@ -1657,25 +2747,57 @@ if __name__ == "__main__":
 
             echo_filter = get_echo_filter(filter_duration=3.0)
 
+            # Debounce: track last wake word time to prevent double triggers
+            last_wake_time = [0]  # Use list to allow mutation in closure
+            DEBOUNCE_SECONDS = 2.0
+
+            # Reuse recognizer for faster response
+            recognizer = SpeechRecognizer()
+            recognizer.initialize()
+
             def on_wake_word():
+                import time as time_module
+
+                # Debounce check - ignore if triggered too recently
+                current_time = time_module.time()
+                if current_time - last_wake_time[0] < DEBOUNCE_SECONDS:
+                    print("[STT] Ignoring duplicate wake word (debounce)")
+                    return
+                last_wake_time[0] = current_time
+
+                # Check if CORA is speaking
                 if echo_filter and echo_filter.is_speaking():
                     print("[STT] Ignoring wake word - CORA is speaking")
                     return
 
                 print("[STT] Wake word detected!")
+
+                # Log that user said "CORA"
                 if _boot_display:
-                    _safe_ui_call(lambda: _boot_display.log("Wake word detected - listening...", 'info'))
+                    _safe_ui_call(lambda: _boot_display.log_user("CORA..."))
+
                 try:
-                    recognizer = SpeechRecognizer()
-                    if recognizer.initialize():
-                        text = recognizer.listen_once(timeout=5, phrase_limit=10)
-                        if text.strip():
-                            if echo_filter and not echo_filter.should_process(text):
-                                print(f"[STT] Ignoring echo: {text}")
-                                return
-                            print(f"[STT] Heard: {text}")
-                            if _boot_display:
-                                _safe_ui_call(lambda: _boot_display._process_user_input(text))
+                    # Small delay to let wake word audio clear from buffer
+                    time_module.sleep(0.15)
+
+                    # NOW show listening indicator (after buffer is ready)
+                    if _boot_display:
+                        _safe_ui_call(lambda: _boot_display.log("Listening...", 'info'))
+
+                    # Listen for command
+                    text = recognizer.listen_once(timeout=5, phrase_limit=10)
+
+                    if text.strip():
+                        if echo_filter and not echo_filter.should_process(text):
+                            print(f"[STT] Ignoring echo: {text}")
+                            return
+                        print(f"[STT] Heard: {text}")
+                        if _boot_display:
+                            _safe_ui_call(lambda: _boot_display._process_user_input(text))
+                    else:
+                        print("[STT] No speech detected")
+                        if _boot_display:
+                            _safe_ui_call(lambda: _boot_display.log("Didn't catch that", 'warn'))
                 except Exception as e:
                     print(f"[STT] Listen error: {e}")
 
@@ -1684,21 +2806,111 @@ if __name__ == "__main__":
             print("[STT] Wake word detection active - say 'CORA' to speak")
             if _boot_display:
                 _safe_ui_call(lambda: _boot_display.log("Voice active - say 'CORA' to speak", 'ok'))
+
+            # Start ambient awareness - CORA monitors and can interject naturally
+            start_ambient_awareness(wake_detector)
+
         except Exception as e:
             print(f"[STT] Voice detection unavailable: {e}")
             if _boot_display:
                 _safe_ui_call(lambda: _boot_display.log(f"Voice detection unavailable: {e}", 'warn'))
+
+    def start_ambient_awareness(wake_detector):
+        """Start CORA's ambient awareness - she monitors and interjects naturally."""
+        global _boot_display
+        try:
+            from voice.ambient_awareness import get_ambient_awareness, InterjectReason
+            from voice.stt import WakeWordDetector
+
+            def on_ambient_interject(context_json: str, reason: InterjectReason):
+                """Handle CORA deciding to interject on her own."""
+                import json
+
+                try:
+                    context = json.loads(context_json)
+                    hint = context.get('hint', '')
+                    recent_speech = context.get('recent_speech', '')
+                    user_activity = context.get('user_activity', '')
+                    user_mood = context.get('user_mood', '')
+
+                    # Build a prompt for CORA to generate her interjection
+                    if reason == InterjectReason.HELPFUL_INFO:
+                        prompt = f"You overheard: '{recent_speech}'. You think you can help. Offer brief, useful input naturally - like a friend who happened to hear something. Keep it short."
+                    elif reason == InterjectReason.JOKE:
+                        prompt = f"The moment feels right for some humor. Based on: '{hint}'. Crack a quick joke or witty comment. Keep it natural and brief."
+                    elif reason == InterjectReason.CHECK_IN:
+                        prompt = f"You noticed: '{hint}'. Check in with your user like a friend would. Keep it casual and brief - don't be overbearing."
+                    elif reason == InterjectReason.VIBE:
+                        prompt = f"You're just vibing with your user. You noticed: '{hint}'. Say something chill and friendly. Keep it short."
+                    elif reason == InterjectReason.COMMENT:
+                        prompt = f"You overheard something interesting: '{recent_speech}'. Make a natural comment like a friend would. Brief and casual."
+                    elif reason == InterjectReason.ALERT:
+                        prompt = f"You noticed something important: '{hint}'. Alert your user briefly."
+                    else:
+                        prompt = f"You want to say something based on: '{hint}'. Keep it brief and natural."
+
+                    # Log that CORA is interjecting
+                    if _boot_display:
+                        _safe_ui_call(lambda: _boot_display.log(f"[Ambient] {reason.value}: {hint[:50]}...", 'info'))
+
+                    # Generate CORA's response using AI
+                    response = cora_respond("Ambient Interjection", prompt, "info")
+
+                    # Speak the interjection
+                    if response:
+                        speak(response)
+
+                except Exception as e:
+                    print(f"[AMBIENT] Interjection error: {e}")
+
+            # Get ambient awareness with friend threshold from settings
+            ambient = get_ambient_awareness(friend_threshold=0.5)
+
+            def ambient_transcript_handler(text):
+                """Feed transcripts to ambient awareness."""
+                # Update ambient awareness with what we're hearing
+                ambient.update_audio_context(text)
+
+            # Register the ambient awareness to receive all transcripts
+            WakeWordDetector.add_transcript_callback(ambient_transcript_handler)
+
+            # Start ambient monitoring
+            ambient.start(on_ambient_interject)
+
+            print("[AMBIENT] Ambient awareness active - CORA is listening and watching")
+            if _boot_display:
+                _safe_ui_call(lambda: _boot_display.log("Ambient awareness active", 'ok'))
+
+        except Exception as e:
+            print(f"[AMBIENT] Ambient awareness unavailable: {e}")
+            if _boot_display:
+                _safe_ui_call(lambda: _boot_display.log(f"Ambient awareness: {e}", 'warn'))
 
     # Create display first (must be on main thread for tkinter)
     from boot_display import BootDisplay
     _boot_display = BootDisplay()
     _boot_display.create_window()
 
-    # Set up phases
+    # Set up phases - short names with phase numbers
     phase_names = [
-        "About CORA", "Voice Synthesis", "AI Engine", "Hardware Check",
-        "Core Tools", "Voice Systems", "External Services", "News Headlines",
-        "Vision Test", "Image Generation", "Final Check"
+        "0.8 Waveform Init",
+        "0.9 About CORA",
+        "1.0 Voice Synthesis",
+        "2.0 AI Engine",
+        "2.1 AI Models",
+        "3.0 Hardware Check",
+        "3.1 Camera Feed",
+        "4.0 Core Tools",
+        "4.1 Code Import",
+        "4.2 YouTube Test",
+        "4.3 Modal Windows",
+        "5.0 Voice Systems",
+        "6.0 External APIs",
+        "6.1 Audio Test",
+        "7.0 News Headlines",
+        "8.0 Vision Test",
+        "9.0 Image Gen",
+        "10.0 Final Check"
     ]
     _boot_display.set_phases(phase_names)
     _boot_display.log_system("Visual boot display initialized")

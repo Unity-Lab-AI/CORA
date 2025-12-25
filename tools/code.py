@@ -75,14 +75,17 @@ class CodeAssistant:
     Uses local Ollama models for AI operations.
     """
 
-    def __init__(self, model: str = "codellama", timeout: int = 60):
+    # Coding model - separate from CORA's chat model (dolphin-mistral)
+    CODE_MODEL = "qwen2.5-coder:7b"  # Best coding model for local use (late 2024)
+
+    def __init__(self, model: str = None, timeout: int = 60):
         """Initialize code assistant.
 
         Args:
-            model: Ollama model to use for code tasks
+            model: Ollama model to use for code tasks (defaults to deepseek-coder)
             timeout: Timeout for AI operations in seconds
         """
-        self.model = model
+        self.model = model or self.CODE_MODEL
         self.timeout = timeout
         self._temp_dir = Path(tempfile.gettempdir()) / "cora_code"
         self._temp_dir.mkdir(exist_ok=True)
@@ -671,7 +674,7 @@ SUGGESTIONS:
 _code_assistant: Optional[CodeAssistant] = None
 
 
-def get_code_assistant(model: str = "codellama") -> CodeAssistant:
+def get_code_assistant(model: str = None) -> CodeAssistant:
     """Get or create the global CodeAssistant instance."""
     global _code_assistant
     if _code_assistant is None:
