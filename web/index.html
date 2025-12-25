@@ -1225,13 +1225,15 @@ WHEN RESPONDING:
 
                 // Simple prompt - system prompt handles personality, just give data and instruction
                 if (mode === 'quick') {
-                    prompt = `${result}\n\nRespond briefly as CORA. 1-2 sentences. No offers to help.`;
+                    // Quick = short acknowledgments (hardware, tools, modals, audio, location)
+                    prompt = `${result}\n\nRespond briefly. No offers to help.`;
                     temperature = 0.9;
                     maxTokens = 150;
                 } else {
-                    prompt = `${result}\n\nGive your take as CORA. 3-4 sentences. No offers to help.`;
+                    // Full = detailed (intro, weather, news, vision, camera, images, screenshots)
+                    prompt = `${result}\n\nGive your full take. No offers to help.`;
                     temperature = 0.8;
-                    maxTokens = 300;
+                    maxTokens = 500;
                 }
 
                 const res = await fetch('http://localhost:11434/api/generate', {
