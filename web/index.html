@@ -2793,9 +2793,9 @@ WHEN RESPONDING:
 
         async function runAutoInstall() {
             // Switch to backend terminal view so user can see progress
-            const mainContent = document.getElementById('mainContent');
+            const mainContainer = document.getElementById('mainContainer');
             const setupTerminal = document.getElementById('setupTerminal');
-            mainContent.style.display = 'none';
+            mainContainer.style.display = 'none';
             setupTerminal.style.display = 'flex';
             document.getElementById('toggleBtn').textContent = '[ MAIN VIEW ]';
 
