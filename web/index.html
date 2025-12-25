@@ -1162,19 +1162,20 @@ WHEN RESPONDING:
                     if (promptText && promptText.length > 100) {
                         CORA_SYSTEM_PROMPT = promptText;
                         console.log(`[CORA] System prompt loaded from GitHub (${promptText.length} chars)`);
-                        return true;
+                        return 'github';
                     }
                 }
             } catch (e) {
                 console.log('[CORA] GitHub fetch failed:', e.message);
             }
             // Fallback to embedded version
-            console.log('[CORA] Using embedded system prompt (fallback)');
-            return true;
+            console.log(`[CORA] Using embedded system prompt (${CORA_SYSTEM_PROMPT?.length || 0} chars)`);
+            return 'embedded';
         }
 
         // Flag to track if AI is ready for CORA responses
         let aiReady = false;
+        let CORA_MODEL = 'dolphin-mistral:7b';  // Default, updated during boot
 
         // CORA generates her own responses using AI
         // System prompt (CORA_SYSTEM_PROMPT) contains full personality
@@ -1210,7 +1211,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
@@ -1218,7 +1219,7 @@ WHEN RESPONDING:
                     })
                 });
 
-                console.log(`[CORA] API call for: "${result.substring(0, 50)}..."`);
+                console.log(`[CORA] API call (${CORA_MODEL}) for: "${result.substring(0, 50)}..."`);
 
                 if (res.ok) {
                     const d = await res.json();
@@ -2595,7 +2596,7 @@ WHEN RESPONDING:
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            model: 'dolphin-mistral:7b',
+                            model: CORA_MODEL,
                             prompt: `[Quick boot done. User came back. Say something short, under 10 words.]`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
@@ -3281,7 +3282,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
@@ -3369,7 +3370,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: `[WAKE WORD - User just said "Hey CORA"]\n\n${fullContext}\nRespond naturally based on what you know and see. If you see the user or overheard something relevant, reference it. Be contextual.`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
@@ -3390,7 +3391,7 @@ WHEN RESPONDING:
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                model: 'dolphin-mistral:7b',
+                                model: CORA_MODEL,
                                 prompt: '[Someone just called your name. One sentence response.]',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
@@ -3429,12 +3430,8 @@ WHEN RESPONDING:
 
             // Load system prompt from GitHub FIRST (config/system_prompt.txt)
             log('Loading CORA personality from system_prompt.txt...', 'info');
-            const promptLoaded = await loadSystemPrompt();
-            if (promptLoaded) {
-                log('System prompt loaded from GitHub', 'ok');
-            } else {
-                log('Using fallback system prompt', 'warn');
-            }
+            const promptSource = await loadSystemPrompt();
+            log(`System prompt: ${CORA_SYSTEM_PROMPT ? CORA_SYSTEM_PROMPT.length + ' chars' : 'MISSING!'} (${promptSource})`, promptSource === 'github' ? 'ok' : 'warn');
 
             // ================================================================
             // PHASE 0.8: WAVEFORM INITIALIZATION
@@ -3558,13 +3555,28 @@ WHEN RESPONDING:
                 log('CORA AI responses enabled', 'ok');
 
                 // CORA introduces herself - system prompt handles personality
-                // Just give it the data, let CORA be CORA
+                // Find a model to use (prefer dolphin-mistral, fall back to first available)
+                const preferredModels = ['dolphin-mistral:7b', 'dolphin-mistral', 'llama3.2', 'mistral'];
+                CORA_MODEL = models[0]?.name || 'dolphin-mistral:7b';
+                for (const pref of preferredModels) {
+                    if (models.some(m => m.name.includes(pref))) {
+                        CORA_MODEL = models.find(m => m.name.includes(pref)).name;
+                        break;
+                    }
+                }
+                log(`CORA brain: ${CORA_MODEL}`, 'ok');
+
+                // Verify system prompt is loaded
+                if (!CORA_SYSTEM_PROMPT || CORA_SYSTEM_PROMPT.length < 100) {
+                    log('WARNING: System prompt missing or too short!', 'fail');
+                }
+
                 try {
                     const introRes = await fetch('http://localhost:11434/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            model: 'dolphin-mistral:7b',
+                            model: CORA_MODEL,
                             prompt: `[Introduce yourself. You just came online. Version 1.0.0, Unity AI Lab. 2-3 sentences max.]`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
@@ -3577,12 +3589,12 @@ WHEN RESPONDING:
                         if (intro) {
                             // Strip "CORA:" prefix if model added it
                             if (intro.toLowerCase().startsWith('cora:')) intro = intro.slice(5).trim();
-                            // speak() already logs, so don't double-log here
+                            log(`CORA: "${intro}"`, 'cora');
                             await speakAndWait(intro);
                         }
                     }
                 } catch (e) {
-                    log('CORA intro generation failed', 'warn');
+                    log('CORA intro generation failed: ' + e.message, 'warn');
                 }
 
                 // Models loaded response
@@ -4386,7 +4398,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: `[Boot complete. ${bootContext} Announce this and ask what they need. 1-2 sentences.]`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
@@ -4427,7 +4439,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: `[Ask what they're working on or up to today. 1 sentence, be nosy.]`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
@@ -4447,7 +4459,7 @@ WHEN RESPONDING:
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                model: 'dolphin-mistral:7b',
+                                model: CORA_MODEL,
                                 prompt: '[Boot done. Ask what they need. 1 sentence.]',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
@@ -4516,7 +4528,7 @@ WHEN RESPONDING:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'dolphin-mistral:7b',
+                        model: CORA_MODEL,
                         prompt: fullPrompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
