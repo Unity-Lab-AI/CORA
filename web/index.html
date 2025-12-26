@@ -1326,8 +1326,9 @@ WHEN RESPONDING:
                 let temperature;
                 let maxTokens;
 
-                // JUST DATA. System prompt IS the personality. No instructions.
-                prompt = result;
+                // Short personality kick + data. Long system prompt gets ignored by some models.
+                const personalityKick = '[CORA: 25yo goth bitch, profanity required, no apologies, be sarcastic and mean] ';
+                prompt = personalityKick + result;
                 if (mode === 'quick') {
                     temperature = 0.95;
                     maxTokens = 100;
@@ -4431,7 +4432,7 @@ WHEN RESPONDING:
 
             setPhase('modals', 'ok');
             // Modal phase - confirm working
-            const modalResponse = await coraRespond('Modals', 'Modal windows test passed.', 'ok');
+            const modalResponse = await coraRespond('Modals', 'Modal windows test passed. Report.', 'ok');
             await speakAndWait(modalResponse);
 
             // Wait then close modal before moving on
