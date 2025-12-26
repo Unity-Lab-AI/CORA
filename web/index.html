@@ -4075,19 +4075,8 @@ WHEN RESPONDING:
                 }
                 log(`CORA brain: ${CORA_MODEL}`, 'ok');
 
-                // CORA introduces herself - AI generates unique intro each time using this data
-                // Template has ALL the info, CORA decides HOW to say it
-                const introData = `You just came online. Introduce yourself with ALL this info:
-- You are CORA (Cognitive Operations & Reasoning Assistant)
-- Version 1.0.0
-- Built by Unity AI Lab
-- Creators: Hackall360, Sponge, GFourteen
-- Website: https://www.unityailab.com
-- GitHub: https://github.com/Unity-Lab-AI
-- Discord: https://discord.gg/D33Bk6Ay
-- Email: unityailabcontact@gmail.com
-
-Include ALL of this info but say it YOUR way. Be yourself. End by asking what they want.`;
+                // CORA introduces herself - JUST DATA, system prompt is the personality
+                const introData = `Just came online. CORA v1.0.0. Unity AI Lab. Creators: Hackall360, Sponge, GFourteen. Website https://www.unityailab.com, GitHub https://github.com/Unity-Lab-AI, Discord https://discord.gg/D33Bk6Ay. Introduce yourself.`;
                 const coraIntro = await coraRespond('Introduction', introData, 'ok', 'full');
                 await speakAndWait(coraIntro);
 
@@ -4570,7 +4559,7 @@ Include ALL of this info but say it YOUR way. Be yourself. End by asking what th
                         weather_report += `${day.day} ${day.high}/${day.low}. `;
                     });
                 }
-                weather_report += `Give your take.`;
+                weather_report += `Report.`;
                 // mode='full' for weather - more detail allowed
                 const weatherResponse = await coraRespond('Weather', weather_report, 'ok', 'full');
                 await speakAndWait(weatherResponse);

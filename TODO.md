@@ -1,7 +1,28 @@
 # TODO - C.O.R.A Active Tasks
 
-> **STATUS: TTS/WAVEFORM BUG FIXES APPLIED - NEEDS TESTING**
-> Updated: 2025-12-25 15:55 | Session: Unity Workflow
+> **STATUS: PERSONALITY + TTS FIXES COMPLETE**
+> Updated: 2025-12-25 | Session: Unity Workflow
+
+---
+
+## PERSONALITY FIX (2025-12-25) - LATEST
+
+### Issue: CORA acting like generic AI, not using system prompt personality
+
+**Root Cause**: Intro prompt had embedded personality instructions that OVERRODE the system prompt:
+```
+"Introduce yourself with ALL this info"
+"Include ALL of this info but say it YOUR way. Be yourself."
+```
+
+**Fix**: Stripped ALL instructions from prompts - now just raw data:
+```
+"Just came online. CORA v1.0.0. Unity AI Lab. Creators: Hackall360, Sponge, GFourteen. Introduce yourself."
+```
+
+The system prompt (27,760 chars) IS the personality. Prompts should NEVER contain personality instructions.
+
+Also fixed: Weather prompt changed from "Give your take." to "Report." for consistency.
 
 ---
 
@@ -65,8 +86,8 @@ Templates now give CORA actual data and say "Report." - NO personality instructi
 - [x] **Voice**: `Voice systems done. Using [Kokoro/Web Speech]. Wake word [active/not supported]. Report.`
 - [x] **Location**: `Location acquired: [city, state, country]. Report.`
 - [x] **Audio**: `Audio test passed. Played [synth tone]. Report.`
-- [x] **Weather**: `Weather done. Currently [temp], [conditions] in [city]. Forecast: [days]. Give your take.`
-- [x] **News**: `News done. X headlines found. Top 3: [headlines]. Give your take.`
+- [x] **Weather**: `Weather done. Currently [temp], [conditions] in [city]. Forecast: [days]. Report.`
+- [x] **News**: `News done. X headlines found. Top 3: [headlines].`
 - [x] **Vision**: `Vision test done. Screenshot and camera [status]. Report.`
 - [x] **Image Gen**: `Image generated in Xs but vision analysis failed. Report.`
 - [x] **Boot Complete**: `Boot done in X seconds. Y systems OK, Z warnings, W failures. Report.`
