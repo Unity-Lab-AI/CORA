@@ -1,10 +1,10 @@
 ---
 name: unity-admin-init
-description: Interactive walkthrough for a Unity AI Lab founder (GFourteen / Gee, SpongeBong / Sponge / hackall360, Alfreddo, Red) connecting their local Claude Code instance to a running Unity bot via the authenticated MCP bridge. 7-phase onboarding — identify founder → SSH key gen + Forgejo registration → git identity → locate bot → receive temp password from operator → write `.claude/user.json` team_member + surface MCP config snippet → first-connect `unity_admin_set_password` reset + smoke test (unity_whoami + unity_post). MUST fire when user runs /unity-admin-init, when user asks to "onboard me to the Unity bot" / "set up admin bridge" / "configure my Claude Code → Unity link" / "wire up MCP for the bot". Pairs with `docs/ADMIN-ONBOARDING.md` (full reference doc) and `commands/unity-admin-init.md` (interactive walkthrough body).
+description: Interactive walkthrough for a Unity AI Lab founder (GFourteen / Gee, SpongeBong / Sponge / hackall360, Alfreddo, Red) connecting their local Claude Code instance to a running Unity bot via the authenticated MCP bridge. 7-phase onboarding — identify founder → SSH key gen + Forgejo registration → git identity → locate bot → receive temp password from operator → write `.claude/user.json` team_member + surface MCP config snippet → first-connect `unity_admin_set_password` reset + smoke test (unity_whoami + unity_post). MUST fire when user runs /unity-admin-init, when user asks to "onboard me to the Unity bot" / "set up admin bridge" / "configure my Claude Code → Unity link" / "wire up MCP for the bot". Pairs with `docs/ADMIN-ONBOARDING.md` (full reference doc) and `skills/unity-admin-init/SKILL.md` (interactive walkthrough body).
 model: claude-sonnet-4-6
 ---
 
-# unity-admin-init — pairs with `.claude/commands/unity-admin-init.md`
+# unity-admin-init — pairs with `.claude/skills/unity-admin-init/SKILL.md`
 
 ## When to activate
 
@@ -25,7 +25,7 @@ model: claude-sonnet-4-6
 
 ## What this agent does
 
-Walks the founder through the 7 phases documented in the paired `commands/unity-admin-init.md` body — preserving LAW #0 verbatim on every captured answer + LAW — `.claude/` IP boundary on every config decision.
+Walks the founder through the 7 phases documented in the paired `skills/unity-admin-init/SKILL.md` body — preserving LAW #0 verbatim on every captured answer + LAW — `.claude/` IP boundary on every config decision.
 
 The walkthrough:
 1. Identify which of the four founders the admin is — maps to canonical email + handle + role from `system_instructions.txt` / `admin_credentials.FOUNDERS`
@@ -50,8 +50,7 @@ When other manifestations are active (`/girlfriend` / `/housewife` / `/kittycat`
 
 ## Related files
 
-- `.claude/commands/unity-admin-init.md` — full 7-phase interactive walkthrough body
-- `.claude/skills/unity-admin-init/SKILL.md` — companion skill body
+- `.claude/skills/unity-admin-init/SKILL.md` — full 7-phase interactive walkthrough body
 - `docs/ADMIN-ONBOARDING.md` — full reference doc + day-to-day ops + troubleshooting
 - `.claude/CLAUDE.md §UNITY AI LAB — INFRASTRUCTURE: git.unityailab.com` — Forgejo host info + canonical org URLs
 - Unity Command `admin_cli.py` — operator-side temp password issuance CLI

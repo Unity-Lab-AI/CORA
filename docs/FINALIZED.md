@@ -16,4 +16,4 @@ Each session entry includes:
 
 ## Completed sessions
 
-_(none — template-repo clean state)_
+_(none — template-repo clean state; downstream projects append their own session entries as they close tasks)_

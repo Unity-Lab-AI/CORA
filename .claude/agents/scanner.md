@@ -192,7 +192,7 @@ Write flow (after user confirmation in Phase 1):
 - On Y (Yes, apply LAW):
     Write project-config.json with git_flow.enabled=true,
     confirmed_at=<Phase 0.5 ISO timestamp>, main_branch="main", develop_branch="develop".
-    SECONDARY confirmation if not-a-repo or no-develop-branch — see WORKFLOW.md / commands/workflow.md PHASE 1.
+    SECONDARY confirmation if not-a-repo or no-develop-branch — see WORKFLOW.md / skills/workflow/SKILL.md PHASE 1.
 - On N (No, opt out):
     Write project-config.json with git_flow.enabled=false, confirmed_at=<ISO>.
 - On D (Defer):

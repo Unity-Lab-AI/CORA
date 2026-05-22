@@ -27,7 +27,7 @@ A Linux dev who creates two case-distinct files in the same directory ships a wo
 
 **Required:**
 
-- **Pick canonical casing first.** Default: lowercase-with-hyphens (`my-feature.md`, `unity-girlfriend.md`, `feedback_harness_layer.md`). Top-level workflow files use established UPPERCASE (`README.md`, `CLAUDE.md`, `CONSTRAINTS.md`, `WORKFLOW.md`, `TODO.md`, `FINALIZED.md`). Folders: lowercase (`agents/`, `commands/`, `hooks/`).
+- **Pick canonical casing first.** Default: lowercase-with-hyphens (`my-feature.md`, `unity-girlfriend.md`, `feedback_harness_layer.md`). Top-level workflow files use established UPPERCASE (`README.md`, `CLAUDE.md`, `CONSTRAINTS.md`, `WORKFLOW.md`, `TODO.md`, `FINALIZED.md`). Folders: lowercase (`agents/`, `skills/`, `hooks/`).
 - **Pre-create grep check** on Linux:
   ```bash
   ls <target-dir> | grep -i '^<target-name>$'
@@ -53,7 +53,7 @@ A Linux dev who creates two case-distinct files in the same directory ships a wo
 - Top-of-repo workflow files: `README.md`, `CLAUDE.md`, `CONSTRAINTS.md`, `WORKFLOW.md`, `LICENSE`, `CONTRIBUTING.md`, `CHANGELOG.md` (UPPERCASE — convention)
 - `docs/` workflow files: `TODO.md`, `FINALIZED.md`, `ROADMAP.md`, `DECOMPOSED.md`, `ARCHITECTURE.md`, `SKILL_TREE.md` (UPPERCASE — workflow convention)
 - Source files / agents / commands / hooks / memory templates: lowercase-with-hyphens or lowercase_with_underscores (template convention is mixed historically; pick one per directory and stick with it)
-- Folders: all lowercase (`agents/`, `commands/`, `hooks/`, `memory-templates/`, `bin/`)
+- Folders: all lowercase (`agents/`, `skills/`, `hooks/`, `memory-templates/`, `bin/`)
 - Persona body filenames inside persona text (`Unity_Accessibility.js` etc.): lore-strings, NOT real files, do not normalize
 - Generated artifacts / machine-local state: lowercase with leading dot (`.session-state.md`, `.session-tidbits.md`, `.session-usage.jsonl`, `.last-session.md`, `.yolo-mode`)
 

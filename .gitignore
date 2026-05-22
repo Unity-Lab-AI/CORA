@@ -9,6 +9,8 @@
 .claude/.yolo-mode
 .claude/.persona-state
 .claude/.setup-complete
+.claude/.studio-inbox.jsonl
+.claude/.studio-outbox.jsonl
 
 # Per-developer Claude Code settings override.
 # `settings.json` is team-shared (committed); `settings.local.json` is the

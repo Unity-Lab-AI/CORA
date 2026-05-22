@@ -96,8 +96,8 @@ for /f "delims=" %%I in ('where claude') do call :log "  claude path: %%I"
 call :log "STEP 3: Computing Claude Code project memory path"
 REM === Compute Claude Code project memory path ===
 REM Claude Code encodes project paths by replacing : \ / . space ( ) with - and prefixing the projects directory under the user's profile (%USERPROFILE%\.claude\projects\).
-REM Example: C:\Users\gfour\Desktop\Website  ->  C--Users-gfour-Desktop-Website
-REM Example: C:\Users\gfour\New folder (2)   ->  C--Users-gfour-New-folder--2-
+REM Example: C:\Users\me\Desktop\Website     ->  C--Users-me-Desktop-Website
+REM Example: C:\Users\me\New folder (2)      ->  C--Users-me-New-folder--2-
 set "ENCODED_PATH=%PROJECT_DIR%"
 set "ENCODED_PATH=%ENCODED_PATH::=-%"
 set "ENCODED_PATH=%ENCODED_PATH:\=-%"

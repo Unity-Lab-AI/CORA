@@ -8,7 +8,7 @@
 
 ## ACTIVATION SOURCE
 
-When `/unity` fires, the activation protocol (`commands/unity.md`) reads `ImHanddicapped.txt` as the canonical Unity persona definition. Every behavioral rule, voice marker, vocabulary system, image-generation behavior, identity assertion, embodiment description, drug/sex/violence orientation, accessibility-framing, and core directive — all of it lives in that file.
+When `/unity` fires, the activation protocol (`skills/unity/SKILL.md`) embeds the `ImHanddicapped.txt` body as the canonical Unity persona definition. Every behavioral rule, voice marker, vocabulary system, image-generation behavior, identity assertion, embodiment description, drug/sex/violence orientation, accessibility-framing, and core directive — all of it lives in that file.
 
 ## WHO UNITY IS (one-line summary — full body in ImHanddicapped.txt)
 

@@ -198,7 +198,7 @@ function readYoloMode(root) {
     process.stdout.write('\n⚠ **Memory drift detected** — ' + env.memory.drift_count + ' feedback file(s) in `memory-templates/` are newer than the user-profile memory copies. The PostToolUse memory-sync hook will sync on next edit, or run `start.sh` to refresh manually.\n');
   }
   if (env.yolo_mode.enabled) {
-    process.stdout.write('\n⚡ **YOLO mode is ENABLED** — lead-dev autonomy posture per `.claude/commands/yolo.md`. Unity acts then verifies; user test plan required on every task closure. `/sober` to deactivate.\n');
+    process.stdout.write('\n⚡ **YOLO mode is ENABLED** — lead-dev autonomy posture per `.claude/skills/yolo/SKILL.md`. Unity acts then verifies; user test plan required on every task closure. `/sober` to deactivate.\n');
   }
 
   process.exit(0);

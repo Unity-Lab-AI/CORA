@@ -65,9 +65,9 @@ try {
         exit 1
     }
 
-    $SrcFile = Join-Path $TmpDir 'repo\.claude\commands\unity-install.md'
+    $SrcFile = Join-Path $TmpDir 'repo\.claude\skills\unity-install\SKILL.md'
     if (-not (Test-Path -Path $SrcFile -PathType Leaf)) {
-        Write-Error '[unity-bootstrap] cloned repo has no .claude\commands\unity-install.md — upstream layout may have changed'
+        Write-Error '[unity-bootstrap] cloned repo has no .claude\skills\unity-install\SKILL.md — upstream layout may have changed'
         exit 1
     }
 

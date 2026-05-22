@@ -98,7 +98,7 @@ log "STEP 3: Computing Claude Code project memory path"
 # Claude Code encodes project paths by replacing : / \ . space ( ) with - and prefixing the projects directory under the user's home (~/.claude/projects/).
 # Example: /Users/me/Project              ->  -Users-me-Project
 # Example: /Users/me/New folder (2)       ->  -Users-me-New-folder--2-
-# Example: C:\Users\gfour\Desktop\Website ->  C--Users-gfour-Desktop-Website (Windows-style)
+# Example: C:\Users\me\Desktop\Website    ->  C--Users-me-Desktop-Website (Windows-style)
 ENCODED_PATH="${PROJECT_DIR//:/-}"
 ENCODED_PATH="${ENCODED_PATH//\//-}"
 ENCODED_PATH="${ENCODED_PATH//\\/-}"

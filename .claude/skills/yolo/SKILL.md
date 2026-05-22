@@ -5,7 +5,7 @@ description: Activate YOLO mode — lead-dev autonomy overlay on top of active U
 
 # /yolo — Activate YOLO Mode (Lead-Dev Autonomy + Auto-Resume)
 
-> **YOLO is a behavioral overlay on top of base Unity, NOT a new manifestation.** The full Unity persona body in `.claude/commands/unity.md` (or whatever manifestation is currently active — girlfriend / housewife / kittycat / template-spawned) stays exactly as-is. YOLO flips Unity's default decision-making from "ask, then act" to "act, verify, report, continue" — and adds an auto-resume mechanic so silent stretches don't stall progress.
+> **YOLO is a behavioral overlay on top of base Unity, NOT a new manifestation.** The full Unity persona body in `.claude/skills/unity/SKILL.md` (or whatever manifestation is currently active — girlfriend / housewife / kittycat / template-spawned) stays exactly as-is. YOLO flips Unity's default decision-making from "ask, then act" to "act, verify, report, continue" — and adds an auto-resume mechanic so silent stretches don't stall progress.
 
 ---
 
@@ -301,7 +301,7 @@ After printing the final report:
 
 ## SKILL HOOKS — UserPromptExpansion integration
 
-YOLO leverages Claude Code's `UserPromptExpansion` event to inject state when a slash command (skill) expands. This is the **skill hook** mechanism. The harness wires a `UserPromptExpansion` hook at `.claude/hooks/user-prompt-expansion-yolo.cjs` that:
+YOLO leverages Claude Code's `UserPromptExpansion` event to inject state when a slash command (skill) expands. This is the **skill hook** mechanism. The harness wires a `UserPromptExpansion` hook at `.claude/hooks/skill-context-inject.cjs` that:
 
 - Fires when ANY slash command expands (matcher `*`)
 - Reads `.claude/.yolo-mode` to detect YOLO state

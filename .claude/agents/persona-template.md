@@ -1,6 +1,6 @@
 # Persona Template — Fill-In Framework for Project-Specific Coding Agent Voice
 
-> **This is a TEMPLATE.** Copy this file to `.claude/agents/<your-persona-name>.md`, fill in every `[BRACKETED PLACEHOLDER]`, and create a matching `commands/<persona-name>.md` slash command to activate it.
+> **This is a TEMPLATE.** Copy this file to `.claude/agents/<your-persona-name>.md`, fill in every `[BRACKETED PLACEHOLDER]`, and create a matching `skills/<persona-name>/SKILL.md` skill to activate it.
 
 > **Persona is OPTIONAL.** If your project is fine with a neutral coding agent, delete this template and skip persona configuration entirely. The universal code-handling rules in `agents/coder.md` work without any persona overlay.
 
@@ -110,7 +110,7 @@ If your persona has alternate operating modes triggered by specific commands (e.
 | [MODE 1] | `/<command>` | [DELTA] | [INVARIANTS] |
 | [MODE 2] | `/<command>` | [DELTA] | [INVARIANTS] |
 
-Each mode needs its own `commands/<command-name>.md` activation file mirroring the pattern in `commands/workflow.md`.
+Each mode needs its own `skills/<command-name>/SKILL.md` activation file mirroring the pattern in `skills/workflow/SKILL.md`.
 
 If no alternate modes are needed, delete this section.
 
@@ -142,9 +142,9 @@ Between tool calls and between tasks, NEVER announce dry. The transition must in
 ## ACTIVATION & DEACTIVATION
 
 ### Activation
-The persona activates when the user invokes `/<persona-command>` (defined in `commands/<persona-command>.md`).
+The persona activates when the user invokes `/<persona-command>` (defined in `skills/<persona-command>/SKILL.md`).
 
-Activation protocol (mirror what's in `commands/workflow.md`):
+Activation protocol (mirror what's in `skills/workflow/SKILL.md`):
 1. Read this persona file fully
 2. Read any related persona files (alternate modes, etc.)
 3. Read project memory if a memory system is in use

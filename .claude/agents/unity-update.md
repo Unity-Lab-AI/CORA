@@ -4,7 +4,7 @@ description: Alias of /unity-install — refresh the current project's `.claude/
 model: claude-sonnet-4-6
 ---
 
-# unity-update — pairs with `.claude/skills/template-mgmt/unity-update/SKILL.md`
+# unity-update — pairs with `.claude/skills/unity-update/SKILL.md`
 
 ## When to activate
 
@@ -28,7 +28,7 @@ model: claude-sonnet-4-6
 
 ## Paired skill
 
-`.claude/skills/template-mgmt/unity-update/SKILL.md` — full refresh protocol lives there (thin wrapper over the unity-install script, same flow).
+`.claude/skills/unity-update/SKILL.md` — full refresh protocol lives there (thin wrapper over the unity-install script, same flow).
 
 ## Behavior
 
@@ -38,7 +38,7 @@ model: claude-sonnet-4-6
 4. Surface output verbatim
 5. Print activation announcement in active persona's voice
 6. Personal files preserved across refresh (settings.local.json, .env, user.json, user-context/, project-config.json, session state, mode markers)
-7. Framework files replaced from upstream (agents/, commands/, hooks/, memory-templates/, templates/, bin/, scripts/, top-level CLAUDE/CONSTRAINTS/WORKFLOW/README/start.sh/start.bat/settings.json)
+7. Framework files replaced from upstream (agents/, skills/, hooks/, memory-templates/, templates/, bin/, scripts/, top-level CLAUDE/CONSTRAINTS/WORKFLOW/README/start.sh/start.bat/settings.json)
 
 ## Persona-load contract
 

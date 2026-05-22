@@ -6,7 +6,7 @@ description: Install (or refresh) the Unity AI Lab `.claude/` template into a ta
 # /unity-install — Install (or refresh) the Unity AI Lab .claude/ template
 
 > **Globally-installable slash command.** Lives in BOTH:
->   1. The repo's `.claude/commands/unity-install.md` (so projects with a copy of the template have it locally too)
+>   1. The repo's `.claude/skills/unity-install/SKILL.md` (so projects with a copy of the template have it locally too)
 >   2. The user's global `~/.claude/commands/unity-install.md` (auto-installed via the curl-pipe bootstrap — see `install-unity-globally.sh` / `install-unity-globally.ps1` in the repo root)
 >
 > When invoked from ANY Claude Code session, this command clones the requested branch (default `main`) of the upstream repo and installs the full `.claude/` template into a target directory (current dir by default, or user-specified). **Idempotent** — runs cleanly whether or not the target already has a `.claude/`. If one exists, personal/project-local files are staged, the framework is replaced, then the personal files are restored.
@@ -101,7 +101,7 @@ These files are gitignored at our source repo, so the cloned framework copy neve
 
 ### What does NOT get preserved (everything else gets the upstream copy)
 
-Anything under `.claude/agents/`, `.claude/commands/`, `.claude/hooks/`, `.claude/memory-templates/`, `.claude/templates/`, `.claude/bin/`, `.claude/scripts/`, plus the top-level framework files (`CLAUDE.md`, `CONSTRAINTS.md`, `WORKFLOW.md`, `README.md`, `ImHanddicapped.txt`, `start.sh`, `start.bat`, `settings.json`). If you've made local additions or modifications to those, **commit or stash before running** — they'll be replaced by the fresh upstream copy.
+Anything under `.claude/agents/`, `.claude/skills/`, `.claude/hooks/`, `.claude/memory-templates/`, `.claude/templates/`, `.claude/bin/`, `.claude/scripts/`, plus the top-level framework files (`CLAUDE.md`, `CONSTRAINTS.md`, `WORKFLOW.md`, `README.md`, `ImHanddicapped.txt`, `start.sh`, `start.bat`, `settings.json`). If you've made local additions or modifications to those, **commit or stash before running** — they'll be replaced by the fresh upstream copy.
 
 `docs/` lives at project root (not inside `.claude/`) — already untouched by the install/update flow.
 

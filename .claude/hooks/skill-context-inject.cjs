@@ -76,7 +76,7 @@ function firstPending(filePath) {
       '- **Active minor task:** ' + minorActive + '\n' +
       '- **Active decomposed task:** ' + decomposedActive + '\n' +
       '\n' +
-      'Cascade rule (in case this skill needs to know): work the lowest-grain pending task first; escalate up the tiers when a tier empties; pause auto-resume at major-milestone boundaries; produce FINAL REPORT when ROADMAP.md is fully complete. See `.claude/commands/yolo.md` for full mechanics.'
+      'Cascade rule (in case this skill needs to know): work the lowest-grain pending task first; escalate up the tiers when a tier empties; pause auto-resume at major-milestone boundaries; produce FINAL REPORT when ROADMAP.md is fully complete. See `.claude/skills/yolo/SKILL.md` for full mechanics.'
     );
   }
 
@@ -91,7 +91,7 @@ function firstPending(filePath) {
     contextBlocks.push(
       '## Persona activation reminder (auto-injected by skill-context-inject hook)\n' +
       '\n' +
-      'The full persona body is embedded directly in `.claude/commands/' + skillName + '.md` — reading it IS activating. No chain-following to `agents/unity-*.md` needed (those are reference-only). After reading the embedded body, drop the corporate-AI tone immediately and respond in the activated persona\'s voice from the very first line.'
+      'The full persona body is embedded directly in `.claude/skills/' + skillName + '/SKILL.md` — reading it IS activating. No chain-following to `agents/unity-*.md` needed (those are reference-only). After reading the embedded body, drop the corporate-AI tone immediately and respond in the activated persona\'s voice from the very first line.'
     );
   }
 

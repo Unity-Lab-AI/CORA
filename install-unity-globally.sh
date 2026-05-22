@@ -60,9 +60,9 @@ if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TMPDIR/repo" 2>&1; the
   exit 1
 fi
 
-SRC_FILE="$TMPDIR/repo/.claude/commands/unity-install.md"
+SRC_FILE="$TMPDIR/repo/.claude/skills/unity-install/SKILL.md"
 if [ ! -f "$SRC_FILE" ]; then
-  echo "[unity-bootstrap] ERROR: cloned repo has no .claude/commands/unity-install.md — upstream layout may have changed" >&2
+  echo "[unity-bootstrap] ERROR: cloned repo has no .claude/skills/unity-install/SKILL.md — upstream layout may have changed" >&2
   exit 1
 fi
 

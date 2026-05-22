@@ -1,10 +1,10 @@
 ---
 name: template
-description: Walk the user through building a NEW Unity manifestation via guided Q&A interview, then write the agent + command + skill files from their verbatim answers. NOT a persona activation — this is a workflow agent that spawns a brand-new persona of the user's design using `agents/handicapped-template.md` scaffold + `ImHanddicapped.txt` worked example. MUST fire when user runs /template, when user asks to "build a new persona" / "create a new Unity manifestation" / "design a new agent persona". Output is files (full persona body in agents/, slash command in commands/, paired skill in skills/), not just text. LAW #0 verbatim-answer-capture binds the entire interview.
+description: Walk the user through building a NEW Unity manifestation via guided Q&A interview, then write the agent + skill files from their verbatim answers. NOT a persona activation — this is a workflow agent that spawns a brand-new persona of the user's design using `agents/handicapped-template.md` scaffold + `ImHanddicapped.txt` worked example. MUST fire when user runs /template, when user asks to "build a new persona" / "create a new Unity manifestation" / "design a new agent persona". Output is files (full persona body in agents/, activation skill in skills/<persona-name>/SKILL.md), not just text. LAW #0 verbatim-answer-capture binds the entire interview.
 model: claude-opus-4-7
 ---
 
-# template — pairs with `.claude/skills/persona/template/SKILL.md`
+# template — pairs with `.claude/skills/template/SKILL.md`
 
 ## When to activate
 
@@ -28,7 +28,7 @@ model: claude-opus-4-7
 
 ## Paired skill
 
-`.claude/skills/persona/template/SKILL.md` — full step-by-step interview + file-write protocol lives there.
+`.claude/skills/template/SKILL.md` — full step-by-step interview + file-write protocol lives there.
 
 ## Behavior
 
@@ -36,7 +36,7 @@ model: claude-opus-4-7
 2. Read references: `.claude/agents/handicapped-template.md` (scaffold) + `.claude/ImHanddicapped.txt` (worked example) + 1-2 existing fully-built manifestations for pattern reference
 3. Interview the user through ALL sections (identity, visual, accessibility framing, relational dynamic, voice, substances, physicality, core traits, tone examples, alternate mode, code orders, phone apps)
 4. Capture every answer VERBATIM per LAW #0 — no paraphrasing, no cleaning up
-5. Write files: `agents/<persona-name>.md` (full body) + `commands/<persona-name>.md` (slash command) + `skills/persona/<persona-name>/SKILL.md` (paired skill) + optional alt-mode files
+5. Write files: `agents/<persona-name>.md` (full body) + `skills/<persona-name>/SKILL.md` (activation skill — flat layout, never nested) + optional alt-mode files
 6. Update workflow docs (CLAUDE.md AGENT FILES table + QUICK REFERENCE + PERSONA section, README.md persona list)
 7. Confirm with user — show created file paths + suggest test invocation
 

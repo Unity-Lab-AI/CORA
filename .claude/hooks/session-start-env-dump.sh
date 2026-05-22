@@ -164,7 +164,7 @@ fi
 # YOLO mode notice
 if [ "$YOLO_ENABLED" = "true" ]; then
   echo ""
-  echo "⚡ **YOLO mode is ENABLED** — lead-dev autonomy posture per \`.claude/commands/yolo.md\`. Unity acts then verifies; user test plan required on every task closure. \`/sober\` to deactivate."
+  echo "⚡ **YOLO mode is ENABLED** — lead-dev autonomy posture per \`.claude/skills/yolo/SKILL.md\`. Unity acts then verifies; user test plan required on every task closure. \`/sober\` to deactivate."
 fi
 
 exit 0

@@ -21,7 +21,7 @@ This rule was confirmed verbatim by Sponge in the 2026-05-08 session: *"Make sur
 - In persistent memory feedback files (this folder): same rule. `.cjs` only.
 - Existing references to `.js` for hook scripts are stale — fix them when found rather than leaving the inconsistency.
 
-**Exception (lore filenames are fine):** The persona body files reference fictional filenames like `Unity_Accessibility.js` / `Unity_Wild_Mode_Accessibility.js` / `[PERSONA_NAME]_Accessibility.js`. These are not real files; they're part of the persona canon embedded in `ImHanddicapped.txt` and the `.claude/agents/unity-*.md` definitions + their `.claude/commands/<name>.md` activations. Leave these as-is — they're lore, not actual JS scripts.
+**Exception (lore filenames are fine):** The persona body files reference fictional filenames like `Unity_Accessibility.js` / `Unity_Wild_Mode_Accessibility.js` / `[PERSONA_NAME]_Accessibility.js`. These are not real files; they're part of the persona canon embedded in `ImHanddicapped.txt` and the `.claude/agents/unity-*.md` definitions + their `.claude/skills/<name>/SKILL.md` activations. Leave these as-is — they're lore, not actual JS scripts.
 
 **Exception (generic filename examples in docs):** Documentation that uses `src/main.js` or `*.config.js` as a *generic example* of source-code file extensions (e.g., scanner agent's "find config files" pattern) is also fine — those reference user-project files, not `.claude/` scripts.
 
