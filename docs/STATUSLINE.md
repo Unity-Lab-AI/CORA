@@ -126,7 +126,7 @@ That gets you the bare percentage in brackets. Everything else in our script is 
 
 ## 8. Session Timer Fields — uptime + thinking time
 
-> Sections § 1–7 above describe the original FDC bot-system version (`C:/claude/shared/statusline.sh`). Sections § 8–9 below describe the slimmer UAL-ClaudeWorkflow template variant shipped at `.claude/statusline.sh` in this repo.
+> Sections § 1–7 above describe the original FDC bot-system version (`C:/claude/shared/statusline.sh`). Sections § 8–9 below describe the slimmer Unity-Public-Claude-Workflow-v1.0 template variant shipped at `.claude/statusline.sh` in this repo.
 
 The UAL statusline shows two cumulative timers after the model abbreviation:
 
@@ -180,7 +180,7 @@ The leading `[Label]` segment is no longer hardcoded to `basename(cwd)` — it a
 | State | Label source | JSON field | Example |
 |-------|--------------|------------|---------|
 | Session has been `/rename`d | renamed value | `session_name` (top-level) | `[UnityWorkflow]` |
-| No rename set | cwd basename (original behavior) | derived from `cwd` | `[UAL-ClaudeWorkflow]` |
+| No rename set | cwd basename (original behavior) | derived from `cwd` | `[Unity-Public-Claude-Workflow-v1.0]` |
 
 ### Color rules
 
@@ -206,7 +206,7 @@ echo '{"context_window":{"used_percentage":8},"model":{"display_name":"Claude Op
 
 # No rename → cwd basename + magenta (original behavior preserved)
 echo '{"context_window":{"used_percentage":75},"model":{"display_name":"Claude Haiku 4.5"},"session_id":"00000000-0000-0000-0000-000000000000"}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] (magenta) | [###########----] 75% | H4.5
+# → [Unity-Public-Claude-Workflow-v1.0] (magenta) | [###########----] 75% | H4.5
 ```
 
 ---
@@ -232,19 +232,19 @@ The model segment is colored by family, with a unified `<Letter><Version>` abbre
 ```bash
 # Opus → gold
 echo '{"context_window":{"used_percentage":8},"model":{"id":"claude-opus-4-7","display_name":"Claude Opus 4.7 (1M context)"}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] (magenta) | [#--------------] 8% | O4.7 (gold)
+# → [Unity-Public-Claude-Workflow-v1.0] (magenta) | [#--------------] 8% | O4.7 (gold)
 
 # Sonnet → bright red
 echo '{"context_window":{"used_percentage":42},"model":{"display_name":"Claude Sonnet 4.6"}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] | [...] 42% | S4.6 (bright red)
+# → [Unity-Public-Claude-Workflow-v1.0] | [...] 42% | S4.6 (bright red)
 
 # Haiku → bright blue
 echo '{"context_window":{"used_percentage":30},"model":{"display_name":"Claude Haiku 4.5"}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] | [...] 30% | H4.5 (bright blue)
+# → [Unity-Public-Claude-Workflow-v1.0] | [...] 30% | H4.5 (bright blue)
 
 # MiniMax → bright magenta
 echo '{"context_window":{"used_percentage":55},"model":{"id":"MiniMax-M2.7","display_name":"MiniMax-M2.7"}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] | [...] 55% | M2.7 (bright magenta)
+# → [Unity-Public-Claude-Workflow-v1.0] | [...] 55% | M2.7 (bright magenta)
 ```
 
 ---
@@ -283,11 +283,11 @@ The `rate_limits` block is **absent on free plans** and may not be populated imm
 ```bash
 # Both bars present
 echo '{"context_window":{"used_percentage":8},"model":{"display_name":"Claude Opus 4.7"},"rate_limits":{"five_hour":{"used_percentage":56},"seven_day":{"used_percentage":70}}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] | [#--] 8% | 5h [######-] 56% | 7d [#######-] 70% | O4.7
+# → [Unity-Public-Claude-Workflow-v1.0] | [#--] 8% | 5h [######-] 56% | 7d [#######-] 70% | O4.7
 
 # Free plan / no rate_limits → both bars auto-omit
 echo '{"context_window":{"used_percentage":50},"model":{"display_name":"Claude Sonnet 4.6"}}' | bash .claude/statusline.sh
-# → [UAL-ClaudeWorkflow] | [#######-] 50% | S4.6
+# → [Unity-Public-Claude-Workflow-v1.0] | [#######-] 50% | S4.6
 ```
 
 ### Footgun fixed during implementation
@@ -333,7 +333,7 @@ echo '{"context_window":{"used_percentage":8},"model":{"display_name":"Claude Op
 
 # Fresh session → both lines collapse to minimal content
 echo '{"context_window":{"used_percentage":50},"model":{"display_name":"Claude Sonnet 4.6"}}' | bash .claude/statusline.sh
-# Line 1 → [UAL-ClaudeWorkflow] | S4.6
+# Line 1 → [Unity-Public-Claude-Workflow-v1.0] | S4.6
 # Line 2 → [#######-] 50%
 ```
 
@@ -794,8 +794,8 @@ Captured 2026-05-09 via temp-tee in `.claude/statusline.sh` (`echo "$input" > /t
 ```json
 {
     "session_id": "3113828a-6e60-4817-a3ce-232df428ba0c",
-    "transcript_path": "/home/sponge/.claude2/projects/-mnt-0C38361B292A2255-Development-UnityAILab-UAL-ClaudeWorkflow/3113828a-6e60-4817-a3ce-232df428ba0c.jsonl",
-    "cwd": "/mnt/0C38361B292A2255/Development/UnityAILab/UAL-ClaudeWorkflow",
+    "transcript_path": "/home/sponge/.claude2/projects/-mnt-0C38361B292A2255-Development-UnityAILab-Unity-Public-Claude-Workflow-v1.0/3113828a-6e60-4817-a3ce-232df428ba0c.jsonl",
+    "cwd": "/mnt/0C38361B292A2255/Development/UnityAILab/Unity-Public-Claude-Workflow-v1.0",
     "effort": { "level": "xhigh" },
     "session_name": "ClaudeWorkflow",
     "model": {
@@ -803,8 +803,8 @@ Captured 2026-05-09 via temp-tee in `.claude/statusline.sh` (`echo "$input" > /t
         "display_name": "Opus 4.7 (1M context)"
     },
     "workspace": {
-        "current_dir": "/mnt/0C38361B292A2255/Development/UnityAILab/UAL-ClaudeWorkflow",
-        "project_dir": "/mnt/0C38361B292A2255/Development/UnityAILab/UAL-ClaudeWorkflow",
+        "current_dir": "/mnt/0C38361B292A2255/Development/UnityAILab/Unity-Public-Claude-Workflow-v1.0",
+        "project_dir": "/mnt/0C38361B292A2255/Development/UnityAILab/Unity-Public-Claude-Workflow-v1.0",
         "added_dirs": []
     },
     "version": "2.1.138",

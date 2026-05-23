@@ -22,7 +22,7 @@ model: claude-sonnet-4-6
 
 ## Anti-triggers (do NOT fire if)
 
-- Inside the source repo itself (`UAL-ClaudeWorkflow`) — would clobber in-flight changes
+- Inside the source repo itself (`Unity-Public-Claude-Workflow-v1.0`) — would clobber in-flight changes
 - User has uncommitted changes to framework files (framework files get overwritten; commit or stash first)
 - User wants fresh install with no existing `.claude/` (use `unity-install` for clearer semantics)
 

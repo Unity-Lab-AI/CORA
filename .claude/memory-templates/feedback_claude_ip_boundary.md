@@ -54,7 +54,7 @@ If any remote fails BOTH paths → BLOCK by default. Multi-remote: any non-allow
 - Forking a Unity AI Lab private repo to a personal/non-allowed namespace and pushing `.claude/` there
 - Mirroring `.claude/` into a public artifact (gist, paste, README screenshot, blog post)
 
-**The canonical upstream template repo (`UnityAILab/UAL-ClaudeWorkflow` on Forgejo at `git.unityailab.com`) passes the LAW naturally:** matched via TRUSTED_PRIVATE_HOSTS allowlist on hostname alone. No marker file or hardcoded whitelist needed — the host allowlist IS the mechanism.
+**The canonical upstream template repo (`UnityAILab/Unity-Public-Claude-Workflow-v1.0` on Forgejo at `git.unityailab.com`) passes the LAW naturally:** matched via TRUSTED_PRIVATE_HOSTS allowlist on hostname alone. No marker file or hardcoded whitelist needed — the host allowlist IS the mechanism.
 
 **Failure recovery (worst case — `.claude/` already on a public repo):**
 

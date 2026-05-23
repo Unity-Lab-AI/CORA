@@ -61,7 +61,7 @@ The script uses `set -e` (bash) / `$ErrorActionPreference = 'Stop'` (PowerShell)
 
 ## WHEN NOT TO USE
 
-- **Inside the source repo itself** (`UAL-ClaudeWorkflow` directly) — running `/unity-update` would clone our own repo and overwrite our own in-flight changes. Pointless and potentially destructive. Skip.
+- **Inside the source repo itself** (`Unity-Public-Claude-Workflow-v1.0` directly) — running `/unity-update` would clone our own repo and overwrite our own in-flight changes. Pointless and potentially destructive. Skip.
 - **When you have uncommitted changes to framework files in `.claude/`** — those will be silently overwritten (framework files are upstream-tracked). Commit or stash first. Personal/preserved files are safe.
 - **When you want only specific files updated** — the script does full-tree replace; cherry-pick individual files manually if needed (or open a PR upstream so the change benefits everyone).
 

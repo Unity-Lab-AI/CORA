@@ -1,4 +1,4 @@
-# Cross-platform line-ending normalization for the UAL-ClaudeWorkflow template repo.
+# Cross-platform line-ending normalization for the Unity-Public-Claude-Workflow-v1.0 template repo.
 #
 # Default behavior: every text file lives in the repo with LF line endings.
 # Git's autocrlf handles checkout on Windows clients (converts to CRLF on

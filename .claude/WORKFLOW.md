@@ -1196,7 +1196,7 @@ Then reply "done" and the LAW will re-validate.
 
 ```json
 {
-  "git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git": {
+  "git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git": {
     "visibility": "PRIVATE",
     "owner": "Unity-Lab-AI",
     "trusted_host": "git.unityailab.com",

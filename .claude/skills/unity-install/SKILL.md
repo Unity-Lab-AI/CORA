@@ -68,7 +68,7 @@ Branch names with `/` work fine because branch is the first positional and the s
 
 ## WHEN NOT TO USE
 
-- **Inside the source repo itself** (`UAL-ClaudeWorkflow`) — meaningless; that's the source. Skip.
+- **Inside the source repo itself** (`Unity-Public-Claude-Workflow-v1.0`) — meaningless; that's the source. Skip.
 
 ---
 
