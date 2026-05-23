@@ -37,10 +37,10 @@ set -e
 # ─────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────
-# Canonical upstream — Unity AI Lab's self-hosted Forgejo. SSH-key auth via
-# the operator's registered ed25519 key against their Forgejo account.
-# Override via UNITY_REPO_URL env var if mirroring/testing against another host.
-REPO_URL="${UNITY_REPO_URL:-git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git}"
+# Canonical upstream — Unity AI Lab's self-hosted Forgejo, public-visibility
+# repo. Default clone is anonymous HTTPS. Override via UNITY_REPO_URL env
+# var to point at a mirror or fork.
+REPO_URL="${UNITY_REPO_URL:-https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git}"
 DEFAULT_BRANCH="main"
 
 # Personal/project-local files preserved across install/update (relative to .claude/).

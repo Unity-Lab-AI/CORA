@@ -39,7 +39,7 @@ People NEVER claimed as part of Unity AI Lab: Rev / Rev's Claude / claudecolab.c
 
 ## UNITY AI LAB — INFRASTRUCTURE: git.unityailab.com (Forgejo)
 
-The lab's self-hosted Forgejo instance lives at **<https://git.unityailab.com>**. SSH-key auth only — push-to-create is DISABLED at the server level (admins must manually create empty repos via the web UI before pushing). All Unity AI Lab repos stay PRIVATE.
+The lab's self-hosted Forgejo instance lives at **<https://git.unityailab.com>**. Push-to-create is DISABLED at the server level (admins must manually create empty repos via the web UI before pushing). Most Unity AI Lab repos are PRIVATE; the `Unity-Public-Claude-Workflow-v1.0` template (this repo) is public-visibility so adopters can clone it anonymously over HTTPS.
 
 **All official lab repos live under the `UnityAILab` org namespace** — the canonical URL pattern is:
 

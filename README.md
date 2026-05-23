@@ -4,13 +4,13 @@
 
 **Four founders:** GFourteen/Gee (co-founder · engineer · financial advisor), SpongeBong/Sponge/hackall360 (co-founder · engineer · ethical hacker · sys admin), Alfreddo (engineer · agentic systems · researcher), Red (engineer · security · sys admin). Unity is the team's coding agent: persistent persona with three manifestation forms (girlfriend / housewife / kittycat) plus `/template` for spawning new ones.
 
-**Lab Forgejo (canonical host going forward):** <https://git.unityailab.com> — self-hosted, SSH-key auth, push-to-create disabled, all Unity AI Lab repos PRIVATE. Every official lab repo lives under the **`UnityAILab`** org namespace (`git@git.unityailab.com:UnityAILab/<repo>.git`). Examples: `UnityAILab/Unity-Public-Claude-Workflow-v1.0` (this template), `UnityAILab/Unity-Command` (Unity bot). The IP-boundary hook (`.claude/hooks/pre-tool-public-repo-guard.cjs`) trusts `git.unityailab.com` as a private-by-server-audit host — no remote URL leaving that host gets `.claude/` content per `CONSTRAINTS.md §LAW — .CLAUDE WORKFLOW IP BOUNDARY`.
+**Lab Forgejo (canonical host going forward):** <https://git.unityailab.com> — self-hosted, push-to-create disabled at the server level. Most Unity AI Lab repos are PRIVATE; this `Unity-Public-Claude-Workflow-v1.0` template is public-visibility (anonymous HTTPS clone). Every official lab repo lives under the **`UnityAILab`** org namespace. The IP-boundary hook (`.claude/hooks/pre-tool-public-repo-guard.cjs`) trusts `git.unityailab.com` as a private-by-server-audit host for the PRIVATE repos — no remote URL leaving that host gets `.claude/` content per `CONSTRAINTS.md §LAW — .CLAUDE WORKFLOW IP BOUNDARY`.
 
 ---
 
 ## Install — three layers
 
-The repo lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0>. SSH-key auth is the supported clone path — register an ed25519 SSH key against your Forgejo account (sign-up at <https://git.unityailab.com>) and the install scripts pull through that key via standard `git clone`. Anyone with a Forgejo account on the host can clone.
+The repo lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0> with **public visibility** — anyone can clone over anonymous HTTPS, no Forgejo account or SSH key required. Contributors who push back use SSH (register an ed25519 key against a Forgejo account at <https://git.unityailab.com> and override `UNITY_REPO_URL` to the `git@...` form — see the "Override upstream URL" section below).
 
 ### Layer 1 — Per-machine global bootstrap (one-time)
 
@@ -18,25 +18,26 @@ Installs JUST the `/unity-install` slash command into your user-global Claude Co
 
 **Prereqs:**
 - `git` on PATH
-- SSH key registered against your Forgejo account (verify with `ssh -T git@git.unityailab.com` — should greet you by handle)
+
+That's it for read-only clone — the repo is public-visibility on Forgejo so anonymous HTTPS works. Contributors who push back also need a Forgejo account + SSH key registered (verify with `ssh -T git@git.unityailab.com` — should greet you by handle) and use the `UNITY_REPO_URL` override below to switch to the SSH URL.
 
 **Linux / macOS / Git Bash (clone-pipe one-liner):**
 
 ```bash
-TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
+TMP=$(mktemp -d) && git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
 ```
 
 **Windows PowerShell:**
 
 ```powershell
-$tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
+$tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
 ```
 
 **Inspect-before-running (safer):**
 
 ```bash
 # Linux / macOS / Git Bash
-git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual
+git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual
 less /tmp/ual/install-unity-globally.sh
 bash /tmp/ual/install-unity-globally.sh
 rm -rf /tmp/ual
@@ -44,7 +45,7 @@ rm -rf /tmp/ual
 
 ```powershell
 # Windows PowerShell
-git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $env:TEMP\ual
+git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $env:TEMP\ual
 notepad "$env:TEMP\ual\install-unity-globally.ps1"
 & "$env:TEMP\ual\install-unity-globally.ps1"
 Remove-Item -Path "$env:TEMP\ual" -Recurse -Force
