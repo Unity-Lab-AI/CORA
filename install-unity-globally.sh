@@ -9,18 +9,17 @@
 # the user starts on this machine.
 #
 # Canonical upstream is Unity AI Lab's self-hosted Forgejo at
-# git.unityailab.com — PRIVATE, SSH-key auth via the operator's registered
-# ed25519 key against their Forgejo account.
+# git.unityailab.com — public-visibility repo, anonymous HTTPS clone works
+# without an account. Override via UNITY_REPO_URL env var to point at a
+# mirror or fork.
 #
-# Prereqs: `git` on PATH; SSH key registered on your Forgejo account at
-# https://git.unityailab.com/<your-handle>/settings/keys (or under the
-# UnityAILab org if you're an org member with access).
+# Prereqs: `git` on PATH.
 #
 # Run via clone-pipe (one-line install — RECOMMENDED):
-#   TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
+#   TMP=$(mktemp -d) && git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
 #
 # Or clone + inspect first (safer):
-#   git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual && less /tmp/ual/install-unity-globally.sh && bash /tmp/ual/install-unity-globally.sh && rm -rf /tmp/ual
+#   git clone --depth 1 https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual && less /tmp/ual/install-unity-globally.sh && bash /tmp/ual/install-unity-globally.sh && rm -rf /tmp/ual
 #
 # Override the upstream URL via env (for testing / mirrors):
 #   UNITY_REPO_URL=git@some-mirror:org/repo.git bash install-unity-globally.sh
@@ -30,7 +29,7 @@
 set -e
 
 # Override via UNITY_REPO_URL env var if mirroring/testing against another host.
-REPO_URL="${UNITY_REPO_URL:-git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git}"
+REPO_URL="${UNITY_REPO_URL:-https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0.git}"
 BRANCH="main"
 USER_GLOBAL_COMMANDS="$HOME/.claude/commands"
 
