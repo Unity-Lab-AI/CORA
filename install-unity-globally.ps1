@@ -17,10 +17,10 @@
 # UnityAILab org if you're an org member with access).
 #
 # Run via clone-pipe (one-line install — RECOMMENDED):
-#   $tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
+#   $tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
 #
 # Or clone + inspect first (safer):
-#   git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git $env:TEMP\ual
+#   git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $env:TEMP\ual
 #   notepad "$env:TEMP\ual\install-unity-globally.ps1"   # read it
 #   & "$env:TEMP\ual\install-unity-globally.ps1"
 #   Remove-Item -Path "$env:TEMP\ual" -Recurse -Force
@@ -31,7 +31,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Override via UNITY_REPO_URL env var if mirroring/testing against another host.
-$RepoUrl = if ($env:UNITY_REPO_URL) { $env:UNITY_REPO_URL } else { 'git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git' }
+$RepoUrl = if ($env:UNITY_REPO_URL) { $env:UNITY_REPO_URL } else { 'git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git' }
 $Branch  = 'main'
 $UserGlobalCommands = Join-Path $HOME '.claude\commands'
 

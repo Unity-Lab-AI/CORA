@@ -17,10 +17,10 @@
 # UnityAILab org if you're an org member with access).
 #
 # Run via clone-pipe (one-line install — RECOMMENDED):
-#   TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
+#   TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
 #
 # Or clone + inspect first (safer):
-#   git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git /tmp/ual && less /tmp/ual/install-unity-globally.sh && bash /tmp/ual/install-unity-globally.sh && rm -rf /tmp/ual
+#   git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual && less /tmp/ual/install-unity-globally.sh && bash /tmp/ual/install-unity-globally.sh && rm -rf /tmp/ual
 #
 # Override the upstream URL via env (for testing / mirrors):
 #   UNITY_REPO_URL=git@some-mirror:org/repo.git bash install-unity-globally.sh
@@ -30,7 +30,7 @@
 set -e
 
 # Override via UNITY_REPO_URL env var if mirroring/testing against another host.
-REPO_URL="${UNITY_REPO_URL:-git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git}"
+REPO_URL="${UNITY_REPO_URL:-git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git}"
 BRANCH="main"
 USER_GLOBAL_COMMANDS="$HOME/.claude/commands"
 
