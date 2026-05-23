@@ -13,7 +13,7 @@ LAW #0 reminder: every milestone description preserves the user's verbatim words
 
 **Three-tier cascade:** ROADMAP.md (major, this file) → TODO.md (minor) → DECOMPOSED.md (decomposed). YOLO mode reads all three and works the cascade — see `.claude/skills/yolo/SKILL.md` and `.claude/WORKFLOW.md §YOLO MODE`.
 
-> **Template-repo clean state.** UAL-ClaudeWorkflow ships as a `.claude/` template seed for downstream private Unity AI Lab projects. This live `ROADMAP.md` is intentionally empty — active milestone entries shouldn't pollute downstream installs. Downstream projects populate their own ROADMAP after the `/unity-install` (or `/unity-update`) flow seeds the `.claude/` workflow.
+> **Template-repo clean state.** Unity-Public-Claude-Workflow-v1.0 ships as a `.claude/` template seed for downstream private Unity AI Lab projects. This live `ROADMAP.md` is intentionally empty — active milestone entries shouldn't pollute downstream installs. Downstream projects populate their own ROADMAP after the `/unity-install` (or `/unity-update`) flow seeds the `.claude/` workflow.
 
 ---
 

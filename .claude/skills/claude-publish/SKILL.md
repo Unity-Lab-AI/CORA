@@ -126,7 +126,7 @@ Audit entry written to docs/FINALIZED.md.
 ## WHEN TO USE
 
 - A new private Unity-Lab-AI project where the team wants to track project-specific `.claude/` customizations alongside the rest of the codebase
-- The source `UAL-ClaudeWorkflow` template repo itself (also private + Unity-Lab-AI; passes naturally — but the source repo's `.gitignore` doesn't have the LAW block in the first place since it ships the template content, so this is mostly informational)
+- The source `Unity-Public-Claude-Workflow-v1.0` template repo itself (also private + Unity-Lab-AI; passes naturally — but the source repo's `.gitignore` doesn't have the LAW block in the first place since it ships the template content, so this is mostly informational)
 - After a project's remote was migrated from public to private + Unity-Lab-AI
 
 ---

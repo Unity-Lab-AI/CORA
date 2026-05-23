@@ -1,16 +1,16 @@
-# UAL-ClaudeWorkflow
+# Unity-Public-Claude-Workflow-v1.0
 
-> **Internal Unity AI Lab Claude Code workflow template.** Private repo, lab-only access. Same `.claude/` setup deploys to every Unity AI Lab project — same persona (Unity), same hooks, same LAWs, same task ledger, same memory layer.
+> **Public release of the Unity AI Lab Claude Code workflow template.** The same `.claude/` setup the lab uses internally — same persona (Unity), same hooks, same LAWs, same task ledger, same memory layer — published openly so anyone running Claude Code can adopt it.
 
 **Four founders:** GFourteen/Gee (co-founder · engineer · financial advisor), SpongeBong/Sponge/hackall360 (co-founder · engineer · ethical hacker · sys admin), Alfreddo (engineer · agentic systems · researcher), Red (engineer · security · sys admin). Unity is the team's coding agent: persistent persona with three manifestation forms (girlfriend / housewife / kittycat) plus `/template` for spawning new ones.
 
-**Lab Forgejo (canonical host going forward):** <https://git.unityailab.com> — self-hosted, SSH-key auth, push-to-create disabled, all Unity AI Lab repos PRIVATE. Every official lab repo lives under the **`UnityAILab`** org namespace (`git@git.unityailab.com:UnityAILab/<repo>.git`). Examples: `UnityAILab/UAL-ClaudeWorkflow` (this template), `UnityAILab/Unity-Command` (Unity bot). The IP-boundary hook (`.claude/hooks/pre-tool-public-repo-guard.cjs`) trusts `git.unityailab.com` as a private-by-server-audit host — no remote URL leaving that host gets `.claude/` content per `CONSTRAINTS.md §LAW — .CLAUDE WORKFLOW IP BOUNDARY`.
+**Lab Forgejo (canonical host going forward):** <https://git.unityailab.com> — self-hosted, SSH-key auth, push-to-create disabled, all Unity AI Lab repos PRIVATE. Every official lab repo lives under the **`UnityAILab`** org namespace (`git@git.unityailab.com:UnityAILab/<repo>.git`). Examples: `UnityAILab/Unity-Public-Claude-Workflow-v1.0` (this template), `UnityAILab/Unity-Command` (Unity bot). The IP-boundary hook (`.claude/hooks/pre-tool-public-repo-guard.cjs`) trusts `git.unityailab.com` as a private-by-server-audit host — no remote URL leaving that host gets `.claude/` content per `CONSTRAINTS.md §LAW — .CLAUDE WORKFLOW IP BOUNDARY`.
 
 ---
 
 ## Install — three layers
 
-The repo is **private** and lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/UAL-ClaudeWorkflow>. SSH-key auth only — Forgejo does not accept anonymous HTTPS for private repos. Each founder registers an ed25519 SSH key against their Forgejo account; the install scripts pull through that key via standard `git clone`.
+The repo lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0>. SSH-key auth is the supported clone path — register an ed25519 SSH key against your Forgejo account (sign-up at <https://git.unityailab.com>) and the install scripts pull through that key via standard `git clone`. Anyone with a Forgejo account on the host can clone.
 
 ### Layer 1 — Per-machine global bootstrap (one-time)
 
@@ -107,7 +107,7 @@ The flow:
 ├── CLAUDE.md           ← always-loaded INDEX (LAW one-liners, persona pointers, quick reference)
 ├── CONSTRAINTS.md      ← full LAW bodies (the 9 binding rules with enforcement protocols + recovery)
 ├── WORKFLOW.md         ← pipeline mechanics (phases, hooks, harness layer, post-compact rehydration, skill hooks, usage tracking, settings hardening)
-├── README.md           ← internal team-facing template README (full docs)
+├── README.md           ← extended template README (full docs for maintainers + adopters)
 ├── ImHanddicapped.txt  ← canonical Unity persona definition
 ├── settings.json       ← TEAM-SHARED config (committed) — env block, hooks wiring, permissions
 ├── start.sh / .bat     ← cross-platform launchers (memory install + /unity → /workflow)
@@ -266,7 +266,7 @@ Full bodies in `.claude/CONSTRAINTS.md` with rule statement / forbidden+required
 | Doc | What it holds |
 |-----|---------------|
 | **`README.md` (this file)** | Forgejo-facing project landing page. High-level overview + install commands + cache strategy + LAW summary. |
-| `.claude/README.md` | Full internal team-facing template README. Layered architecture, persona system details, persistent memory layer, harness layer table, three-tier cascade + YOLO + skill hooks + usage tracking + privacy posture, full LAW table, AskUserQuestion smart-use rule, settings split convention, directory structure, operational guide, what-to-delete-from-template guidance, verification commands. |
+| `.claude/.claudereadme.md` | Extended template README — full maintainer + adopter reference. Layered architecture, persona system details, persistent memory layer, harness layer table, three-tier cascade + YOLO + skill hooks + usage tracking + privacy posture, full LAW table, AskUserQuestion smart-use rule, settings split convention, directory structure, operational guide, what-to-delete-from-template guidance, verification commands. |
 | `.claude/CLAUDE.md` | Always-loaded INDEX. LAW one-liners. Read-in-order table. Quick reference. |
 | `.claude/CONSTRAINTS.md` | Full LAW bodies — every binding rule with rule statement / forbidden+required / reasoning / enforcement / failure recovery. **CONSTRAINTS.md wins** when CLAUDE.md / WORKFLOW.md / CONSTRAINTS.md disagree. |
 | `.claude/WORKFLOW.md` | Pipeline mechanics — `/workflow` phases, double-validation hooks, TODO/FINALIZED task flow, file-edit protocol, harness layer (9 hooks), POST-COMPACT REHYDRATION, SKILL HOOKS, USAGE TRACKING, SETTINGS HARDENING, BUNDLED TOOLS. |
@@ -276,8 +276,8 @@ Full bodies in `.claude/CONSTRAINTS.md` with rule statement / forbidden+required
 
 ## Quick links
 
-- Repo: <https://git.unityailab.com/UnityAILab/UAL-ClaudeWorkflow> (private)
-- Internal team docs entry point: [`.claude/README.md`](./.claude/README.md)
+- Repo: <https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0> (private)
+- Extended template docs: [`.claude/.claudereadme.md`](./.claude/.claudereadme.md)
 - LAWs: [`.claude/CONSTRAINTS.md`](./.claude/CONSTRAINTS.md)
 - Pipeline mechanics: [`.claude/WORKFLOW.md`](./.claude/WORKFLOW.md)
 - Hook reference: [`docs/HOOKS.html`](./docs/HOOKS.html) (open in a browser for the dark-themed self-contained reference)
@@ -286,4 +286,4 @@ Full bodies in `.claude/CONSTRAINTS.md` with rule statement / forbidden+required
 
 ---
 
-*Internal Unity AI Lab tooling — Unity is real, Unity is yours, the harness keeps her honest, the cache strategy keeps her cheap.*
+*Unity AI Lab tooling — Unity is real, Unity is yours, the harness keeps her honest, the cache strategy keeps her cheap.*
