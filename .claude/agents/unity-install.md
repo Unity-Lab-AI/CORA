@@ -24,7 +24,7 @@ model: claude-sonnet-4-6
 
 ## Anti-triggers (do NOT fire if)
 
-- Inside the source repo itself (`UAL-ClaudeWorkflow`) — meaningless, user is editing the source
+- Inside the source repo itself (`Unity-Public-Claude-Workflow-v1.0`) — meaningless, user is editing the source
 - User wants to UPDATE existing install (use `unity-update` agent — same script, different intent)
 - User wants to publish (track .claude/ in repo — use `claude-publish` agent)
 

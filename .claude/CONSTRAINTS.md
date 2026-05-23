@@ -873,7 +873,7 @@ The PreToolUse hook `.claude/hooks/pre-tool-public-repo-guard.cjs` (matcher: `Ba
 [CLAUDE-IP-GUARD] git pattern detected: add | commit | push | (none)
 [CLAUDE-IP-GUARD] .claude/ involvement: yes | no | (n/a)
 [CLAUDE-IP-GUARD] checking remotes via gh...
-[CLAUDE-IP-GUARD] remote `origin` (Unity-Lab-AI/UAL-ClaudeWorkflow): PRIVATE + Unity-Lab-AI ✓
+[CLAUDE-IP-GUARD] remote `origin` (Unity-Lab-AI/Unity-Public-Claude-Workflow-v1.0): PRIVATE + Unity-Lab-AI ✓
 [CLAUDE-IP-GUARD] remote `fork` (someone/myfork): PUBLIC + non-Unity-Lab-AI ✗
 [CLAUDE-IP-GUARD] DECISION: BLOCK
 ```
@@ -970,7 +970,7 @@ When `.claude/` content has accidentally landed on a public repo (worst-case sce
 
 ## What this LAW does NOT cover
 
-- **The source repo itself (`Unity-Lab-AI/UAL-ClaudeWorkflow`)** — confirmed PRIVATE under `Unity-Lab-AI` org, passes the LAW naturally; no special-case marker needed
+- **The source repo itself (`Unity-Lab-AI/Unity-Public-Claude-Workflow-v1.0`)** — confirmed PRIVATE under `Unity-Lab-AI` org, passes the LAW naturally; no special-case marker needed
 - **Local-only repos with no configured remote** — no public exposure path possible; LAW allows commits but re-validates the moment a remote is added
 - **Memory installation under `~/.claude/projects/<encoded>/memory/`** — that's outside the working tree of any project, never enters git
 - **`.claude/.env`, `.claude/user.json`, `.claude/user-context/`** — already gitignored by Anthropic default; LAW is a layer on top, not a replacement

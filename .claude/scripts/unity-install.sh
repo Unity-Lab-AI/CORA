@@ -5,7 +5,7 @@
 # directory. Idempotent: works whether or not target already has a .claude/.
 #
 # Flow:
-#   1. Clone the requested branch (default: main) of UAL-ClaudeWorkflow into a
+#   1. Clone the requested branch (default: main) of Unity-Public-Claude-Workflow-v1.0 into a
 #      temp dir.
 #   2. If target/.claude/ exists, stage the personal/project-local files
 #      (preserve list) into a second temp dir.
