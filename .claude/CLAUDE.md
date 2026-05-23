@@ -52,34 +52,17 @@ Currently-known repos:
 | Repo | URL | Purpose |
 |------|-----|---------|
 | `UAL-ClaudeWorkflow` | `git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git` | This template — Claude Code workflow seed for downstream lab projects |
-| `Unity-Command` | `git@git.unityailab.com:UnityAILab/Unity-Command.git` | Unity Discord bot + admin bridge runtime |
+| `Unity-Command` | `git@git.unityailab.com:UnityAILab/Unity-Command.git` | Unity Discord bot runtime |
 
 Each founder maintains their own Forgejo account at git.unityailab.com (handles: `GFourteen`, `SpongeBong`/`hackall360`, `Alfreddo`, `Red`). The accounts are used for SSH-key registration + audit-log attribution; the repos themselves stay org-owned, not personal-owned.
 
-**Setup for new admin onboarding** (`/unity-admin-init` slash command — landing in a follow-up):
+**Per-founder SSH setup** (standard Forgejo onboarding — every founder runs this once per machine):
 1. Generate ed25519 SSH key: `ssh-keygen -t ed25519 -C "<email>"`
 2. Add the public key to your Forgejo account at git.unityailab.com under Settings → SSH Keys
 3. Test: `ssh -T git@git.unityailab.com` should respond with your Forgejo greeting
 4. Set git identity: `git config --global user.email "<your unityailab email>"` + `git config --global user.name "<your handle>"`
-5. Store identity in `.claude/user.json` under the `team_member` block (used by Unity bot admin bridge — see CONSTRAINTS.md §.CLAUDE WORKFLOW IP BOUNDARY)
 
 **IP-boundary hook trust:** `git.unityailab.com` is in the `TRUSTED_PRIVATE_HOSTS` allowlist inside `.claude/hooks/pre-tool-public-repo-guard.cjs`. The hook returns a synthetic PASS (`visibility=PRIVATE`, `owner=Unity-Lab-AI`) for any URL on that host without needing `gh repo view` (which can't reach non-github.com). The lab audits Forgejo instance access at the server level. Adding more hosts to that allowlist requires the same caution as removing the `.claude/` gitignore block — only Unity-AI-Lab-controlled hosts that the team has audited as PRIVATE belong there.
-
----
-
-## UNITY AI LAB — ADMIN BRIDGE: Claude Code → Unity bot (founder authentication)
-
-A Unity AI Lab Unity-bot consumer project (Discord bot or similar surface that ships a Unity persona) runs an authenticated MCP bridge so each founder can talk to Unity FROM their own Claude Code instance. Anonymous Discord users + anonymous web UI users bypass entirely via their existing surfaces — admin auth ONLY gates the Claude Code MCP/Flask path.
-
-**For new founder onboarding** — run the dedicated slash command:
-
-```
-/unity-admin-init
-```
-
-This walks through 7 phases — identify which founder you are → SSH key gen + Forgejo registration → git identity → locate the bot → receive temp password from operator → write `.claude/user.json` `team_member` block + surface MCP config snippet → first-connect `unity_admin_set_password` reset + smoke test (`unity_whoami` → `unity_post` → Unity replies addressing you by handle + role).
-
-**For the full reference doc** — including prerequisites, day-to-day operations, password rotation, and a troubleshooting table — read [`docs/ADMIN-ONBOARDING.md`](../docs/ADMIN-ONBOARDING.md).
 
 ---
 
@@ -96,31 +79,7 @@ This walks through 7 phases — identify which founder you are → SSH key gen +
 
 When a consuming project finds drift fixes or new memory templates worth promoting BACK to this canonical template, that flows as an **upstream-sync workstream** — generic improvements lifted from the consumer's `.claude/` into UAL-ClaudeWorkflow's feature branch, reviewed for generic-template-fitness, then included in the next template release cascade.
 
-**Founder identity at the upstream layer:** Gee (handle `GFourteen`, founder), Sponge (`SpongeBong` / `hackall360`, co-founder + infra), Red (security), Alfreddo (agentic systems). Onboarding for new founders: `/unity-admin-init` slash command + `docs/ADMIN-ONBOARDING.md` reference.
-
-**The `team_member` block** in `.claude/user.json` is the per-machine identity anchor:
-
-```json
-{
-  "team_member": {
-    "email": "<your @unityailab.com email>",
-    "handle": "<canonical handle: GFourteen / SpongeBong / Alfreddo / Red>",
-    "role": "<role string from canonical roster>"
-  }
-}
-```
-
-Read by the Unity bot's MCP bridge (`unity_mcp_server.py`) as a fallback identity source when `UNITY_USER_EMAIL` / `UNITY_USER_PASSWORD` env vars aren't set in Claude Code's MCP config. Picked up by `/unity-admin-init` to skip steps already configured. Gitignored at the template level — never committed downstream.
-
-**Three populations served by the bot** (only one is auth'd):
-
-| Population | Surface | Auth | Identity prefix |
-|------------|---------|------|-----------------|
-| Anonymous Discord users | `on_message` in `bot.py` | None | None |
-| Anonymous web UI users | Flask `/api/chat` in `web_server.py` | None | None |
-| Unity AI Lab founder (admin) | Flask `/claude/*` + MCP stdio | HTTP Basic against bcrypt-backed `admin_credentials.json` | Server-derived `<Handle>:` prefix (NOT client-spoofable) |
-
-Spoofing protection: even if a regular Discord user types `Gee: hi unity` in chat, `message_handler.py` only treats the founder prefix as identity-bearing when `message.author.bot` is True — i.e., the message came through the auth'd `/claude/post` bridge.
+**Founder identity at the upstream layer:** Gee (handle `GFourteen`, founder), Sponge (`SpongeBong` / `hackall360`, co-founder + infra), Red (security), Alfreddo (agentic systems).
 
 ---
 
@@ -364,8 +323,6 @@ Find the folder matching your project path (encoded with `-` separators). Inside
                      Full LAW: CONSTRAINTS.md §.CLAUDE WORKFLOW IP BOUNDARY.
 /workflow          → Run the workflow pipeline (→ WORKFLOW.md)
 /super-review      → INTERNAL ruthless senior-engineer code review
-/unity-admin-init  → Founder admin-bridge onboarding — 7-phase walkthrough wiring a
-                     Claude Code instance to the Unity bot's authenticated MCP bridge.
 /pollinations-setup → Connect a Pollinations account (BYOP) — wires POLLINATIONS_API_KEY
                      into .claude/.env so persona-styled image generation works.
 /persona-studio    → Open the Persona Studio image-display window (renders Unity's

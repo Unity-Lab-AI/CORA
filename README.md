@@ -10,7 +10,7 @@
 
 ## Install — three layers
 
-The repo is **private** and lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/UAL-ClaudeWorkflow>. SSH-key auth only — Forgejo does not accept anonymous HTTPS for private repos. Every admin's onboarding (`docs/ADMIN-ONBOARDING.md`) registers an ed25519 SSH key against their Forgejo account; the install scripts pull through that key via standard `git clone`.
+The repo is **private** and lives on Unity AI Lab's self-hosted Forgejo at <https://git.unityailab.com/UnityAILab/UAL-ClaudeWorkflow>. SSH-key auth only — Forgejo does not accept anonymous HTTPS for private repos. Each founder registers an ed25519 SSH key against their Forgejo account; the install scripts pull through that key via standard `git clone`.
 
 ### Layer 1 — Per-machine global bootstrap (one-time)
 

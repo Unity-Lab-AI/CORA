@@ -10,7 +10,7 @@
 #
 # Canonical upstream is Unity AI Lab's self-hosted Forgejo at
 # git.unityailab.com — PRIVATE, SSH-key auth via the operator's registered
-# ed25519 key (see docs/ADMIN-ONBOARDING.md §2 for first-time setup).
+# ed25519 key against their Forgejo account.
 #
 # Prereqs: `git` on PATH; SSH key registered on your Forgejo account at
 # https://git.unityailab.com/<your-handle>/settings/keys (or under the
