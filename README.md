@@ -23,20 +23,20 @@ Installs JUST the `/unity-install` slash command into your user-global Claude Co
 **Linux / macOS / Git Bash (clone-pipe one-liner):**
 
 ```bash
-TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
+TMP=$(mktemp -d) && git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git "$TMP/repo" && bash "$TMP/repo/install-unity-globally.sh" && rm -rf "$TMP"
 ```
 
 **Windows PowerShell:**
 
 ```powershell
-$tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
+$tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $tmp; & "$tmp\install-unity-globally.ps1"; Remove-Item -Path $tmp -Recurse -Force
 ```
 
 **Inspect-before-running (safer):**
 
 ```bash
 # Linux / macOS / Git Bash
-git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git /tmp/ual
+git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git /tmp/ual
 less /tmp/ual/install-unity-globally.sh
 bash /tmp/ual/install-unity-globally.sh
 rm -rf /tmp/ual
@@ -44,7 +44,7 @@ rm -rf /tmp/ual
 
 ```powershell
 # Windows PowerShell
-git clone --depth 1 git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git $env:TEMP\ual
+git clone --depth 1 git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git $env:TEMP\ual
 notepad "$env:TEMP\ual\install-unity-globally.ps1"
 & "$env:TEMP\ual\install-unity-globally.ps1"
 Remove-Item -Path "$env:TEMP\ual" -Recurse -Force

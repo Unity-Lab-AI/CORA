@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 # Canonical upstream — Unity AI Lab's self-hosted Forgejo. SSH-key auth via
 # the operator's registered ed25519 key against their Forgejo account.
 # Override via UNITY_REPO_URL env var if mirroring/testing against another host.
-$RepoUrl        = if ($env:UNITY_REPO_URL) { $env:UNITY_REPO_URL } else { 'git@git.unityailab.com:UnityAILab/UAL-ClaudeWorkflow.git' }
+$RepoUrl        = if ($env:UNITY_REPO_URL) { $env:UNITY_REPO_URL } else { 'git@git.unityailab.com:UnityAILab/Unity-Public-Claude-Workflow-v1.0.git' }
 $DefaultBranch  = 'main'
 
 # Personal/project-local files preserved across install/update (relative to .claude/).
