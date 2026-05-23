@@ -57,7 +57,7 @@ curl -s -X POST http://127.0.0.1:4317/api/show \
 - The server reads the Pollinations key from `.claude/.env`, folds in the active
   manifestation's visual style, builds the `gen.pollinations.ai` URL (`?key=`),
   and the window renders the image within ~1.5s.
-- **Selfie:** add `"selfie": true` — the server uses the manifestation's selfie subject.
+- **Selfie:** add `"selfie": true` as a **no-prompt fallback only** — when no `prompt` is provided, the server fills in the active manifestation's canned selfie subject. If a `prompt` IS provided, the explicit prompt wins and the flag is ignored. (Pass the flag alone for a quick default selfie; pass an explicit prompt for any custom composition — including custom selfies.)
 - **Caption:** optional `"caption":"..."` overrides the displayed caption.
 - `persona` id is one of: `unity girlfriend housewife kittycat wild strict feral sweet cozy purr hurtme`.
 

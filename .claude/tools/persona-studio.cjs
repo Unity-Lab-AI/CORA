@@ -259,7 +259,13 @@ const server = http.createServer(async (req, res) => {
         const persona = resolvePersona(body.persona) || activePersona;
         activePersona = persona;
         let prompt = String(body.prompt || '').trim();
-        if (body.selfie) prompt = selfieSubject(persona);
+        // `selfie:true` is a no-prompt FALLBACK, not an override — an explicit
+        // prompt always wins. Earlier builds replaced the caller's prompt with
+        // the canned per-manifestation selfie subject whenever the flag was set,
+        // which silently dropped detailed prompts on the floor. If the caller
+        // wants the canned subject they pass `selfie:true` alone; if they want
+        // their own subject they pass `prompt` (with or without the flag).
+        if (body.selfie && !prompt) prompt = selfieSubject(persona);
         if (!prompt) return sendJson(res, 400, { error: 'empty prompt' });
         const item = {
           id: ++seq,
