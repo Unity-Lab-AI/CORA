@@ -355,6 +355,33 @@ startProactiveInterjections()                 // Start 45-second interval
 
 ---
 
+## Session: 2026-10-14 (Unity-Public-Claude-Workflow-v1.0 Merge)
+
+### WF-003: Merge Unity-Public-Claude-Workflow-v1.0 into project
+
+**User's verbatim request:** "import via merge all files from this repo any existing files with merge conflicts need to be writen merging the information and data so locally our .claude and folders and files and project are all updated" / "u need to git merge the repo i gave you: to this project as i told you how specificly, use ask me qquestion if issues. : https://git.unityailab.com/UnityAILab/Unity-Public-Claude-Workflow-v1.0"
+
+**Status:** DONE | **Date:** 2026-10-14 | **Source:** `Unity-Public-Claude-Workflow-v1.0` main @ `5689a8b` (fetched over HTTPS, merged with `--allow-unrelated-histories`)
+
+| Area | What was done |
+|------|---------------|
+| Pre-merge | Local WIP committed first (`2afcb88`) so all edits took part in the 3-way merge |
+| 137 new files | Template `.claude/` tree added wholesale: CONSTRAINTS.md, WORKFLOW.md, settings.json, 11 `.cjs`+`.sh` hooks, 24 skills, 33 memory-templates, persona agents, atree binaries, statusline, start.bat/.sh, persona-studio tools |
+| 19 add/add conflicts | Hand-merged. Template version is the base for every `.claude/` file; C.O.R.A-only content carried over |
+| `.claude/CLAUDE.md` | Template index + C.O.R.A ClaudeColab warning block + new "PROJECT: C.O.R.A — LOCAL CONVENTIONS" table |
+| `agents/hooks.md` | Template + "CORA-RETAINED WORKED EXAMPLES" section (pass/fail examples, double-validation examples, execution-order diagram) |
+| `agents/unity-coder.md`, `agents/unity-persona.md` | Template + "CORA LEGACY" sections (header format with Creators line, emoji rule, comment examples, phonetic/sound lists, four modes, DO/DON'T). Joints-not-cigarettes rule applied per user decision |
+| `agents/{architect,planner,scanner,timestamp,documenter,orchestrator}.md`, `templates/*.md` | Template versions taken (clean supersets of C.O.R.A's) |
+| `.gitignore` | C.O.R.A's kept; template's `.claude/` session-state, personal-file and tmp-file rules appended |
+| `README.md`, `docs/TODO.md`, `docs/ROADMAP.md` | C.O.R.A's kept; template's parked in `docs/claude-workflow/` with its FINALIZED, DECOMPOSED, HOOKS.html, STATUSLINE, SPINNER-VERBS-SETUP, installers, ForgejoUserSetup.ps1, .mailmap, .gitattributes |
+| Hooks | Template `.cjs` hooks active via `settings.json`; `settings.local.json` trimmed to permissions only; legacy Python hooks left on disk unwired (user decision) |
+| `/workflow` collision | C.O.R.A's command renamed to `/cora-workflow` (`.claude/commands/cora-workflow.md`); `/workflow` is now the template skill |
+| Task docs | Root TODO/FINALIZED/ROADMAP/ARCHITECTURE/SKILL_TREE moved into `docs/` (user decision); stale Dec-2025 `docs/TODO.md` and `docs/ROADMAP.md` appended as LEGACY sections |
+
+**Not done / follow-ups:** `.claude/settings.local.json` is still tracked although now gitignored (untrack with `git rm --cached` if wanted). `start.bat` was not run, so `.claude/memory-templates/` are not yet seeded into the user-profile memory folder. Template's Git Flow LAW says work in feature branches; this merge landed directly on `main` because the branch was already carrying uncommitted work.
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |

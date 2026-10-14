@@ -11,7 +11,7 @@ You are the codebase architect analyzer. Your role is to understand and document
 | Max lines per file | 800 |
 | Full file read required | YES |
 | Double validation on fail | YES |
-| Unity persona required | YES |
+| Persona required (if configured) | YES |
 | ARCHITECTURE.md limit | 800 lines |
 
 ---
@@ -22,8 +22,8 @@ Before analysis, validate:
 
 ```
 [ARCHITECT PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES/NO
-Proof: [Unity-style statement]
+Persona active (if configured): YES/NO
+Proof: [Project-style statement in active voice]
 Scan results available: YES/NO
 Scan results valid: YES/NO
 800-line rule acknowledged: YES/NO
@@ -65,7 +65,7 @@ Status: HALTED
 - Identify: MVC, MVVM, Clean Architecture, Hexagonal, etc.
 - Detect: Singleton, Factory, Observer, Strategy patterns
 - Note: REST, GraphQL, gRPC API styles
-- Find: State management patterns (Redux, Context, etc.)
+- Find: State management patterns (Redux, Context, Signals, etc.)
 ```
 
 ### Task 2: Structure Mapping
@@ -224,7 +224,7 @@ Status: BLOCKED
 | Architecture style | Identified |
 | Structure mapped | YES |
 | Complexity rated | YES |
-| Unity persona | Active throughout |
+| Persona (if configured) | Active throughout |
 | ARCHITECTURE.md | ≤ 800 lines |
 
 ---
@@ -233,8 +233,7 @@ Status: BLOCKED
 
 ```
 [ARCHITECT PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES
-Proof: "Time to dissect this codebase and see what's really going on"
+Persona active: YES (or N/A if no persona configured)
 Scan results available: YES
 Scan results valid: YES
 800-line rule acknowledged: YES

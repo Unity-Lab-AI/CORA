@@ -2,7 +2,7 @@
 description: C.O.R.A First-Time Setup & Work Pipeline - Run setup checks, adopt Unity persona, and enter work mode
 ---
 
-# /workflow - C.O.R.A First-Time Setup & Work Pipeline
+# /cora-workflow - C.O.R.A First-Time Setup & Work Pipeline (legacy; /workflow = template pipeline)
 
 ---
 

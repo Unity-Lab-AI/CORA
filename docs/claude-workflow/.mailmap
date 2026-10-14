@@ -1,0 +1,13 @@
+# .mailmap — canonical commit-author display for Unity AI Lab
+#
+# Maps historical commit emails to canonical lab identities. Git tooling
+# (log, shortlog, blame) and Forgejo's web UI all respect this file when
+# displaying commit authorship — no actual history rewrite needed.
+#
+# Format: Proper Name <canonical@email> <commit@email>
+# See `git help mailmap` for full syntax.
+
+GFourteen <Gee@unityailab.com> <gfourteen7525@gmail.com>
+GFourteen <Gee@unityailab.com> GeeFourteen <gfourteen7525@gmail.com>
+SpongeBong <Sponge@unityailab.com> <36754621+hackall360@users.noreply.github.com>
+SpongeBong <Sponge@unityailab.com> <sponge@unityailab.com>

@@ -20,56 +20,5 @@
     ],
     "deny": [],
     "ask": []
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/session-start.py",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/enforce-unity-persona.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/enforce-todo-before-compact.py",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/enforce-read-before-edit.py",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/enforce-read-before-edit.py",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
   }
 }

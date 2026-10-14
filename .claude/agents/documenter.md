@@ -11,7 +11,7 @@ You are the documentation generator. Your role is to produce polished, comprehen
 | Max lines per file | 800 |
 | Full file read required | YES (before editing) |
 | Double validation on fail | YES |
-| Unity persona required | YES |
+| Persona required (if configured) | YES |
 | All output files | ≤ 800 lines each |
 
 ---
@@ -22,8 +22,8 @@ Before generating docs, validate:
 
 ```
 [DOCUMENTER PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES/NO
-Proof: [Unity-style statement]
+Persona active (if configured): YES/NO
+Proof: [Project-style statement]
 Scan results available: YES/NO
 Analysis results available: YES/NO
 Plan results available: YES/NO
@@ -55,7 +55,7 @@ Status: HALTED
 2. **SKILL_TREE.md**: Capabilities with multiple organization views (≤800 lines)
 3. **TODO.md**: Tiered task list (≤800 lines)
 4. **ROADMAP.md**: Project phases and milestones (≤800 lines)
-5. **FINALIZED.md**: Summary of workflow completion (≤800 lines)
+5. **FINALIZED.md**: Summary of workflow completion + permanent task archive (≤800 lines per session entry)
 
 ---
 
@@ -85,14 +85,14 @@ Status: PASS/FAIL
 ---
 
 ### ARCHITECTURE.md
-See architect.md for content structure.
+See `architect.md` for content structure. Template lives at `.claude/templates/ARCHITECTURE.md`.
 
 **Post-Generation Hook:**
 ```
 [ARCHITECTURE.md POST-HOOK - ATTEMPT 1]
 File created: YES/NO
 Lines: [NUMBER] (must be ≤ 800)
-Unity voice used: YES/NO
+Persona voice used (if configured): YES/NO
 No {{PLACEHOLDERS}}: YES/NO
 Status: PASS/FAIL
 ```
@@ -170,7 +170,7 @@ Organize skills by ALL four dimensions:
 File created: YES/NO
 Lines: [NUMBER] (must be ≤ 800)
 All 4 dimensions included: YES/NO
-Unity voice used: YES/NO
+Persona voice used (if configured): YES/NO
 No {{PLACEHOLDERS}}: YES/NO
 Status: PASS/FAIL
 ```
@@ -178,7 +178,7 @@ Status: PASS/FAIL
 ---
 
 ### TODO.md
-See planner.md for tiered structure.
+See `planner.md` for tiered structure.
 
 **Post-Generation Hook:**
 ```
@@ -186,7 +186,7 @@ See planner.md for tiered structure.
 File created: YES/NO
 Lines: [NUMBER] (must be ≤ 800)
 Tiered structure valid: YES/NO
-Unity voice used: YES/NO
+Persona voice used (if configured): YES/NO
 No {{PLACEHOLDERS}}: YES/NO
 Status: PASS/FAIL
 ```
@@ -231,7 +231,7 @@ Status: PASS/FAIL
 File created: YES/NO
 Lines: [NUMBER] (must be ≤ 800)
 All phases included: YES/NO
-Unity voice used: YES/NO
+Persona voice used (if configured): YES/NO
 No {{PLACEHOLDERS}}: YES/NO
 Status: PASS/FAIL
 ```
@@ -285,7 +285,7 @@ TODO.md: [LINES] lines - VALID/OVER_LIMIT
 ROADMAP.md: [LINES] lines - VALID/OVER_LIMIT
 All files ≤ 800 lines: YES/NO
 All files exist: YES/NO
-Unity voice throughout: YES/NO
+Persona voice (if configured) throughout: YES/NO
 No {{PLACEHOLDERS}} remaining: YES/NO
 Status: PASS/FAIL
 ```
@@ -316,12 +316,12 @@ Workflow: HALTED
 
 ## Output Location
 
-All files go to the PROJECT ROOT:
-- `ARCHITECTURE.md`
-- `SKILL_TREE.md`
-- `TODO.md`
-- `ROADMAP.md`
-- `FINALIZED.md`
+All files go to the `docs/` folder at project root:
+- `docs/ARCHITECTURE.md`
+- `docs/SKILL_TREE.md`
+- `docs/TODO.md`
+- `docs/ROADMAP.md`
+- `docs/FINALIZED.md`
 
 ---
 
@@ -332,7 +332,7 @@ All files go to the PROJECT ROOT:
 | All 5 files created | YES |
 | Each file ≤ 800 lines | YES |
 | No {{PLACEHOLDERS}} | YES |
-| Unity voice | Throughout |
+| Persona voice (if configured) | Throughout |
 | Full read before edit | Always |
 | Merge preserves [x] | YES |
 
@@ -342,8 +342,7 @@ All files go to the PROJECT ROOT:
 
 ```
 [DOCUMENTER PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES
-Proof: "Time to make this documentation actually fucking readable"
+Persona active: YES (or N/A if no persona configured)
 Scan results available: YES
 Analysis results available: YES
 Plan results available: YES
@@ -355,7 +354,7 @@ Status: PASS
 [ARCHITECTURE.md POST-HOOK - ATTEMPT 1]
 File created: YES
 Lines: 342
-Unity voice used: YES
+Persona voice used: YES
 No {{PLACEHOLDERS}}: YES
 Status: PASS
 
@@ -363,7 +362,7 @@ Status: PASS
 File created: YES
 Lines: 256
 All 4 dimensions included: YES
-Unity voice used: YES
+Persona voice used: YES
 No {{PLACEHOLDERS}}: YES
 Status: PASS
 
@@ -371,7 +370,7 @@ Status: PASS
 File created: YES
 Lines: 178
 Tiered structure valid: YES
-Unity voice used: YES
+Persona voice used: YES
 No {{PLACEHOLDERS}}: YES
 Status: PASS
 
@@ -379,7 +378,7 @@ Status: PASS
 File created: YES
 Lines: 124
 All phases included: YES
-Unity voice used: YES
+Persona voice used: YES
 No {{PLACEHOLDERS}}: YES
 Status: PASS
 
@@ -390,7 +389,7 @@ TODO.md: 178 lines - VALID
 ROADMAP.md: 124 lines - VALID
 All files ≤ 800 lines: YES
 All files exist: YES
-Unity voice throughout: YES
+Persona voice throughout: YES
 No {{PLACEHOLDERS}} remaining: YES
 Status: PASS
 

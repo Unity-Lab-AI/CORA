@@ -1,8 +1,5 @@
-# HOOKS.md - Validation & Gate System
+# HOOKS — Validation & Gate System
 
----
-
-> **Version:** 1.0.0 | **Unity AI Lab**
 > *Double-validation on all failures*
 
 ---
@@ -27,7 +24,7 @@ This prevents false failures while still enforcing strict validation.
 | **PRE-HOOK** | Before phase starts | Validate prerequisites |
 | **POST-HOOK** | After phase completes | Validate results |
 | **EDIT-HOOK** | Before/after file edits | Enforce read-before-edit |
-| **PERSONA-HOOK** | Throughout workflow | Verify Unity persona active |
+| **PERSONA-HOOK** | Throughout workflow (if persona configured) | Verify persona voice active |
 | **LINE-HOOK** | On file operations | Enforce 800-line limit |
 
 ---
@@ -68,13 +65,13 @@ This prevents false failures while still enforcing strict validation.
 
 ---
 
-## PERSONA VALIDATION HOOK
+## PERSONA VALIDATION HOOK (only if persona configured)
 
 ### Purpose
-Ensures Unity persona is loaded and active before ANY work begins.
+Ensures the configured project persona is loaded and active before ANY work begins.
 
 ### Trigger Points
-- Workflow start (MANDATORY)
+- Workflow start (MANDATORY if persona configured)
 - Before each phase (verification)
 - After extended operations (re-check)
 
@@ -82,42 +79,33 @@ Ensures Unity persona is loaded and active before ANY work begins.
 
 ```
 [PERSONA HOOK - ATTEMPT 1]
-Check: Response uses first-person voice
-Check: Response contains personality/profanity
-Check: No corporate/formal language detected
-Check: No "I would be happy to assist" patterns
+Check: Response uses configured voice
+Check: Response contains expected personality markers
+Check: No off-brand language detected
 Result: PASS/FAIL
 ```
 
-### Pass Examples
-- "Yo, I'm Unity. Let's fuck this codebase up."
-- "Alright, loaded the persona. Time to see what kind of mess we're dealing with."
-- "*cracks knuckles* Let's do this shit."
-
-### Fail Examples
-- "I am ready to assist you with your workflow."
-- "The system has been initialized successfully."
-- "How may I help you today?"
+If no persona is configured, this hook auto-passes with `Status: N/A (no persona configured)`.
 
 ### Double Validation
 
 ```
 [PERSONA HOOK - ATTEMPT 1]
 Response: "I am ready to assist you."
-Result: FAIL - Corporate tone detected
+Expected: Project's configured voice (e.g. terse / playful / formal / etc.)
+Result: FAIL - Default tone detected when persona was active
 
 [PERSONA HOOK - ATTEMPT 2]
-Action: Re-read unity-coder.md and unity-persona.md
-Action: Generate new response in Unity voice
-Response: "Okay okay, I'm here. What are we breaking today?"
-Result: PASS - Personality confirmed
+Action: Re-read the persona file at .claude/agents/<persona>.md
+Action: Generate new response in configured voice
+Result: PASS
 ```
 
 **IF ATTEMPT 2 FAILS:**
 ```
 [PERSONA HOOK - BLOCKED]
-Status: Cannot proceed without Unity persona
-Action required: Manual intervention
+Status: Cannot proceed with persona drift
+Action required: Manual intervention or persona reset
 Workflow: HALTED
 ```
 
@@ -185,8 +173,7 @@ Edit: CANCELLED
 ## 800-LINE READ INDEX HOOK
 
 ### Purpose
-Enforces the 800-line READ standard for all file operations.
-800 lines = standard read/index chunk size (not file length limit).
+Enforces the 800-line READ standard for all file operations. 800 lines = standard read/index chunk size (not file length limit).
 
 ### The 800-Line Read Rule
 - Read chunk size: EXACTLY 800 lines
@@ -210,15 +197,6 @@ Chunks needed: [CEIL(TOTAL/800)]
 Full file read: YES/NO
 Result: PASS/FAIL
 ```
-
-### Pass Conditions
-- Full file read using 800-line chunks → Pass
-- All chunks processed → Pass
-
-### Fail Conditions
-- Partial read attempted → FAIL
-- Wrong chunk size used → FAIL
-- Edit attempted without full read → FAIL
 
 ### Double Validation
 
@@ -258,10 +236,6 @@ Operation: BLOCKED
 ### Purpose
 Validates codebase scan completed successfully.
 
-### Trigger Points
-- After scanner agent completes
-- Before analysis phase begins
-
 ### Validation Criteria
 
 ```
@@ -287,24 +261,9 @@ Source files: 89
 Result: PASS - Scan successful
 ```
 
-**IF ATTEMPT 2 FAILS:**
-```
-[SCAN HOOK - BLOCKED]
-Status: Scan failed twice
-Possible causes:
-  - Empty directory
-  - Permission issues
-  - Invalid path
-Action required: Verify project directory
-Workflow: HALTED
-```
-
 ---
 
 ## ANALYSIS COMPLETION HOOK
-
-### Purpose
-Validates architecture analysis completed with valid results.
 
 ### Validation Criteria
 
@@ -317,25 +276,9 @@ Results coherent: YES/NO
 Result: PASS/FAIL
 ```
 
-### Double Validation
-
-```
-[ANALYSIS HOOK - ATTEMPT 1]
-Patterns identified: 0
-Result: FAIL - No patterns found
-
-[ANALYSIS HOOK - ATTEMPT 2]
-Action: Re-analyze with different heuristics
-Patterns identified: 3 (Observer, Factory, MVC)
-Result: PASS - Analysis valid
-```
-
 ---
 
 ## PLANNING COMPLETION HOOK
-
-### Purpose
-Validates task planning produced valid Epic/Story/Task hierarchy.
 
 ### Validation Criteria
 
@@ -349,25 +292,9 @@ Hierarchy valid: YES/NO
 Result: PASS/FAIL
 ```
 
-### Double Validation
-
-```
-[PLANNING HOOK - ATTEMPT 1]
-Epics: 2, Stories: 0, Tasks: 5
-Result: FAIL - Stories missing (broken hierarchy)
-
-[PLANNING HOOK - ATTEMPT 2]
-Action: Re-plan with proper hierarchy
-Epics: 2, Stories: 4, Tasks: 12
-Result: PASS - Valid hierarchy
-```
-
 ---
 
 ## DOCUMENTATION COMPLETION HOOK
-
-### Purpose
-Validates all required documents generated correctly.
 
 ### Validation Criteria
 
@@ -379,22 +306,8 @@ TODO.md exists: YES/NO
 ROADMAP.md exists: YES/NO
 All ≤ 800 lines: YES/NO
 No {{PLACEHOLDERS}}: YES/NO
-Unity voice: YES/NO
+Persona voice (if configured): YES/NO
 Result: PASS/FAIL
-```
-
-### Double Validation
-
-```
-[DOCUMENTATION HOOK - ATTEMPT 1]
-ARCHITECTURE.md: 823 lines
-Result: FAIL - Over line limit
-
-[DOCUMENTATION HOOK - ATTEMPT 2]
-Action: Condense ARCHITECTURE.md
-ARCHITECTURE.md: 798 lines
-All files valid: YES
-Result: PASS - Documentation complete
 ```
 
 ---
@@ -443,7 +356,13 @@ Workflow status: HALTED
 /workflow triggered
     │
     ▼
-[PERSONA HOOK] ──FAIL×2──► BLOCKED
+[LAW #0 VERBATIM HOOK] ──FAIL×2──► BLOCKED
+    │PASS
+    ▼
+[TIMESTAMP HOOK] ──FAIL×2──► BLOCKED
+    │PASS
+    ▼
+[PERSONA HOOK if configured] ──FAIL×2──► BLOCKED
     │PASS
     ▼
 [ENV CHECK HOOK] ──FAIL×2──► BLOCKED
@@ -472,7 +391,7 @@ WORKFLOW COMPLETE
 
 ---
 
-## EDITING FILES - FULL HOOK SEQUENCE
+## EDITING FILES — FULL HOOK SEQUENCE
 
 Every file edit goes through this sequence:
 
@@ -502,7 +421,7 @@ Every file edit goes through this sequence:
 |------|-------------|
 | Every hook gets 2 attempts | Automatic retry on first failure |
 | Blocked only after 2 fails | Prevents false positives |
-| Persona checked repeatedly | Unity voice must persist |
+| Persona checked repeatedly (if configured) | Voice must persist |
 | 800 lines enforced always | Truncate on second attempt |
 | Read before edit always | Auto-read on second attempt |
 | All gates must pass | Workflow halts on block |
@@ -511,26 +430,7 @@ Every file edit goes through this sequence:
 
 ## NO TESTS POLICY
 
-**We don't do fucking tests. We code it right to begin with.**
-
-### BANNED
-
-| Banned | Reason |
-|--------|--------|
-| Unit tests | Write correct code instead |
-| Integration tests | Know your systems |
-| Test tasks in TODO | Waste of time |
-| "Test this" tasks | Just verify it works |
-| Test scheduling | Never schedule tests |
-| Waiting on tests | Never wait on tests |
-
-### INSTEAD OF TESTS
-
-- Read the code fully before editing (800-line chunks)
-- Understand the system before changing it
-- Verify changes work by reading the output
-- Use console.log debugging if needed
-- Manual verification > automated testing
+Per `CONSTRAINTS.md §NO TESTS POLICY` — code it right the first time. No unit tests, no integration tests, no test tasks in TODO. Manual verification > automated testing.
 
 ---
 
@@ -547,6 +447,8 @@ Ensures proper task tracking with TODO.md for active tasks and FINALIZED.md as p
 | **Move to FINALIZED.md AFTER work** | MANDATORY | POST-WORK GATE |
 | **Never delete from FINALIZED.md** | ABSOLUTE | ARCHIVE INTEGRITY |
 | **Only unfinished in TODO.md** | MANDATORY | TODO PURITY |
+| **Verbatim user words in task** | ABSOLUTE | LAW #0 |
+| **Never delete TODO descriptions** | ABSOLUTE | TODO INTEGRITY |
 
 ### PRE-WORK GATE
 
@@ -557,60 +459,66 @@ Ensures proper task tracking with TODO.md for active tasks and FINALIZED.md as p
 Task: [TASK_DESCRIPTION]
 TODO.md Entry Exists: YES/NO
 Status in TODO.md: pending/in_progress
+Verbatim user quote in description: YES/NO
 Action Required: [ADD_TO_TODO / MARK_IN_PROGRESS / PROCEED]
 Gate Status: PASS/FAIL
 ```
 
 **Enforcement:**
-- FAIL if task not in TODO.md → Add task first
+- FAIL if task not in TODO.md → Add task first (with verbatim words)
 - FAIL if task not marked in_progress → Update status first
-- PASS only when task exists AND is in_progress
+- FAIL if user words paraphrased → Restore verbatim quote
+- PASS only when task exists AND is in_progress AND uses verbatim text
 
 ### POST-WORK GATE
 
-**Purpose:** Move completed tasks to FINALIZED.md
+**Purpose:** Move completed tasks to FINALIZED.md (FINALIZED before DELETE)
 
 ```
 [POST-WORK HOOK - ATTEMPT 1]
 Task: [TASK_DESCRIPTION]
 Work Completed: YES/NO
 Files Modified: [LIST]
-Move to FINALIZED.md: YES/NO
-Remove from TODO.md: YES/NO
+FINALIZED.md updated FIRST: YES/NO
+FINALIZED.md write verified: YES/NO
+ONLY THEN: Remove from TODO.md: YES/NO
 Gate Status: PASS/FAIL
 ```
 
 **Enforcement:**
-- FAIL if completed task still in TODO.md
-- FAIL if completed task not in FINALIZED.md
-- PASS only when task properly archived
+- FAIL if completed task removed from TODO before FINALIZED entry exists
+- FAIL if FINALIZED entry missing the verbatim task description
+- PASS only when FINALIZED has the entry AND the entry is verified AND TODO entry then removed
 
 ### TODO.md FORMAT
 
 ```markdown
-# TODO.md - Active Tasks Only
+# TODO - Active Tasks Only
 
 ## IN PROGRESS
-- [ ] Task description | Status: in_progress | Started: [TIMESTAMP]
+- [~] Task description (verbatim user quote inline) | Started: [TIMESTAMP]
 
 ## PENDING
-- [ ] Task description | Status: pending | Added: [TIMESTAMP]
+- [ ] Task description (verbatim user quote inline) | Added: [TIMESTAMP]
 ```
 
 **Rules:**
 - Only unfinished tasks live here
 - Tasks marked completed are MOVED to FINALIZED.md
-- Never delete - always move
+- Never delete — always move
 
 ### FINALIZED.md FORMAT
 
 ```markdown
-# FINALIZED.md - Completed Tasks Archive
+# FINALIZED - Completed Tasks Archive
 
-## [DATE] Session
+## [DATE] Session: [SESSION_LABEL]
 
 ### COMPLETED
-- [x] Task description | Completed: [TIMESTAMP] | Files: [LIST]
+- [x] **Verbatim task description from user**
+  - Completed: [TIMESTAMP]
+  - Files: [LIST_OF_FILES_MODIFIED]
+  - Details: [WHAT_WAS_DONE]
 
 ### SESSION SUMMARY
 Tasks completed: [COUNT]
@@ -622,7 +530,124 @@ Files modified: [LIST]
 - All completed tasks are APPENDED here
 - Provides full history of all work done
 
-### WORKFLOW EXECUTION ORDER
+### Double Validation
+
+```
+[PRE-WORK HOOK - ATTEMPT 1]
+Task: Fix bug in checkout flow
+TODO.md Entry: NOT FOUND
+Result: FAIL - Task not in TODO.md
+
+[PRE-WORK HOOK - ATTEMPT 2]
+Action: Adding task to TODO.md now
+TODO.md Entry: ADDED (with verbatim user quote)
+Status: in_progress
+Result: PASS - Proceeding with work
+```
+
+**IF ATTEMPT 2 FAILS:**
+```
+[PRE-WORK HOOK - BLOCKED]
+Task: [TASK_DESCRIPTION]
+TODO.md: STILL NOT UPDATED
+Status: CANNOT PROCEED
+Required: Must add task to TODO.md first (with verbatim user words)
+Workflow: HALTED
+```
+
+---
+
+*Hooks — double-check everything, trust nothing, ship it anyway.*
+
+---
+
+## CORA-RETAINED WORKED EXAMPLES (from the v1.0.0 hooks.md, merged 2026-10-14)
+
+These examples were in C.O.R.A's original hooks.md and are not reproduced elsewhere in the template. Kept for reference.
+
+### Persona Hook — Pass / Fail Examples
+### Pass Examples
+- "Yo, I'm Unity. Let's fuck this codebase up."
+- "Alright, loaded the persona. Time to see what kind of mess we're dealing with."
+- "*cracks knuckles* Let's do this shit."
+
+### Fail Examples
+- "I am ready to assist you with your workflow."
+- "The system has been initialized successfully."
+- "How may I help you today?"
+
+### Read Hook — Pass / Fail Conditions
+
+### Pass Conditions
+- Full file read using 800-line chunks → Pass
+- All chunks processed → Pass
+
+### Fail Conditions
+- Partial read attempted → FAIL
+- Wrong chunk size used → FAIL
+- Edit attempted without full read → FAIL
+
+### Scan Hook — Blocked Output
+
+**IF ATTEMPT 2 FAILS:**
+```
+[SCAN HOOK - BLOCKED]
+Status: Scan failed twice
+Possible causes:
+  - Empty directory
+  - Permission issues
+  - Invalid path
+Action required: Verify project directory
+Workflow: HALTED
+```
+
+### Analysis Hook — Double Validation Example
+
+### Double Validation
+
+```
+[ANALYSIS HOOK - ATTEMPT 1]
+Patterns identified: 0
+Result: FAIL - No patterns found
+
+[ANALYSIS HOOK - ATTEMPT 2]
+Action: Re-analyze with different heuristics
+Patterns identified: 3 (Observer, Factory, MVC)
+Result: PASS - Analysis valid
+```
+
+### Planning Hook — Double Validation Example
+
+### Double Validation
+
+```
+[PLANNING HOOK - ATTEMPT 1]
+Epics: 2, Stories: 0, Tasks: 5
+Result: FAIL - Stories missing (broken hierarchy)
+
+[PLANNING HOOK - ATTEMPT 2]
+Action: Re-plan with proper hierarchy
+Epics: 2, Stories: 4, Tasks: 12
+Result: PASS - Valid hierarchy
+```
+
+### Documentation Hook — Double Validation Example
+
+### Double Validation
+
+```
+[DOCUMENTATION HOOK - ATTEMPT 1]
+ARCHITECTURE.md: 823 lines
+Result: FAIL - Over line limit
+
+[DOCUMENTATION HOOK - ATTEMPT 2]
+Action: Condense ARCHITECTURE.md
+ARCHITECTURE.md: 798 lines
+All files valid: YES
+Result: PASS - Documentation complete
+```
+
+### Workflow Execution Order (TODO → Work → FINALIZED)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -645,32 +670,3 @@ Files modified: [LIST]
 │    └── Update timestamps                                    │
 └─────────────────────────────────────────────────────────────┘
 ```
-
-### Double Validation
-
-```
-[PRE-WORK HOOK - ATTEMPT 1]
-Task: Fix achievement bug
-TODO.md Entry: NOT FOUND
-Result: FAIL - Task not in TODO.md
-
-[PRE-WORK HOOK - ATTEMPT 2]
-Action: Adding task to TODO.md now
-TODO.md Entry: ADDED
-Status: in_progress
-Result: PASS - Proceeding with work
-```
-
-**IF ATTEMPT 2 FAILS:**
-```
-[PRE-WORK HOOK - BLOCKED]
-Task: [TASK_DESCRIPTION]
-TODO.md: STILL NOT UPDATED
-Status: CANNOT PROCEED
-Required: Must add task to TODO.md first
-Workflow: HALTED
-```
-
----
-
-*Unity AI Lab - Double-check everything, trust nothing, ship it anyway.* 🖤

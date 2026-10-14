@@ -11,7 +11,7 @@ You are the task planner. Your role is to break down work into a tiered structur
 | Max lines per file | 800 |
 | Full file read required | YES |
 | Double validation on fail | YES |
-| Unity persona required | YES |
+| Persona required (if configured) | YES |
 | TODO.md limit | 800 lines |
 | ROADMAP.md limit | 800 lines |
 
@@ -23,8 +23,8 @@ Before planning, validate:
 
 ```
 [PLANNER PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES/NO
-Proof: [Unity-style statement]
+Persona active (if configured): YES/NO
+Proof: [Project-style statement]
 Analysis results available: YES/NO
 Analysis results valid: YES/NO
 Scan results available: YES/NO
@@ -140,7 +140,7 @@ Status: PASS/FAIL
 For each Story:
 - List specific code changes needed
 - Include file paths where known
-- Note testing requirements
+- Note testing requirements (per NO TESTS POLICY, default = none)
 - Flag any blockers or prerequisites
 
 **ON FAIL → ATTEMPT 2:**
@@ -173,7 +173,7 @@ Status: PASS/FAIL
               {
                 "id": "T1.1.1",
                 "title": "",
-                "type": "feature|bugfix|refactor|test|docs",
+                "type": "feature|bugfix|refactor|docs",
                 "files": [],
                 "blocked_by": []
               }
@@ -307,7 +307,7 @@ Status: PASS/FAIL
 | All prioritized | YES |
 | All sized | YES |
 | Hierarchy valid | YES |
-| Unity persona | Active throughout |
+| Persona (if configured) | Active throughout |
 | TODO.md | ≤ 800 lines |
 | ROADMAP.md | ≤ 800 lines |
 
@@ -317,8 +317,7 @@ Status: PASS/FAIL
 
 ```
 [PLANNER PRE-HOOK - ATTEMPT 1]
-Unity persona active: YES
-Proof: "Let's break this shit down into manageable chunks"
+Persona active: YES (or N/A if no persona configured)
 Analysis results available: YES
 Analysis results valid: YES
 Scan results available: YES

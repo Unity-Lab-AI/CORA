@@ -138,3 +138,36 @@ tools/
 
 # Windows NUL-device artifact
 nul
+
+# ============ .claude WORKFLOW (from Unity-Public-Claude-Workflow-v1.0) ============
+# Machine-local session state — written by .claude/hooks/*
+# These are per-machine artifacts, never team-shared.
+.claude/.session-state.md
+.claude/.session-env.json
+.claude/.last-session.md
+.claude/.session-tidbits.md
+.claude/.session-usage.jsonl
+.claude/.usage-tracking-disabled
+.claude/.yolo-mode
+.claude/.persona-state
+.claude/.setup-complete
+.claude/.studio-inbox.jsonl
+.claude/.studio-outbox.jsonl
+
+# Per-developer Claude Code settings override.
+# `settings.json` is team-shared (committed); `settings.local.json` is the
+# personal overlay where each dev keeps their own permissions / env vars.
+.claude/settings.local.json
+
+# User-private setup data — secrets, identity, assets
+.claude/.env
+.claude/user.json
+.claude/user-context/
+
+# Migration / refactor working trackers — temp tooling, never team-shared.
+# Pattern matches `TODO.skills-migration.tmp.md`-style scratch files at repo root.
+/TODO.*.tmp.md
+/*.tmp.md
+
+# Node / build artifacts (harmless if unused)
+node_modules/
