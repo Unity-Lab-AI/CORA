@@ -286,13 +286,25 @@ def _escape_powershell_string(s: str) -> str:
     """
     if not s:
         return ''
-    # Escape backticks, double quotes, and dollar signs
-    s = s.replace('`', '``')
-    s = s.replace('"', '`"')
-    s = s.replace('$', '`$')
-    # Remove any null bytes or control characters
+    # Remove any null bytes or control characters first
     s = ''.join(c for c in s if ord(c) >= 32 or c in '\t\n\r')
-    return s
+    # Escape in correct order: backticks first, then other special chars
+    s = s.replace('`', '``')      # Backticks (escape char)
+    s = s.replace('"', '`"')      # Double quotes
+    s = s.replace("'", "''")      # Single quotes (doubled in PS)
+    s = s.replace('$', '`$')      # Variable expansion
+    s = s.replace('#', '`#')      # Comments
+    s = s.replace('&', '`&')      # Command chaining
+    s = s.replace('|', '`|')      # Pipe
+    s = s.replace(';', '`;')      # Statement separator
+    s = s.replace('(', '`(')      # Subexpression
+    s = s.replace(')', '`)')
+    s = s.replace('{', '`{')      # Script block
+    s = s.replace('}', '`}')
+    s = s.replace('<', '`<')      # Redirection
+    s = s.replace('>', '`>')
+    # Limit length to prevent DoS
+    return s[:1000]
 
 
 def notify(title, message, duration=5):
@@ -364,15 +376,19 @@ def clipboard_copy(text):
         bool: True if copied successfully
     """
     try:
+        text_str = str(text) if text else ''
         if platform.system() == 'Windows':
-            safe_text = _escape_powershell_string(str(text))
-            subprocess.run(['powershell', '-Command', f'Set-Clipboard -Value "{safe_text}"'],
-                         timeout=5)
+            # Use stdin piping - no string interpolation, no injection risk
+            subprocess.run(
+                ['powershell', '-Command', '$input | Set-Clipboard'],
+                input=text_str.encode('utf-8'),
+                timeout=5
+            )
         elif platform.system() == 'Darwin':
-            subprocess.run(['pbcopy'], input=text.encode(), timeout=5)
+            subprocess.run(['pbcopy'], input=text_str.encode(), timeout=5)
         else:
             subprocess.run(['xclip', '-selection', 'clipboard'],
-                         input=text.encode(), timeout=5)
+                         input=text_str.encode(), timeout=5)
         return True
     except Exception as e:
         print(f"Failed to copy to clipboard: {e}")
@@ -509,7 +525,7 @@ def take_screenshot(save_path=None):
 
 
 def calculate(expression: str) -> dict:
-    """Safely evaluate a math expression.
+    """Safely evaluate a math expression using AST parsing.
 
     Args:
         expression: Math expression like "2 + 2" or "sqrt(16)"
@@ -517,7 +533,9 @@ def calculate(expression: str) -> dict:
     Returns:
         dict: {'success': bool, 'result': number, 'expression': str}
     """
+    import ast
     import math
+    import operator
     import re
 
     if not expression or not expression.strip():
@@ -525,34 +543,78 @@ def calculate(expression: str) -> dict:
 
     expr = expression.strip()
 
-    # Safety check - only allow safe characters and math functions
-    allowed_chars = set('0123456789+-*/.() ')
-    allowed_funcs = ['sqrt', 'sin', 'cos', 'tan', 'log', 'log10', 'exp', 'pow', 'abs', 'round', 'floor', 'ceil', 'pi', 'e']
+    # Replace common symbols before parsing
+    expr = expr.replace('^', '**')  # Power operator
+    expr = expr.replace('×', '*')
+    expr = expr.replace('÷', '/')
 
-    # Check for dangerous patterns
-    if any(x in expr.lower() for x in ['import', 'eval', 'exec', '__', 'open', 'os.', 'sys.']):
-        return {'success': False, 'error': 'Invalid expression - unsafe pattern detected'}
+    # Allowed math functions and constants
+    SAFE_FUNCTIONS = {
+        'sqrt': math.sqrt, 'sin': math.sin, 'cos': math.cos, 'tan': math.tan,
+        'log': math.log, 'log10': math.log10, 'exp': math.exp, 'pow': pow,
+        'abs': abs, 'round': round, 'floor': math.floor, 'ceil': math.ceil
+    }
+    SAFE_CONSTANTS = {'pi': math.pi, 'e': math.e}
 
-    # Replace math function names with math module versions
-    safe_expr = expr
-    for func in allowed_funcs:
-        safe_expr = re.sub(rf'\b{func}\b', f'math.{func}', safe_expr, flags=re.IGNORECASE)
+    # Allowed binary operators
+    SAFE_OPERATORS = {
+        ast.Add: operator.add, ast.Sub: operator.sub,
+        ast.Mult: operator.mul, ast.Div: operator.truediv,
+        ast.Pow: operator.pow, ast.Mod: operator.mod,
+        ast.FloorDiv: operator.floordiv
+    }
+    SAFE_UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
-    # Replace common symbols
-    safe_expr = safe_expr.replace('^', '**')  # Power operator
-    safe_expr = safe_expr.replace('×', '*')
-    safe_expr = safe_expr.replace('÷', '/')
+    def _safe_eval(node):
+        """Recursively evaluate AST node with safety checks."""
+        if isinstance(node, ast.Constant):  # Numbers
+            if isinstance(node.value, (int, float)):
+                return node.value
+            raise ValueError(f"Unsupported constant type: {type(node.value)}")
+        elif isinstance(node, ast.Num):  # Python 3.7 compat
+            return node.n
+        elif isinstance(node, ast.Name):  # Constants like pi, e
+            if node.id.lower() in SAFE_CONSTANTS:
+                return SAFE_CONSTANTS[node.id.lower()]
+            raise ValueError(f"Unknown variable: {node.id}")
+        elif isinstance(node, ast.BinOp):  # Binary operations
+            if type(node.op) not in SAFE_OPERATORS:
+                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+            left = _safe_eval(node.left)
+            right = _safe_eval(node.right)
+            return SAFE_OPERATORS[type(node.op)](left, right)
+        elif isinstance(node, ast.UnaryOp):  # Unary operations (-x, +x)
+            if type(node.op) not in SAFE_UNARY:
+                raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+            return SAFE_UNARY[type(node.op)](_safe_eval(node.operand))
+        elif isinstance(node, ast.Call):  # Function calls
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("Complex function calls not allowed")
+            func_name = node.func.id.lower()
+            if func_name not in SAFE_FUNCTIONS:
+                raise ValueError(f"Unknown function: {node.func.id}")
+            args = [_safe_eval(arg) for arg in node.args]
+            return SAFE_FUNCTIONS[func_name](*args)
+        elif isinstance(node, ast.Expression):
+            return _safe_eval(node.body)
+        else:
+            raise ValueError(f"Unsupported expression type: {type(node).__name__}")
 
     try:
-        # Only allow safe math operations
-        result = eval(safe_expr, {"__builtins__": {}, "math": math}, {})
+        # Parse expression into AST
+        tree = ast.parse(expr, mode='eval')
+        result = _safe_eval(tree)
         return {
             'success': True,
-            'expression': expr,
+            'expression': expression.strip(),
             'result': result
         }
     except ZeroDivisionError:
         return {'success': False, 'error': 'Division by zero'}
+    except SyntaxError as e:
+        return {'success': False, 'error': f'Invalid syntax: {e}'}
+    except ValueError as e:
+        return {'success': False, 'error': str(e)}
     except Exception as e:
         return {'success': False, 'error': f'Calculation error: {e}'}
 

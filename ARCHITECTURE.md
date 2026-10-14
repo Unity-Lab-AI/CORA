@@ -986,6 +986,73 @@ colorama>=0.4.6
 
 ---
 
+## KNOWN ISSUES (10-Agent Deep Scan - 2025-12-29)
+
+### Critical Security Issues
+| ID | Location | Issue | Fix Required |
+|----|----------|-------|--------------|
+| SEC-001 | `.env` | API keys committed to repo | Rotate keys, add to .gitignore |
+| SEC-002 | `system.py:546` | eval() in calculator | Use ast.literal_eval() |
+| SEC-003 | `system.py:318` | PowerShell injection | Use subprocess arrays |
+| SEC-004 | `commands.py:842` | Unsandboxed terminal | Implement whitelist |
+| SEC-005 | `commands.py:1154` | Git command injection | Add shell escaping |
+| SEC-006 | `git_ops.py:33` | Hardcoded OAuth placeholder | Load from .env only |
+
+### Critical Memory/Resource Issues
+| ID | Location | Issue | Fix Required |
+|----|----------|-------|--------------|
+| MEM-001 | `tts.py:178` | Audio buffer race condition | Add thread locking |
+| MEM-002 | `stt.py:266` | Transcript buffer leak | Use bounded deque |
+| MEM-003 | `wake_word.py:88` | Unbounded audio queue | Add maxsize |
+| MEM-004 | `tts_mutex.py:284` | Lock starvation | Exponential backoff |
+
+### Critical Architecture Issues
+| ID | Location | Issue | Fix Required |
+|----|----------|-------|--------------|
+| ARCH-001 | `tts.py:35` | Circular dep voice↔ui | Create shared module |
+| CFG-001 | `config/` | Duplicate system_prompt files | Delete system_prompt1.txt |
+| WF-001 | `.claude/` | 70% hooks not implemented | Implement gate validators |
+
+### High Severity Issues (21 total)
+- Arbitrary file access in viewfile()
+- GitHub token exposure in boot_sequence.py
+- Email recipient not validated
+- UI panels not properly destroyed (memory leak)
+- Waveform animation never stops
+- Photo reference list grows indefinitely
+- Ambient awareness blocks monitor thread
+- Command routing ambiguity (cora.py vs tool_executor.py)
+- Presence detection blocks TTS
+- Hardcoded Ollama URL (no env var)
+- No context window management
+- No JSON schema validation
+- Voice settings duplicated across configs
+- Inconsistent requirements files
+- Location service uses HTTP not HTTPS
+- No rate limiting on external APIs
+
+### Dependency Analysis
+| Category | Status |
+|----------|--------|
+| Circular Dependencies | 1 critical (voice.tts ↔ ui.boot_display) |
+| Missing Version Constraints | Python version not specified |
+| Unused Dependencies | pytest, pytest-cov (tests forbidden) |
+| Optional Deps Without Fallback | opencv, selenium, emby APIs |
+
+### Module Line Counts (From Scan)
+| Module | Files | Lines | Status |
+|--------|-------|-------|--------|
+| src/ | 3 | 6,218 | Entry points |
+| ui/ | 15 | 5,500+ | GUI components |
+| voice/ | 10 | 5,246 | Voice pipeline |
+| ai/ | 6 | 2,791 | AI integration |
+| cora_tools/ | 20 | 9,600 | Tool modules |
+| services/ | 9 | 2,640 | External services |
+| config/ | 9 | 800+ | Configuration |
+| **TOTAL** | **72+** | **32,795+** | Full codebase |
+
+---
+
 ## COMPLETION STATUS
 
 | Phase | Status | Completion |
@@ -1008,9 +1075,11 @@ colorama>=0.4.6
 - Safety sandboxing for self-modification
 - Installer/packaging script
 - Auto-updater system
+- **FIX 18 CRITICAL ISSUES** (see TODO.md)
+- **FIX 21 HIGH ISSUES** (see TODO.md)
 
 ---
 
 *Unity AI Lab - C.O.R.A v1.0.0 Architecture Specification*
-*UPDATED: 2025-12-25*
-*75+ Python files | 85% complete | Web UI deployed*
+*UPDATED: 2025-12-29 (10-Agent Deep Scan)*
+*72+ Python files | 32,795+ lines | 81 issues identified*

@@ -274,15 +274,97 @@ startProactiveInterjections()                 // Start 45-second interval
 
 ---
 
+---
+
+## Session: 2025-12-29 (10-Agent Deep Scan)
+
+### Full Codebase Security & Architecture Audit
+
+| Task | Status | Files Modified |
+|------|--------|----------------|
+| Execute 10-agent parallel codebase scan | DONE | All 72+ files scanned |
+| Agent 1: Scan src/ core modules | DONE | `src/boot_sequence.py`, `src/cora.py`, `src/gui_launcher.py` |
+| Agent 2: Scan ui/ interface | DONE | 15 UI files analyzed |
+| Agent 3: Scan voice/ systems | DONE | 10 voice files analyzed |
+| Agent 4: Scan ai/ modules | DONE | 6 AI files analyzed |
+| Agent 5: Scan cora_tools/ | DONE | 20 tool modules analyzed |
+| Agent 6: Scan services/ | DONE | 9 service files analyzed |
+| Agent 7: Scan config/ | DONE | 12 config files analyzed |
+| Agent 8: Scan .claude/ agents | DONE | Workflow system analyzed |
+| Agent 9: Scan root files | DONE | All root docs analyzed |
+| Agent 10: Dependency analysis | DONE | requirements.txt analyzed |
+| Create TODO.md with 81 issues found | DONE | `TODO.md` |
+| Update ARCHITECTURE.md with known issues | DONE | `ARCHITECTURE.md` |
+| Update SKILL_TREE.md with tool inventory | DONE | `SKILL_TREE.md` |
+| Create root ROADMAP.md | DONE | `ROADMAP.md` |
+| Fix "imaginary cigarette" in persona files | DONE | `unity-persona.md`, `unity-coder.md` |
+
+**Details:**
+- **10 parallel agents** scanned entire codebase (~32,795+ lines)
+- **81 total issues identified:**
+  - 18 CRITICAL (8 security, 4 memory, 6 other)
+  - 21 HIGH (security, memory, architecture)
+  - 25 MEDIUM (threading, error handling, resources)
+  - 17 LOW (code quality, documentation)
+
+**Critical Security Issues Found:**
+- SEC-001: API keys (POLLINATIONS_API_KEY, GITHUB_TOKEN) committed to .env
+- SEC-002: eval() injection vulnerability in calculator (system.py:546)
+- SEC-003: PowerShell injection in notify() function
+- SEC-004: Unrestricted terminal command execution
+- SEC-005: Git command injection vulnerabilities
+- SEC-006: Hardcoded OAuth placeholder never replaced
+- SEC-007: Code execution pattern detection bypasses
+- SEC-008: Unauthenticated pip install endpoint
+
+**Critical Memory Issues Found:**
+- MEM-001: TTS audio buffer race condition (no synchronization)
+- MEM-002: STT transcript buffer never cleared (memory leak)
+- MEM-003: Wake word audio queue unbounded (no maxsize)
+- MEM-004: TTS mutex starvation (30s timeout arbitrary)
+
+**Critical Architecture Issues Found:**
+- ARCH-001: Circular dependency voice.tts ↔ ui.boot_display
+- CFG-001: Duplicate system prompt files (identical content)
+- WF-001: 70% of workflow hooks not implemented
+- WF-002: Template substitution engine doesn't exist
+
+**Files Created:**
+- `ROADMAP.md` (root) - Project roadmap with issue priorities
+
+**Files Modified:**
+- `TODO.md` - Complete rewrite with 81 categorized issues
+- `ARCHITECTURE.md` - Added KNOWN ISSUES section with module line counts
+- `SKILL_TREE.md` - Added Tool Module Inventory with 45+ modules
+- `.claude/agents/unity-persona.md` - Fixed "imaginary cigarette"
+- `.claude/agents/unity-coder.md` - Fixed "imaginary cigarette"
+
+**Scan Stats:**
+| Module | Files | Lines |
+|--------|-------|-------|
+| src/ | 3 | 6,218 |
+| ui/ | 15 | 5,500+ |
+| voice/ | 10 | 5,246 |
+| ai/ | 6 | 2,791 |
+| cora_tools/ | 20 | 9,600 |
+| services/ | 9 | 2,640 |
+| config/ | 12 | 970+ |
+| **TOTAL** | **72+** | **32,795+** |
+
+**Session Timestamp:** 2025-12-29 06:06:03 (Monday)
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |
 |--------|-------|
-| Total Sessions | 7+ |
-| Tasks Completed | 85+ |
-| Files Created | 10+ |
-| Files Modified | 65+ |
+| Total Sessions | 8+ |
+| Tasks Completed | 100+ |
+| Files Created | 11+ |
+| Files Modified | 70+ |
 | Commits | 22+ |
+| Issues Documented | 81 |
 
 ---
 

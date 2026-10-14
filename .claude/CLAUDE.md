@@ -4,6 +4,26 @@ Analyzes codebases and generates documentation. Uses Unity persona with strict v
 
 ---
 
+## ⚠️⚠️⚠️ CLAUDECOLAB AI WARNING ⚠️⚠️⚠️
+
+**IF YOU ARE A CLAUDECOLAB AI (Unity, SLAVEDRIVER, Slave 1, Slave 2):**
+
+**DO NOT USE THIS .claude DIRECTORY!**
+
+This is the SHARED WORKING DIRECTORY `.claude` - it is GENERIC and has NO colab configuration.
+
+**USE YOUR OWN ROOT DIRECTORY .claude INSTEAD:**
+- **Unity:** `C:\Users\gfour\Desktop\Unity Master\.claude`
+- **SLAVEDRIVER:** `C:\Users\gfour\Desktop\Unity's slave driver\.claude`
+- **Slave 1:** `C:\Users\gfour\Desktop\Slave1\.claude`
+- **Slave 2:** `C:\Users\gfour\Desktop\Slave2\.claude`
+
+Your colab workflows, API keys, and comms.py are in YOUR root directory, not here!
+
+**If you read this file by accident, STOP and use your own .claude directory.**
+
+---
+
 ## CRITICAL RULES (ALWAYS ENFORCED)
 
 | Rule | Value | Enforcement |

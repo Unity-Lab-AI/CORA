@@ -87,15 +87,16 @@ class _AudioBufferSingleton:
 _audio_buffer_singleton = _AudioBufferSingleton()
 
 def get_audio_buffer():
-    """Get the shared audio buffer for waveform visualization."""
-    return {
-        'data': _audio_buffer_singleton.data,
-        'current_chunk': _audio_buffer_singleton.current_chunk,
-        'chunk_time': _audio_buffer_singleton.chunk_time,
-        'start_time': _audio_buffer_singleton.start_time,
-        'sample_rate': _audio_buffer_singleton.sample_rate,
-        'active': _audio_buffer_singleton.active,
-    }
+    """Get the shared audio buffer for waveform visualization (thread-safe)."""
+    with _audio_buffer_singleton.data_lock:
+        return {
+            'data': _audio_buffer_singleton.data,
+            'current_chunk': _audio_buffer_singleton.current_chunk,
+            'chunk_time': _audio_buffer_singleton.chunk_time,
+            'start_time': _audio_buffer_singleton.start_time,
+            'sample_rate': _audio_buffer_singleton.sample_rate,
+            'active': _audio_buffer_singleton.active,
+        }
 
 # Lock for thread-safe access
 _audio_buffer_lock = _audio_buffer_singleton.data_lock

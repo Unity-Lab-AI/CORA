@@ -213,5 +213,74 @@
 
 ---
 
+## Tool Module Inventory (10-Agent Scan 2025-12-29)
+
+### cora_tools/ (20 modules, 9,600 lines)
+
+| Module | Lines | Purpose | Issues |
+|--------|-------|---------|--------|
+| `__init__.py` | 158 | Module exports | OK |
+| `ai_tools.py` | 334 | Ollama LLM integration | OK |
+| `browser.py` | 179 | Playwright automation | Optional dep |
+| `calendar.py` | 338 | Event management | OK |
+| `code.py` | 800 | Code analysis/exec | SEC-007 danger gaps |
+| `email_tool.py` | 366 | Email client | No recipient validation |
+| `files.py` | 517 | File operations | OK |
+| `git_ops.py` | 850+ | Git + GitHub API | SEC-006 hardcoded OAuth |
+| `image_gen.py` | 314 | Pollinations API | OK |
+| `media.py` | 800+ | Media control | Optional deps |
+| `memory.py` | 352 | Working memory | OK |
+| `modal_tools.py` | 358 | UI modal handlers | Terminal injection risk |
+| `reminders.py` | 461 | Reminder scheduling | OK |
+| `screenshots.py` | 394 | Desktop capture | OK |
+| `self_modify.py` | 381 | Dynamic scripts | Script injection risk |
+| `system.py` | 622 | System control | SEC-002/003 eval+PS |
+| `tasks.py` | 546 | Task management | OK |
+| `tts_handler.py` | 205 | Async TTS | OK |
+| `web.py` | 506 | Web search/fetch | Rate limiting needed |
+| `windows.py` | 711 | Window management | OK |
+
+### voice/ (10 modules, 5,246 lines)
+
+| Module | Lines | Purpose | Issues |
+|--------|-------|---------|--------|
+| `commands.py` | 1,725 | Voice command router | SEC-004/005 injection |
+| `tts.py` | 707 | Kokoro TTS | MEM-001 race condition |
+| `ambient_awareness.py` | 509 | Proactive interjections | Resource drain |
+| `stt.py` | 425 | Vosk STT | MEM-002 memory leak |
+| `emotion.py` | 404 | Mood tracking | Thread safety |
+| `wake_word.py` | 368 | Wake detection | MEM-003 unbounded queue |
+| `tts_mutex.py` | 365 | Speech coordination | MEM-004 starvation |
+| `converse.py` | 352 | Conversation loop | Timeout issues |
+| `echo_filter.py` | 339 | Echo cancellation | Duration formula wrong |
+| `__init__.py` | 52 | Module exports | OK |
+
+### ai/ (6 modules, 2,791 lines)
+
+| Module | Lines | Purpose | Issues |
+|--------|-------|---------|--------|
+| `ollama.py` | 1,051 | HTTP client | Hardcoded URL |
+| `prompts.py` | 625 | Prompt templates | OK |
+| `context.py` | 429 | Context building | OK |
+| `router.py` | 347 | Model selection | OK |
+| `tool_executor.py` | 292 | Tool routing | Ambiguity with cora.py |
+| `__init__.py` | 47 | Module exports | OK |
+
+### services/ (9 modules, 2,640 lines)
+
+| Module | Lines | Purpose | Issues |
+|--------|-------|---------|--------|
+| `audio.py` | 486 | Audio devices | OK |
+| `presence.py` | 387 | Webcam detection | No snapshot cleanup |
+| `hotkeys.py` | 368 | Keyboard hooks | OK |
+| `stats_server.py` | 353 | HTTP stats server | SEC-008 pip install |
+| `cli_popup.py` | 399 | Terminal popup | OK |
+| `notifications.py` | 252 | System notifications | OK |
+| `weather.py` | 212 | wttr.in API | No rate limiting |
+| `location.py` | 156 | IP geolocation | HTTP not HTTPS |
+| `__init__.py` | 27 | Module exports | OK |
+
+---
+
 *Unity AI Lab - C.O.R.A v1.0.0 Skill Tree*
-*UPDATED: 2025-12-25*
+*UPDATED: 2025-12-29 (10-Agent Deep Scan)*

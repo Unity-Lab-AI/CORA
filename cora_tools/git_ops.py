@@ -353,6 +353,41 @@ class GitHubAPI:
         return result
 
 
+def _validate_git_ref(ref: str) -> bool:
+    """Validate a git reference (branch name, tag, etc.) for safety.
+
+    Rejects refs containing shell metacharacters as defense in depth.
+    Note: subprocess with list args is already safe, this is extra protection.
+    """
+    if not ref or not ref.strip():
+        return False
+    # Reject shell metacharacters and control characters
+    dangerous_chars = set('$`|;&<>(){}[]!*?~\\"\'')
+    if any(c in ref for c in dangerous_chars):
+        return False
+    if any(ord(c) < 32 for c in ref):  # Control characters
+        return False
+    # Git ref restrictions
+    if ref.startswith('-'):  # Could be interpreted as option
+        return False
+    if '..' in ref:  # Path traversal in refs
+        return False
+    return True
+
+
+def _validate_path(path: str) -> bool:
+    """Validate a file path for git operations."""
+    if not path or not path.strip():
+        return False
+    # Reject shell metacharacters
+    dangerous_chars = set('$`|;&<>(){}[]!*?')
+    if any(c in path for c in dangerous_chars):
+        return False
+    if path.startswith('-'):  # Could be interpreted as option
+        return False
+    return True
+
+
 class GitOperations:
     """Complete Git operations for CORA."""
 
@@ -584,6 +619,8 @@ class GitOperations:
 
     def branch_create(self, name: str) -> Dict[str, Any]:
         """Create a new branch."""
+        if not _validate_git_ref(name):
+            return {'success': False, 'error': f'Invalid branch name: {name}'}
         result = self._run_git(['branch', name])
         if result['success']:
             return {
@@ -594,6 +631,8 @@ class GitOperations:
 
     def branch_delete(self, name: str, force: bool = False) -> Dict[str, Any]:
         """Delete a branch."""
+        if not _validate_git_ref(name):
+            return {'success': False, 'error': f'Invalid branch name: {name}'}
         flag = '-D' if force else '-d'
         result = self._run_git(['branch', flag, name])
         if result['success']:
@@ -605,6 +644,8 @@ class GitOperations:
 
     def checkout(self, branch: str) -> Dict[str, Any]:
         """Switch to a branch."""
+        if not _validate_git_ref(branch):
+            return {'success': False, 'error': f'Invalid branch name: {branch}'}
         result = self._run_git(['checkout', branch])
         if result['success']:
             return {
@@ -615,6 +656,8 @@ class GitOperations:
 
     def checkout_new(self, branch: str) -> Dict[str, Any]:
         """Create and switch to new branch."""
+        if not _validate_git_ref(branch):
+            return {'success': False, 'error': f'Invalid branch name: {branch}'}
         result = self._run_git(['checkout', '-b', branch])
         if result['success']:
             return {
@@ -625,6 +668,8 @@ class GitOperations:
 
     def merge(self, branch: str) -> Dict[str, Any]:
         """Merge a branch into current branch."""
+        if not _validate_git_ref(branch):
+            return {'success': False, 'error': f'Invalid branch name: {branch}'}
         result = self._run_git(['merge', branch])
         if result['success']:
             return {

@@ -135,3 +135,6 @@ screenshots/
 # The tools/ folder is ONLY for downloaded binaries (mpv, ffmpeg, etc)
 # CORA source code tools are in cora_tools/
 tools/
+
+# Windows NUL-device artifact
+nul
