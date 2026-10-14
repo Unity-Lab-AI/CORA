@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
 C.O.R.A Boot Sequence - F-100 Fighter Jet Style
-Sequential system initialization with Kokoro TTS announcements.
+Sequential system initialization narrated in CORA's own voice (unity-voice-v2).
 
 Tests all tools and announces each system as it comes online.
-User hears EVERY component boot up through Kokoro TTS.
+The user hears EVERY component boot up through her voice sidecar.
+
+Demo phases (GitHub code import, YouTube test, modal test, audio test,
+image generation) run only when config.json `boot.demo_phases` is true; the
+default boot is the spec'd one: voice, AI, hardware, camera, core tools, the
+day's calendar / tasks / reminders, voice systems, location + weather, news,
+vision, final check.
 
 Created by: Unity AI Lab
 """
@@ -68,6 +74,14 @@ BOOT_STATUS: Dict[str, Any] = {
 # Global TTS engine
 _tts_engine = None
 
+# Reminder scheduler (started in Phase 4.5 so reminders actually fire)
+_reminder_manager = None
+
+
+class _SkippedPhase(Exception):
+    """Raised inside a demo phase when boot.demo_phases is off."""
+
+
 # Cache for system prompt
 _system_prompt_cache = None
 
@@ -129,92 +143,126 @@ def get_full_prompt() -> str:
     return get_system_prompt() + "\n\n" + get_tools_prompt()
 
 
+def _boot_config() -> Dict[str, Any]:
+    """config.json `boot` block (demo_phases, github_import, ...)."""
+    try:
+        import json
+        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+            return json.load(f).get('boot') or {}
+    except Exception:
+        return {}
+
+
+def _app_version() -> str:
+    try:
+        import json
+        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+            return str(json.load(f).get('version') or '3.0.0')
+    except Exception:
+        return '3.0.0'
+
+
 def init_tts():
-    """Initialize Kokoro TTS - THIS IS THE FIRST THING THAT BOOTS."""
+    """Bring up CORA's own voice (unity-voice-v2 sidecar) - FIRST THING THAT BOOTS."""
     global _tts_engine
     print("\n[BOOT] ========== VOICE SYNTHESIS INITIALIZATION ==========")
-    print("[BOOT] Loading Kokoro TTS engine...")
+    print("[BOOT] Connecting to unity-voice-v2 ...")
 
     try:
-        from voice.tts import KokoroTTS
-        engine = KokoroTTS(voice='af_bella', speed=1.0)
-
-        if engine.initialize():
-            _tts_engine = engine
-            print("[BOOT] Kokoro TTS initialized successfully")
-            print("[BOOT] Voice: af_bella (sexy voice)")
+        from voice.tts import get_tts_queue, voice_status
+        q = get_tts_queue()          # starts the sidecar if needed
+        status = voice_status()
+        if q.engine and q.engine.is_initialized:
+            _tts_engine = q.engine
+            print(f"[BOOT] unity-voice-v2 online at {status['url']}")
             print("[BOOT] ========== VOICE ONLINE ==========\n")
 
-            # FIRST THING USER HEARS - TTS announcing itself
-            speak("Voice synthesis online. Kokoro TTS loaded and ready.")
+            # FIRST THING USER HEARS - her voice announcing itself
+            speak("Voice synthesis online. My own voice, version two, loaded and ready.")
             responsive_sleep(0.3)
             return True
-        else:
-            print("[BOOT] [FAIL] Kokoro TTS failed to initialize")
-            return False
+        err = getattr(q.engine, 'last_error', None) if q.engine else 'engine missing'
+        print(f"[BOOT] [FAIL] unity-voice-v2 unavailable: {err}")
+        return False
 
     except Exception as e:
         print(f"[BOOT] [FAIL] TTS init error: {e}")
         return False
 
 
-def speak(text: str, blocking: bool = True):
-    """Speak text via Kokoro TTS and update visual display.
+def speak(text: str, blocking: bool = True, emotion: str = None):
+    """Speak text in CORA's voice and update the visual display.
 
     Args:
         text: Text to speak
-        blocking: If True, wait for speech to finish. If False, return immediately.
+        blocking: If True, wait for speech to finish (keeping Tk responsive).
+        emotion: Optional emotion label; detected from the text when omitted.
     """
     global _boot_display
+    if not text:
+        return
     print(f"[CORA] {text}")
 
     # Mark echo filter that we're speaking (prevents hearing ourselves)
     try:
         from voice.echo_filter import get_echo_filter
         echo_filter = get_echo_filter()
-        # Estimate duration: ~0.4 seconds per word
         word_count = len(text.split())
         duration = max(1.0, word_count * 0.4)
         echo_filter.start_speaking(duration=duration, text=text)
-    except:
+    except Exception:
         pass
 
-    # Note: Waveform start/stop is now handled automatically by KokoroTTS.speak()
-    # via the set_boot_display() registration
+    if emotion is None:
+        try:
+            from voice.emotion import detect_emotion
+            emotion = detect_emotion(text)
+        except Exception:
+            emotion = 'neutral'
 
-    def do_speak():
-        """Actual TTS call - runs in thread."""
-        if _tts_engine:
-            try:
-                _tts_engine.speak(text, emotion='neutral')
-            except Exception as e:
-                print(f"[TTS ERROR] {e}")
+    try:
+        from voice.tts import get_tts_queue, is_speaking
+    except Exception as e:
+        print(f"[TTS ERROR] {e}")
+        return
 
-        # Clear echo filter now that we're done
+    q = get_tts_queue()
+    if not (q.engine and q.engine.is_initialized):
+        # No voice: show the text, don't block the boot on it.
         try:
             from voice.echo_filter import get_echo_filter
             get_echo_filter().stop_speaking()
-        except:
+        except Exception:
             pass
+        return
 
-    # Run TTS in background thread so UI stays responsive
-    import threading
-    tts_thread = threading.Thread(target=do_speak, daemon=True)
-    tts_thread.start()
+    q.speak(text, emotion=emotion, priority=3, skip_presence=True)
 
-    # If blocking, wait for thread to finish while keeping Tkinter responsive
     if blocking:
-        while tts_thread.is_alive():
+        # Wait until the line has been picked up and finished, keeping Tk alive
+        deadline = time.time() + 180
+        started = False
+        while time.time() < deadline:
+            busy = q.pending_count() > 0 or is_speaking()
+            if busy:
+                started = True
+            elif started or time.time() > deadline - 179.5:
+                # queue empty and nothing playing: give the worker 150 ms to pick it up
+                time.sleep(0.15)
+                if q.pending_count() == 0 and not is_speaking():
+                    break
             if _boot_display and _boot_display.root:
                 try:
-                    # Process ALL pending events including mouse drags
-                    for _ in range(10):  # Process multiple events per cycle
+                    for _ in range(10):
                         _boot_display.root.update()
                 except tk.TclError:
-                    break  # Window was closed
-            # Minimal sleep - just yield to other threads
-            time.sleep(0.001)
-        tts_thread.join()  # Clean up thread
+                    break
+            time.sleep(0.005)
+        try:
+            from voice.echo_filter import get_echo_filter
+            get_echo_filter().stop_speaking()
+        except Exception:
+            pass
 
 
 def cora_respond(context: str, result: str, status: str = "ok", mode: str = "quick") -> str:
@@ -660,12 +708,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     if not skip_tts:
         tts_ok = init_tts()
         if tts_ok:
-            BOOT_STATUS['systems'].append({'name': 'Voice TTS (Kokoro)', 'status': 'OK'})
-            display_log("Kokoro TTS initialized - Voice: af_bella", "ok")
+            BOOT_STATUS['systems'].append({'name': 'Voice (unity-voice-v2)', 'status': 'OK'})
+            display_log("unity-voice-v2 online - her own voice", "ok")
             display_phase("1.0 Voice Synthesis", "ok")
         else:
-            BOOT_STATUS['systems'].append({'name': 'Voice TTS (Kokoro)', 'status': 'FAIL'})
-            display_log("Kokoro TTS failed to initialize", "fail")
+            BOOT_STATUS['systems'].append({'name': 'Voice (unity-voice-v2)', 'status': 'FAIL'})
+            display_log("unity-voice-v2 sidecar unavailable (see data/voice-sidecar.log)", "fail")
             display_phase("1.0 Voice Synthesis", "fail")
     else:
         print("[BOOT] TTS skipped (silent mode)")
@@ -748,12 +796,12 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("\n[PHASE 2.1] AI Models Check")
     print("=" * 50)
 
-    # Required models for CORA
-    REQUIRED_MODELS = {
-        'dolphin-mistral': 'Chat/Response model (CORA\'s personality)',
-        'llava': 'Vision model (see/look commands)',
-        'qwen2.5-coder': 'Coding model (write/fix code)',
-    }
+    # Required models for CORA come from config (ai.settings), never hardcoded
+    from ai import settings as _ai_settings
+    REQUIRED_MODELS = {_ai_settings.chat_model(): "Chat/Response model (CORA's personality)",
+                       _ai_settings.vision_model(): 'Vision model (see/look commands)'}
+    if _ai_settings.code_model() not in REQUIRED_MODELS:
+        REQUIRED_MODELS[_ai_settings.code_model()] = 'Coding model (write/fix code)'
 
     models_ok = 0
     models_missing = []
@@ -767,8 +815,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Found {len(installed_models)} models installed", "info")
 
         for model_key, model_desc in REQUIRED_MODELS.items():
-            # Check if model is installed (partial match)
-            found = any(model_key.lower() in name for name in installed_names)
+            # Check if model is installed (exact tag or same base name)
+            base = model_key.lower().split(':')[0]
+            found = any(name == model_key.lower() or name.split(':')[0] == base for name in installed_names)
             if found:
                 print(f"  [OK] {model_key} - {model_desc}")
                 display_log(f"{model_key} - OK", "ok")
@@ -929,8 +978,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
                     vision_result = generate_with_image(
                         prompt="What do you see through this camera? Describe the scene briefly.",
-                        image_path=str(frame_path),
-                        model="llava"
+                        image_path=str(frame_path)
                     )
 
                     if vision_result and vision_result.content:
@@ -1144,7 +1192,122 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     responsive_sleep(0.3)
 
     # ================================================================
-    # PHASE 4.1: CODE IMPORT TEST - Fetch real code from GitHub
+    # PHASE 4.5: DAILY BRIEFING - today's calendar, tasks, reminders
+    # (the spec'd boot narration) + start the reminder scheduler
+    # ================================================================
+    display_phase("4.5 Daily Briefing", "running")
+    display_log("PHASE 4.5: DAILY BRIEFING", "phase")
+    print("\n[PHASE 4.5] Daily Briefing")
+    print("=" * 50)
+    try:
+        briefing_parts = []
+
+        # Calendar: today's events
+        try:
+            from cora_tools.calendar import get_today_events, format_event_time
+            events = get_today_events()
+            if events:
+                names = []
+                for ev in events[:4]:
+                    try:
+                        names.append(f"{ev.get('title', 'event')} at {format_event_time(ev)}")
+                    except Exception:
+                        names.append(str(ev.get('title', 'event')))
+                briefing_parts.append(f"{len(events)} event{'s' if len(events) != 1 else ''} today: " + "; ".join(names) + ".")
+                display_log(f"Calendar: {len(events)} event(s) today", "ok")
+                for n in names:
+                    display_log(f"  {n}", "info")
+            else:
+                briefing_parts.append("Nothing on the calendar today.")
+                display_log("Calendar: no events today", "info")
+            BOOT_STATUS['today_events'] = len(events)
+        except Exception as e:
+            display_log(f"Calendar: {e}", "warn")
+
+        # Tasks: overdue + pending
+        try:
+            from cora_tools.tasks import get_manager
+            tm = get_manager()
+            pending = tm.list_tasks('pending')
+            overdue = tm.list_tasks('overdue')
+            high = [t for t in pending if int(t.get('priority', 3) or 3) <= 1]
+            if overdue:
+                titles = ", ".join(str(t.get('text') or t.get('title') or 'task') for t in overdue[:3])
+                briefing_parts.append(f"{len(overdue)} overdue task{'s' if len(overdue) != 1 else ''}: {titles}.")
+                display_log(f"Tasks: {len(overdue)} OVERDUE", "warn")
+            if high:
+                titles = ", ".join(str(t.get('text') or t.get('title') or 'task') for t in high[:3])
+                briefing_parts.append(f"High priority: {titles}.")
+            if pending:
+                briefing_parts.append(f"{len(pending)} task{'s' if len(pending) != 1 else ''} pending.")
+                display_log(f"Tasks: {len(pending)} pending", "info")
+            else:
+                briefing_parts.append("No pending tasks.")
+            BOOT_STATUS['tasks_pending'] = len(pending)
+            BOOT_STATUS['tasks_overdue'] = len(overdue)
+        except Exception as e:
+            display_log(f"Tasks: {e}", "warn")
+
+        # Reminders: upcoming today + start the scheduler so they actually fire
+        try:
+            from cora_tools.reminders import ReminderManager, format_reminder
+            global _reminder_manager
+            _reminder_manager = ReminderManager()
+            upcoming = []
+            today = datetime.now().date()
+            for r in _reminder_manager.list_all(enabled_only=True):
+                when = r.get('time') or r.get('due') or r.get('datetime')
+                try:
+                    when_dt = datetime.fromisoformat(str(when)) if when else None
+                except Exception:
+                    when_dt = None
+                if when_dt is None or when_dt.date() == today:
+                    upcoming.append(r)
+            if upcoming:
+                texts = ", ".join(str(r.get('text') or r.get('message') or 'reminder') for r in upcoming[:3])
+                briefing_parts.append(f"{len(upcoming)} reminder{'s' if len(upcoming) != 1 else ''} today: {texts}.")
+                display_log(f"Reminders: {len(upcoming)} today", "ok")
+
+            def _on_reminder(rem):
+                try:
+                    line = format_reminder(rem)
+                except Exception:
+                    line = str(rem.get('text') or rem.get('message') or 'Reminder')
+                display_log(f"REMINDER: {line}", "warn")
+                try:
+                    from services.notifications import notify
+                    notify("CORA Reminder", line)
+                except Exception:
+                    pass
+                speak(f"Reminder: {line}", blocking=False, emotion='urgent')
+
+            _reminder_manager.set_callback(_on_reminder)
+            _reminder_manager.start_checking(interval=30)
+            display_log("Reminder scheduler running (30 s)", "ok")
+            BOOT_STATUS['systems'].append({'name': 'Reminder Scheduler', 'status': 'OK'})
+        except Exception as e:
+            display_log(f"Reminders: {e}", "warn")
+            BOOT_STATUS['systems'].append({'name': 'Reminder Scheduler', 'status': 'WARN'})
+
+        display_phase("4.5 Daily Briefing", "ok")
+        briefing = " ".join(briefing_parts) if briefing_parts else "Nothing scheduled, nothing pending."
+        response = cora_respond("Daily Briefing", briefing, "ok", mode="full")
+        speak(response)
+    except Exception as e:
+        print(f"  [WARN] Daily briefing: {e}")
+        display_log(f"Daily briefing error: {e}", "warn")
+        display_phase("4.5 Daily Briefing", "warn")
+
+    responsive_sleep(0.3)
+
+    # Demo phases (GitHub import, YouTube, modal test, audio test, image gen)
+    # only run when config.json boot.demo_phases is true.
+    _boot_cfg = _boot_config()
+    _demo = bool(_boot_cfg.get('demo_phases', False))
+    _github_import = bool(_boot_cfg.get('github_import', False))
+
+    # ================================================================
+    # PHASE 4.1: CODE IMPORT TEST - Fetch real code from GitHub (demo)
     # ================================================================
     display_phase("4.1 Code Import", "running")
     display_log("PHASE 4.1: CODE IMPORT FROM GITHUB", "phase")
@@ -1152,14 +1315,16 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("=" * 50)
 
     try:
+        if not _demo:
+            raise _SkippedPhase("boot.demo_phases is false")
         import random
         import urllib.request
         import json
         import base64
         import os
 
-        # Try to use GitHub token from .env to fetch from user's repos
-        github_token = os.environ.get('GITHUB_TOKEN', '')
+        # Private-repo import is opt-in (boot.github_import); public fallback otherwise
+        github_token = os.environ.get('GITHUB_TOKEN', '') if _github_import else ''
         fetched_from_user_repo = False
         url = None
         code_name = None
@@ -1399,6 +1564,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             except:
                 pass
 
+    except _SkippedPhase as e:
+        display_log(f"Code import skipped ({e})", "info")
+        display_phase("4.1 Code Import", "ok")
     except Exception as e:
         print(f"  [WARN] Code import test: {e}")
         display_log(f"Code import error: {e}", "warn")
@@ -1416,6 +1584,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("=" * 50)
 
     try:
+        if not _demo:
+            raise _SkippedPhase("boot.demo_phases is false")
         import random
         import subprocess
         import threading
@@ -1589,6 +1759,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             except:
                 pass
 
+    except _SkippedPhase as e:
+        display_log(f"YouTube test skipped ({e})", "info")
+        display_phase("4.2 YouTube Test", "ok")
     except Exception as e:
         print(f"  [WARN] YouTube test: {e}")
         display_log(f"YouTube test error: {e}", "warn")
@@ -1606,6 +1779,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("=" * 50)
 
     try:
+        if not _demo:
+            raise _SkippedPhase("boot.demo_phases is false")
         import tkinter as tk
         import random
 
@@ -1684,6 +1859,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         except:
             pass
 
+    except _SkippedPhase as e:
+        display_log(f"Modal test skipped ({e})", "info")
+        display_phase("4.3 Modal Windows", "ok")
     except Exception as e:
         print(f"  [WARN] Modal windows test: {e}")
         display_log(f"Modal windows error: {e}", "warn")
@@ -1733,9 +1911,25 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_log(f"Wake Word: {e}", "info")
         BOOT_STATUS['systems'].append({'name': 'Wake Word', 'status': 'INFO'})
 
+    # Her voice (sidecar) + STT engine status
+    voice_result = "Voice systems online."
+    try:
+        from voice.tts import voice_status
+        vs = voice_status()
+        display_log(f"Voice: unity-voice-v2 {'UP' if vs['up'] else 'DOWN'} at {vs['url']}", "ok" if vs['up'] else "warn")
+        if not vs['up']:
+            voice_result = "Voice server is down."
+    except Exception as e:
+        display_log(f"Voice status: {e}", "warn")
+    try:
+        from voice.stt import stt_status
+        ss = stt_status()
+        display_log(f"STT: {ss.get('engine')} ({ss.get('status')})", "ok" if ss.get('status') == 'ready' else "warn")
+        voice_result += " Wake word active." if ss.get('status') == 'ready' else " Speech recognition not ready."
+    except Exception:
+        voice_result += " Wake word active."
+
     display_phase("5.0 Voice Systems", "ok")
-    # Voice summary - just status
-    voice_result = "Voice systems online. Wake word active."
     response = cora_respond("Voice Systems check", voice_result, "ok")
     speak(response)
     responsive_sleep(0.3)
@@ -1912,6 +2106,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     print("=" * 50)
 
     try:
+        if not _demo:
+            raise _SkippedPhase("boot.demo_phases is false")
         import subprocess
         import random
 
@@ -2000,6 +2196,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             response = cora_respond("Audio Playback", "Audio skipped. Need yt-dlp and mpv.", "warn")
             speak(response)
 
+    except _SkippedPhase as e:
+        display_log(f"Audio test skipped ({e})", "info")
+        display_phase("6.1 Audio Test", "ok")
     except Exception as e:
         print(f"  [WARN] Audio playback test: {e}")
         display_log(f"Audio playback error: {e}", "warn")
@@ -2148,8 +2347,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 vision_result = generate_with_image(
                     prompt="What do you see on this screen? Describe the specific windows, apps, content, or anything interesting. Be detailed.",
                     image_path=result.path,
-                    system=get_system_prompt(),
-                    model="llava"
+                    system=get_system_prompt()
                 )
                 if vision_result and vision_result.content:
                     screen_description = vision_result.content.strip()
@@ -2268,8 +2466,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 vision_result = generate_with_image(
                     prompt="What do you see through this camera? Describe the person, their appearance, the room, objects, or anything interesting. Be detailed and specific.",
                     image_path=str(cam_path),
-                    system=get_system_prompt(),
-                    model="llava"
+                    system=get_system_prompt()
                 )
                 if vision_result and vision_result.content:
                     camera_description = vision_result.content.strip()
@@ -2343,9 +2540,11 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     try:
         from cora_tools.image_gen import generate_image, show_fullscreen_image
-        print("  [OK] Image generation module loaded (Pollinations Flux)")
-        display_log("Pollinations Flux module loaded", "ok")
+        print("  [OK] Image generation module loaded (Pollinations)")
+        display_log("Pollinations image module loaded", "ok")
         BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
+        if not _demo:
+            raise _SkippedPhase("boot.demo_phases is false")
 
         # Have CORA generate her own unique prompt using Ollama
         print("  Asking CORA for a fucked up image idea...")
@@ -2394,9 +2593,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             prompt=cora_prompt,
             width=1280,
             height=720,
-            model="flux",
-            seed=random_seed,
-            nologo=True
+            seed=random_seed
         )
 
         if result.get('success'):
@@ -2450,8 +2647,7 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 vision_result = generate_with_image(
                     prompt="Describe this image in detail. What do you see? Be specific about the scene, objects, colors, mood, and style.",
                     image_path=img_path,
-                    system=get_system_prompt(),
-                    model="llava"
+                    system=get_system_prompt()
                 )
                 if vision_result and vision_result.content:
                     image_description = vision_result.content.strip()
@@ -2490,6 +2686,9 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
             response = cora_respond("Image Generation", f"Image gen failed: {error[:50]}", "fail")
             speak(response)
 
+    except _SkippedPhase as e:
+        display_log(f"Image generation test skipped ({e})", "info")
+        display_phase("9.0 Image Gen", "ok")
     except Exception as e:
         print(f"  [WARN] Image generation: {e}")
         display_log(f"Image generation error: {e}", "warn")
@@ -3148,6 +3347,7 @@ Don't repeat the context - just respond to it naturally. No quotes around your r
         "3.0 Hardware Check",
         "3.1 Camera Feed",
         "4.0 Core Tools",
+        "4.5 Daily Briefing",
         "4.1 Code Import",
         "4.2 YouTube Test",
         "4.3 Modal Windows",

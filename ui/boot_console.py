@@ -279,13 +279,12 @@ def create_default_boot_checks() -> List[tuple]:
 
     def check_location():
         try:
-            import requests
-            resp = requests.get('http://ip-api.com/json/', timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
+            from services.location import get_location
+            data = get_location() or {}
+            if data.get('city'):
                 return {
                     'city': data.get('city', 'Unknown'),
-                    'region': data.get('regionName', ''),
+                    'region': data.get('region', data.get('state', '')),
                     'country': data.get('country', '')
                 }
         except Exception:
@@ -397,15 +396,17 @@ def create_default_boot_checks() -> List[tuple]:
 
     def check_ollama():
         try:
-            import requests
-            resp = requests.get('http://localhost:11434/api/tags', timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                models = data.get('models', [])
+            from ai.ollama import check_ollama as _check
+            from ai import settings
+            st = _check()
+            if st.get('connected'):
+                names = st.get('model_names', [])
+                primary = settings.chat_model()
+                ordered = [primary] + [n for n in names if n != primary]
                 return {
                     'connected': True,
-                    'models': len(models),
-                    'model_names': [m.get('name', '') for m in models[:3]]
+                    'models': st.get('models', 0),
+                    'model_names': ordered[:3]
                 }
         except Exception:
             pass
@@ -438,38 +439,26 @@ def create_default_boot_checks() -> List[tuple]:
         ])
 
     def check_tts():
+        """Her own voice: the unity-voice-v2 sidecar (started if needed)."""
         try:
-            import pyttsx3
-            return {'available': True, 'engine': 'pyttsx3'}
-        except ImportError:
-            pass
-        try:
-            from kokoro import KPipeline
-            return {'available': True, 'engine': 'kokoro'}
-        except ImportError:
-            pass
-        return {'available': False, 'engine': None}
+            from voice import unity_voice as uv
+            ok, msg = uv.ensure_sidecar(timeout=30)
+            return {'available': ok, 'engine': 'unity-voice-v2', 'url': uv.VOICE_URL, 'detail': msg}
+        except Exception as e:
+            return {'available': False, 'engine': None, 'detail': str(e)}
 
     def tts_tts(data):
         import random
         if data.get('available'):
-            engine = data.get('engine', 'unknown')
-            if engine == 'kokoro':
-                return random.choice([
-                    "Voice synthesis online. Kokoro engine active.",
-                    "Speech systems ready. Premium voice enabled.",
-                    "Vocal interface initialized. High-fidelity mode.",
-                ])
-            else:
-                return random.choice([
-                    "Voice output ready. Standard synthesis.",
-                    "Speech systems active. Basic engine loaded.",
-                    "Text-to-speech operational.",
-                ])
+            return random.choice([
+                "Voice synthesis online. My own voice, version two.",
+                "Speech systems ready. This is my real voice.",
+                "Vocal interface initialized. Her own voice, live.",
+            ])
         return random.choice([
-            "Voice systems offline. Text-only mode.",
-            "No speech engine detected. Silent running.",
-            "TTS unavailable. Reading text instead.",
+            "Voice server offline. Text-only mode.",
+            "My voice server isn't answering. Silent running.",
+            "Voice unavailable. Reading text instead.",
         ])
 
     def check_system():
@@ -809,55 +798,38 @@ def create_default_boot_checks() -> List[tuple]:
             "No scheduled alerts.",
         ])
 
-    # VOSK CHECK - STT/wake word status
+    # STT CHECK - speech recognition / wake word status
     def check_vosk():
         try:
-            # Check if vosk is installed
-            import vosk
-            vosk_available = True
-
-            # Check for model directory
-            vosk_model_path = PROJECT_DIR / 'models' / 'vosk'
-            model_exists = vosk_model_path.exists() if vosk_model_path else False
-
-            # Alternative paths
-            if not model_exists:
-                alt_paths = [
-                    PROJECT_DIR / 'vosk-model-small-en-us-0.15',
-                    PROJECT_DIR / 'vosk-model',
-                    Path.home() / '.vosk' / 'model',
-                ]
-                for p in alt_paths:
-                    if p.exists():
-                        model_exists = True
-                        break
-
-            return {
-                'installed': vosk_available,
-                'model_found': model_exists,
-                'status': 'ready' if (vosk_available and model_exists) else 'partial'
-            }
-        except ImportError:
-            return {'installed': False, 'model_found': False, 'status': 'unavailable'}
+            from voice.stt import stt_status
+            return stt_status()
         except Exception:
-            return {'installed': False, 'model_found': False, 'status': 'error'}
+            pass
+        try:
+            import vosk  # noqa: F401
+            return {'installed': True, 'model_found': False, 'status': 'partial', 'engine': 'vosk'}
+        except ImportError:
+            return {'installed': False, 'model_found': False, 'status': 'unavailable', 'engine': None}
+        except Exception:
+            return {'installed': False, 'model_found': False, 'status': 'error', 'engine': None}
 
     def tts_vosk(data):
         import random
+        engine = data.get('engine') or 'speech'
         if data.get('status') == 'ready':
             return random.choice([
                 "Voice recognition ready. Wake word listening enabled.",
-                "Speech-to-text online. Say 'Hey Cora' to activate.",
-                "Vosk STT initialized. Voice commands available.",
+                "Speech-to-text online. Say 'Cora' to activate.",
+                f"{engine} initialized. Voice commands available.",
             ])
         elif data.get('installed'):
             return random.choice([
-                "Vosk installed but model not found.",
+                f"{engine} installed but the model is not ready yet.",
                 "STT partially configured. Model download needed.",
                 "Voice recognition available, awaiting model setup.",
             ])
         return random.choice([
-            "Voice recognition unavailable. Vosk not installed.",
+            "Voice recognition unavailable.",
             "STT offline. Text input only.",
             "No speech recognition. Keyboard mode active.",
         ])
@@ -928,29 +900,10 @@ def _get_default_speak_func() -> Callable:
             queue_speak(text, emotion=emotion, priority=3)
 
         return speak_with_emotion
-    except ImportError:
-        pass
+    except ImportError as e:
+        print(f"[BOOT-CONSOLE] voice unavailable: {e}")
 
-    # Fallback to pyttsx3 with emotion-based rate/pitch
-    try:
-        import pyttsx3
-        engine = pyttsx3.init()
-        base_rate = engine.getProperty('rate') or 150
-
-        def speak_sync_emotional(text):
-            """Speak with emotion-adjusted rate/pitch."""
-            if EMOTION_AVAILABLE:
-                emotion = detect_emotion(text)
-                params = get_voice_params(emotion, base_rate=base_rate)
-                engine.setProperty('rate', params['rate'])
-            engine.say(text)
-            engine.runAndWait()
-
-        return speak_sync_emotional
-    except Exception:
-        pass
-
-    # No TTS available
+    # No voice available (there is no fallback voice by design)
     return lambda x: None
 
 

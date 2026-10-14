@@ -22,12 +22,21 @@ from .stt import (
 
 from .tts import (
     TTSEngine,
-    KokoroTTS,
-    Pyttsx3TTS,
+    UnityVoiceTTS,
     get_tts_engine,
     speak,
-    list_voices
+    speak_async,
+    queue_speak,
+    speak_interrupt,
+    stop_speaking,
+    is_speaking,
+    list_voices,
+    voice_status,
 )
+
+# Legacy names kept so older call sites keep working (they get her voice).
+KokoroTTS = UnityVoiceTTS
+Pyttsx3TTS = UnityVoiceTTS
 
 __all__ = [
     # Emotion
@@ -44,9 +53,16 @@ __all__ = [
     'list_microphones',
     # TTS
     'TTSEngine',
+    'UnityVoiceTTS',
     'KokoroTTS',
     'Pyttsx3TTS',
     'get_tts_engine',
     'speak',
+    'speak_async',
+    'queue_speak',
+    'speak_interrupt',
+    'stop_speaking',
+    'is_speaking',
     'list_voices',
+    'voice_status',
 ]

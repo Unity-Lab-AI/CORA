@@ -421,6 +421,24 @@ User's words: "get to fixing it all we need it 100% operationsal and complete wi
 
 ---
 
+## Session: 2026-10-14 (Repair Phases 1, 2, 4 — runtime, V2 voice, STT)
+
+| Task | Done |
+|---|---|
+| UPG-008 | Python 3.13.16 installed (3.12 has no Windows installer any more: security-only). `.venv` created on 3.13 and all requirements installed (pip exit 0). `CORA.bat` rewritten: picks `py -3.13`/`3.12`/fallback, creates the venv, re-installs when `requirements.txt` hash changes, runs `scripts/bootstrap.py` (Ollama up, configured models pulled, yt-dlp upgraded, Playwright browser, V2 sidecar) and launches `src/boot_sequence.py` under the venv |
+| UPG-010 | Chat model = `huihui_ai/qwen3-abliterated:8b` (uncensored, native tool calling verified: `get_time` tool call in 4.0 s), fallback `dolphin3:8b`; vision = `qwen3-vl:4b` (pulled); code = chat model. `cora_respond`, presence, boot vision all use `ai.settings` |
+| UPG-011 | `cora_tools/image_gen.py` rewritten for current Pollinations: Bearer auth, live `/image/models` resolution with alias fallback, 404 retry without model, legacy flags opt-in |
+| UPG-005 | Private-repo GitHub import at boot is opt-in (`boot.github_import`) |
+| UPG-012 (core) | `voice/unity_voice.py` (sidecar client: `voice_text()` port, `prepare_text`, sentence split, emotion/act mapping, `delivery_support` validation, 422 fallback, sidecar autostart with interpreter detection, shared `unity-voice.lock` turn-taking). `voice/tts.py` rewritten on it: `UnityVoiceTTS` (synth-ahead, waveform feed, volume, stop flag), `TTSQueue` (presence via cached monitor), `stop_speaking`/`speak_async`/`voice_status`. `cora_tools/tts_handler.py` = adapter. `voice/__init__.py` exports updated with legacy aliases. `services/presence.py` rewritten (settings model, `PresenceMonitor` thread, snapshot pruning). Boot: `init_tts`/`speak` on the queue, Phase 1/5 strings, config `tts.unity_voice` block. Verified live: sidecar auto-started with Python 3.10, 63 delivery pairs, 4.0 s audio in 0.54 s, playback OK |
+| UPG-015 | New Phase 4.5 Daily Briefing speaks today's events, overdue/high-priority/pending tasks, today's reminders; `ReminderManager.start_checking(30)` runs with a spoken+toast callback. Demo phases 4.1/4.2/4.3/6.1/9.0 gated behind `boot.demo_phases` (default false) via `_SkippedPhase` |
+| UPG-017 (core) | `voice/stt.py` rewritten: faster-whisper (CUDA, int8_float16) with energy-gated phrase segmentation, Vosk fallback, bounded queues, `stt_status()`, fuzzy wake-word matching on the transcript stream, optional openWakeWord custom model. `voice/wake_word.py` = thin local layer (no Google STT). Whisper base.en loads on CUDA in 3.9 s |
+| API-H01 | `services/location.py`: HTTPS `ipapi.co` first, `ip-api.com` fallback, 30-min cache; boot console uses it |
+| Boot console | `ui/boot_console.py`: TTS check = sidecar health, Ollama/location via shared modules, STT via `stt_status()` |
+
+Open from these phases: cuBLAS/cuDNN CUDA-12 DLLs for ctranslate2 being installed (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`); UPG-013 streaming; UPG-012 leftovers in `src/cora.py`, `ui/panels.py`, web.
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |

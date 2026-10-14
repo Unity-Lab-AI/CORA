@@ -10,37 +10,69 @@ import urllib.request
 import urllib.error
 
 
+_cache = {'at': 0.0, 'data': None}
+_CACHE_SECONDS = 1800  # the machine does not move every minute
+
+
+def _fetch_ipapi_co():
+    """https://ipapi.co (HTTPS, keyless)."""
+    req = urllib.request.Request('https://ipapi.co/json/', headers={'User-Agent': 'CORA/3.0'})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        data = json.loads(response.read().decode())
+    if data.get('error') or not data.get('city'):
+        return None
+    return {
+        'city': data.get('city', 'Unknown'),
+        'region': data.get('region', ''),
+        'country': data.get('country_name', ''),
+        'country_code': data.get('country_code', data.get('country', '')),
+        'lat': data.get('latitude', 0),
+        'lon': data.get('longitude', 0),
+        'timezone': data.get('timezone', ''),
+        'isp': data.get('org', ''),
+        'ip': data.get('ip', '')
+    }
+
+
+def _fetch_ip_api_com():
+    """ip-api.com fallback (its free tier is HTTP-only)."""
+    req = urllib.request.Request('http://ip-api.com/json/', headers={'User-Agent': 'CORA/3.0'})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        data = json.loads(response.read().decode())
+    if data.get('status') != 'success':
+        return None
+    return {
+        'city': data.get('city', 'Unknown'),
+        'region': data.get('regionName', ''),
+        'country': data.get('country', ''),
+        'country_code': data.get('countryCode', ''),
+        'lat': data.get('lat', 0),
+        'lon': data.get('lon', 0),
+        'timezone': data.get('timezone', ''),
+        'isp': data.get('isp', ''),
+        'ip': data.get('query', '')
+    }
+
+
 def get_location_from_ip():
-    """Get location from IP address using ip-api.com.
+    """Get location from the public IP. HTTPS provider first, cached 30 min.
 
     Returns:
         dict: Location data including city, region, country, lat, lon
     """
-    try:
-        req = urllib.request.Request(
-            'http://ip-api.com/json/',
-            headers={'User-Agent': 'CORA/2.0'}
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode())
-
-            if data.get('status') == 'success':
-                return {
-                    'city': data.get('city', 'Unknown'),
-                    'region': data.get('regionName', ''),
-                    'country': data.get('country', ''),
-                    'country_code': data.get('countryCode', ''),
-                    'lat': data.get('lat', 0),
-                    'lon': data.get('lon', 0),
-                    'timezone': data.get('timezone', ''),
-                    'isp': data.get('isp', ''),
-                    'ip': data.get('query', '')
-                }
-            else:
-                return None
-    except Exception as e:
-        print(f"[!] Location lookup failed: {e}")
-        return None
+    import time
+    now = time.time()
+    if _cache['data'] and now - _cache['at'] < _CACHE_SECONDS:
+        return dict(_cache['data'])
+    for fetch in (_fetch_ipapi_co, _fetch_ip_api_com):
+        try:
+            data = fetch()
+            if data:
+                _cache.update(at=now, data=data)
+                return dict(data)
+        except Exception as e:
+            print(f"[!] Location lookup failed ({fetch.__name__}): {e}")
+    return None
 
 
 def get_location(config=None):

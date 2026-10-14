@@ -1,36 +1,46 @@
 """
 C.O.R.A Text-to-Speech Module
 
-TTS wrapper supporting Kokoro and pyttsx3 engines.
-Per ARCHITECTURE.md: Emotion-aware TTS with af_bella voice.
+CORA speaks with unity-voice-v2 — Unity AI Lab's own trained voice — through
+the sidecar client in voice/unity_voice.py. There is no other engine and no
+fallback voice: if the sidecar is down or refuses a line, that is reported.
 
-Includes TTSQueue for non-blocking speech with queue management.
+Keeps the module API every caller uses:
+    set_boot_display / process_speech_queue   (UI text updates)
+    TTSEngine, UnityVoiceTTS, get_tts_engine, speak
+    TTSQueue, get_tts_queue, queue_speak, speak_interrupt
+and adds the two symbols callers always imported but never existed:
+    stop_speaking(), speak_async()
 """
 
-import os
+import json
 import queue
-import subprocess
-import tempfile
 import threading
 import time
-import numpy as np
-from typing import Optional, Callable
+from pathlib import Path
+from typing import Optional, Callable, List
 
-# Import TTS mutex for preventing overlapping speech
+import numpy as np
+
+from voice import unity_voice as uv
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+# Cross-process TTS mutex (CORA instances)
 try:
-    from voice.tts_mutex import get_mutex, speak_with_mutex
+    from voice.tts_mutex import get_mutex
     TTS_MUTEX_AVAILABLE = True
 except ImportError:
     TTS_MUTEX_AVAILABLE = False
 
-# Import presence detection for "speak only when present"
+# Presence (non-blocking cached answer from a background monitor)
 try:
-    from services.presence import check_human_present
+    from services.presence import user_is_present, get_monitor
     PRESENCE_AVAILABLE = True
 except ImportError:
     PRESENCE_AVAILABLE = False
 
-# Import waveform audio buffer at module level for reliable sharing
+# Waveform audio buffer shared with the boot display
 try:
     from ui.boot_display import _audio_buffer_singleton
     WAVEFORM_AVAILABLE = True
@@ -38,35 +48,28 @@ except ImportError:
     _audio_buffer_singleton = None
     WAVEFORM_AVAILABLE = False
 
-# Note: Waveform visualization is handled automatically.
-# The waveform in boot_display.py runs continuously and responds to
-# audio data in _audio_buffer_singleton. No explicit start/stop needed.
 
-# Reference to boot display for updating speech text in UI
+# --------------------------------------------------------------------------- UI text bridge
 _boot_display = None
-
-# Pending speech text updates (thread-safe queue for UI updates)
 _speech_queue = queue.Queue()
+
 
 def set_boot_display(display):
     """Set the boot display reference for UI text updates."""
     global _boot_display
     _boot_display = display
 
+
 def _update_speech_text(text: str):
-    """Queue speech text update for UI (thread-safe)."""
     _speech_queue.put(('start', text))
 
+
 def _clear_speech_text():
-    """Queue speech text clear for UI (thread-safe)."""
     _speech_queue.put(('stop', None))
 
-def process_speech_queue():
-    """Process pending speech text updates (call from main thread).
 
-    This should be called periodically from the main thread's update loop.
-    """
-    global _boot_display
+def process_speech_queue():
+    """Process pending speech text updates (call from the Tk main thread)."""
     try:
         while not _speech_queue.empty():
             action, text = _speech_queue.get_nowait()
@@ -75,10 +78,36 @@ def process_speech_queue():
                     _boot_display.start_speaking(text)
                 elif action == 'stop':
                     _boot_display.stop_speaking()
-    except:
+    except Exception:
         pass
 
 
+# --------------------------------------------------------------------------- playback state
+_stop_event = threading.Event()
+_speaking = threading.Event()
+
+
+def is_speaking() -> bool:
+    return _speaking.is_set()
+
+
+def stop_speaking():
+    """Barge-in: stop the current line and drop everything queued."""
+    _stop_event.set()
+    q = _tts_queue
+    if q is not None:
+        q.clear()
+
+
+def _tts_config() -> dict:
+    try:
+        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+            return json.load(f).get('tts') or {}
+    except Exception:
+        return {}
+
+
+# --------------------------------------------------------------------------- engine
 class TTSEngine:
     """Base TTS engine interface."""
 
@@ -86,505 +115,247 @@ class TTSEngine:
         self.is_initialized = False
 
     def initialize(self):
-        """Initialize the TTS engine."""
         raise NotImplementedError
 
     def speak(self, text, emotion='neutral'):
-        """Speak text with optional emotion."""
         raise NotImplementedError
 
     def get_audio(self, text, emotion='neutral'):
-        """Get audio data without playing."""
         raise NotImplementedError
 
 
-class KokoroTTS(TTSEngine):
-    """Kokoro TTS engine (high-quality neural voice - af_bella)."""
+class UnityVoiceTTS(TTSEngine):
+    """unity-voice-v2 over HTTP, sentence by sentence, with the Tk waveform fed
+    from the playback callback (same contract the old engine had)."""
 
-    def __init__(self, voice='af_bella', speed=1.0):
-        """Initialize Kokoro TTS.
+    SAMPLE_RATE = 24000
 
-        Args:
-            voice: Voice ID (af_bella, af_heart, etc.)
-            speed: Speech speed multiplier
-        """
+    def __init__(self, volume: Optional[float] = None):
         super().__init__()
-        self.voice = voice
-        self.speed = speed
-        self.pipeline = None
+        cfg = _tts_config()
+        self.volume = float(cfg.get('volume', 1.0)) if volume is None else float(volume)
+        self.sd = None
+        self.last_error: Optional[str] = None
 
-    def initialize(self):
-        """Initialize Kokoro engine.
-
-        Returns:
-            bool: True if initialized successfully
-        """
+    # -- lifecycle ----------------------------------------------------------
+    def initialize(self) -> bool:
         try:
-            from kokoro import KPipeline
             import sounddevice as sd
-            # Initialize pipeline for English with American voice
-            self.pipeline = KPipeline(lang_code='a')
             self.sd = sd
-            self.is_initialized = True
-            return True
         except ImportError as e:
-            print(f"[!] Kokoro dependencies missing: {e}")
-            print("[!] Run: pip install kokoro sounddevice")
+            self.last_error = f"sounddevice missing: {e}"
+            print(f"[!] {self.last_error}")
             return False
-        except Exception as e:
-            print(f"[!] Failed to initialize Kokoro: {e}")
+        ok, msg = uv.ensure_sidecar()
+        if not ok:
+            self.last_error = f"unity-voice-v2 unavailable: {msg}"
+            print(f"[!] {self.last_error}")
+            self.is_initialized = False
             return False
+        self.is_initialized = True
+        return True
 
-    def speak(self, text, emotion='neutral'):
-        """Speak text with emotion.
-
-        Args:
-            text: Text to speak
-            emotion: Emotion type (neutral, excited, concerned, etc.)
-
-        Returns:
-            bool: True if spoken successfully
-        """
-        if not self.is_initialized:
-            if not self.initialize():
-                return False
-
-        try:
-            # Clean text for TTS - remove action markers like *sighs* or *lights cigarette*
-            import re
-            clean_text = re.sub(r'\*[^*]+\*', '', text)  # Remove *action* markers
-            clean_text = re.sub(r'_[^_]+_', '', clean_text)  # Remove _italic_ markers
-            clean_text = re.sub(r'\s+', ' ', clean_text).strip()  # Clean up extra spaces
-
-            if not clean_text:
-                return True  # Nothing to speak after cleaning
-
-            # Update UI to show what CORA is saying
-            _update_speech_text(clean_text)
-
-            # Get speed modifier based on emotion
-            speed = self._get_emotion_speed(emotion)
-
-            # Generate audio using Kokoro pipeline
-            for result in self.pipeline(clean_text, voice=self.voice, speed=speed):
-                if result.audio is not None:
-                    # Share audio data with waveform visualizer BEFORE playing
-                    if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
-                        try:
-                            audio_len = len(result.audio) if result.audio is not None else 0
-                            audio_max = float(np.max(np.abs(result.audio))) if audio_len > 0 else 0
-                            with _audio_buffer_singleton.data_lock:
-                                _audio_buffer_singleton.data = result.audio
-                                _audio_buffer_singleton.start_time = time.time()
-                                _audio_buffer_singleton.sample_rate = 24000
-                                _audio_buffer_singleton.active = True
-                        except Exception as e:
-                            pass
-
-                    # Play audio with real-time level reporting for waveform
-                    audio_data = result.audio
-                    sample_rate = 24000
-                    position = [0]  # Track playback position
-
-                    def audio_callback(outdata, frames, time_info, status):
-                        """Callback that plays audio and reports levels to waveform."""
-                        nonlocal position
-                        start = position[0]
-                        end = start + frames
-
-                        if end <= len(audio_data):
-                            outdata[:, 0] = audio_data[start:end]
-                        elif start < len(audio_data):
-                            # Partial data at end
-                            valid = len(audio_data) - start
-                            outdata[:valid, 0] = audio_data[start:]
-                            outdata[valid:, 0] = 0
-                        else:
-                            outdata.fill(0)
-                            raise self.sd.CallbackStop()
-
-                        # Send current audio chunk to waveform visualizer
-                        if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
-                            try:
-                                chunk = audio_data[start:end] if end <= len(audio_data) else audio_data[start:]
-                                # Ensure numpy array for waveform
-                                if not isinstance(chunk, np.ndarray):
-                                    chunk = np.array(chunk, dtype=np.float32)
-                                # Directly update singleton for guaranteed same instance
-                                with _audio_buffer_singleton.data_lock:
-                                    _audio_buffer_singleton.current_chunk = chunk.copy()
-                                    _audio_buffer_singleton.chunk_time = time.time()
-                                    _audio_buffer_singleton.active = True
-                            except Exception:
-                                pass
-
-                        position[0] = end
-
-                    # Use OutputStream with callback for real-time level reporting
-                    with self.sd.OutputStream(
-                        samplerate=sample_rate,
-                        channels=1,
-                        callback=audio_callback,
-                        blocksize=1024
-                    ):
-                        while position[0] < len(audio_data):
-                            self.sd.sleep(10)
-
-                    # Clear audio data AFTER playback is done
-                    if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
-                        try:
-                            with _audio_buffer_singleton.data_lock:
-                                _audio_buffer_singleton.active = False
-                                _audio_buffer_singleton.data = None
-                                _audio_buffer_singleton.current_chunk = None
-                        except:
-                            pass
-
-            # Clear speech text from UI
-            _clear_speech_text()
-            return True
-        except Exception as e:
-            print(f"[!] Kokoro TTS error: {e}")
-            _clear_speech_text()
-            return False
+    # -- synthesis ----------------------------------------------------------
+    def _sentences(self, text: str) -> List[tuple]:
+        """[(sentence, had_bang)] after cleaning + normalisation."""
+        raw = str(text or '')
+        had_bang = '!' in raw
+        clean = uv.prepare_text(raw)
+        return [(s, had_bang and i == 0) for i, s in enumerate(uv.split_sentences(clean))], clean
 
     def get_audio(self, text, emotion='neutral'):
-        """Get audio data as numpy array.
-
-        Args:
-            text: Text to convert
-            emotion: Emotion type
-
-        Returns:
-            numpy array: Audio data or None
-        """
-        if not self.is_initialized:
-            if not self.initialize():
-                return None
-
-        try:
-            import numpy as np
-            speed = self._get_emotion_speed(emotion)
-            audio_chunks = []
-
-            for result in self.pipeline(text, voice=self.voice, speed=speed):
-                if result.audio is not None:
-                    audio_chunks.append(result.audio)
-
-            if audio_chunks:
-                return np.concatenate(audio_chunks)
+        """All sentences synthesised and concatenated (no playback)."""
+        if not self.is_initialized and not self.initialize():
             return None
-        except Exception as e:
-            print(f"[!] Audio generation error: {e}")
-            return None
+        parts = []
+        sents, _ = self._sentences(text)
+        for s, bang in sents:
+            try:
+                parts.append(uv.synth_with_fallback(s, emotion, bang))
+            except (uv.VoiceRefused, uv.VoiceDown) as e:
+                self.last_error = str(e)
+                print(f"[TTS] {e}")
+        return np.concatenate(parts) if parts else None
 
-    def _get_emotion_speed(self, emotion):
-        """Get speed modifier for emotion.
+    # -- playback -----------------------------------------------------------
+    def _play(self, audio: np.ndarray) -> bool:
+        """Play float32 mono at 24 kHz, feeding the waveform. Returns False if stopped."""
+        sd = self.sd
+        audio = (audio * self.volume).astype('float32') if self.volume != 1.0 else audio
+        if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+            with _audio_buffer_singleton.data_lock:
+                _audio_buffer_singleton.data = audio
+                _audio_buffer_singleton.start_time = time.time()
+                _audio_buffer_singleton.sample_rate = self.SAMPLE_RATE
+                _audio_buffer_singleton.active = True
+        position = [0]
+        stopped = [False]
 
-        Args:
-            emotion: Emotion type
-
-        Returns:
-            float: Speed modifier
-        """
-        speeds = {
-            'excited': 1.15,
-            'urgent': 1.2,
-            'annoyed': 1.05,
-            'concerned': 0.95,
-            'caring': 0.9,
-            'playful': 1.1,
-            'sarcastic': 0.95,
-            'neutral': 1.0,
-        }
-        return speeds.get(emotion, self.speed)
-
-
-class Pyttsx3TTS(TTSEngine):
-    """pyttsx3 TTS engine (fallback, offline)."""
-
-    def __init__(self, rate=150, volume=1.0, voice_id=None):
-        """Initialize pyttsx3 TTS.
-
-        Args:
-            rate: Speech rate (words per minute)
-            volume: Volume (0.0 to 1.0)
-            voice_id: Specific voice ID (optional)
-        """
-        super().__init__()
-        self.rate = rate
-        self.volume = volume
-        self.voice_id = voice_id
-        self.engine = None
-
-    def initialize(self):
-        """Initialize pyttsx3 engine.
-
-        Returns:
-            bool: True if initialized successfully
-        """
-        try:
-            import pyttsx3
-            self.engine = pyttsx3.init()
-            self.engine.setProperty('rate', self.rate)
-            self.engine.setProperty('volume', self.volume)
-
-            # Set voice if specified
-            if self.voice_id:
-                self.engine.setProperty('voice', self.voice_id)
+        def callback(outdata, frames, time_info, status):
+            if _stop_event.is_set():
+                stopped[0] = True
+                outdata.fill(0)
+                raise sd.CallbackStop()
+            start = position[0]
+            end = start + frames
+            if end <= len(audio):
+                outdata[:, 0] = audio[start:end]
+            elif start < len(audio):
+                valid = len(audio) - start
+                outdata[:valid, 0] = audio[start:]
+                outdata[valid:, 0] = 0
             else:
-                # Try to use a female voice
-                voices = self.engine.getProperty('voices')
-                for voice in voices:
-                    if 'female' in voice.name.lower() or 'zira' in voice.name.lower():
-                        self.engine.setProperty('voice', voice.id)
-                        break
+                outdata.fill(0)
+                raise sd.CallbackStop()
+            if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+                try:
+                    chunk = audio[start:end] if end <= len(audio) else audio[start:]
+                    with _audio_buffer_singleton.data_lock:
+                        _audio_buffer_singleton.current_chunk = np.array(chunk, dtype=np.float32, copy=True)
+                        _audio_buffer_singleton.chunk_time = time.time()
+                        _audio_buffer_singleton.active = True
+                except Exception:
+                    pass
+            position[0] = end
 
-            self.is_initialized = True
+        with sd.OutputStream(samplerate=self.SAMPLE_RATE, channels=1, callback=callback, blocksize=1024):
+            while position[0] < len(audio) and not stopped[0] and not _stop_event.is_set():
+                sd.sleep(10)
+        if WAVEFORM_AVAILABLE and _audio_buffer_singleton is not None:
+            with _audio_buffer_singleton.data_lock:
+                _audio_buffer_singleton.active = False
+                _audio_buffer_singleton.data = None
+                _audio_buffer_singleton.current_chunk = None
+        return not stopped[0]
+
+    def speak(self, text, emotion='neutral') -> bool:
+        """Speak a reply: sentences are synthesised one ahead of playback so
+        the first audio starts fast and a refused sentence costs one sentence,
+        not the whole reply."""
+        if not self.is_initialized and not self.initialize():
+            return False
+        sents, clean = self._sentences(text)
+        if not sents:
             return True
-        except ImportError:
-            print("[!] pyttsx3 not installed. Run: pip install pyttsx3")
-            return False
-        except Exception as e:
-            print(f"[!] Failed to initialize pyttsx3: {e}")
-            return False
-
-    def speak(self, text, emotion='neutral'):
-        """Speak text (emotion affects rate/pitch).
-
-        Args:
-            text: Text to speak
-            emotion: Emotion type
-
-        Returns:
-            bool: True if spoken successfully
-        """
-        if not self.is_initialized:
-            if not self.initialize():
+        _stop_event.clear()
+        _speaking.set()
+        _update_speech_text(clean)
+        spoke_any = False
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            if not uv.take_turn():
+                self.last_error = "voice busy (another process holds the turn)"
+                print(f"[TTS] {self.last_error}")
                 return False
-
-        try:
-            # Adjust rate based on emotion
-            rate_mod = self._get_emotion_rate_mod(emotion)
-            self.engine.setProperty('rate', self.rate + rate_mod)
-
-            self.engine.say(text)
-            self.engine.runAndWait()
-            return True
+            try:
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    futures = [pool.submit(uv.synth_with_fallback, s, emotion, b) for s, b in sents[:1]]
+                    for i, (s, b) in enumerate(sents):
+                        if _stop_event.is_set():
+                            break
+                        if i + 1 < len(sents):
+                            futures.append(pool.submit(uv.synth_with_fallback, sents[i + 1][0], emotion, sents[i + 1][1]))
+                        try:
+                            audio = futures[i].result()
+                        except uv.VoiceDown as e:
+                            self.last_error = str(e)
+                            print(f"[TTS] {e}")
+                            self.is_initialized = False
+                            break
+                        except uv.VoiceRefused as e:
+                            self.last_error = f"refused: {e}"
+                            print(f"[TTS] line refused by her voice: {e} :: {s[:60]}")
+                            continue
+                        if not self._play(audio):
+                            break
+                        spoke_any = True
+            finally:
+                uv.give_turn()
         except Exception as e:
-            print(f"[!] TTS error: {e}")
-            return False
+            self.last_error = str(e)
+            print(f"[!] unity-voice TTS error: {e}")
+        finally:
+            _speaking.clear()
+            _clear_speech_text()
+        return spoke_any
 
-    def get_audio(self, text, emotion='neutral'):
-        """Save audio to temporary file and return path.
 
-        Args:
-            text: Text to convert
-            emotion: Emotion type
-
-        Returns:
-            str: Path to audio file or None
-        """
-        if not self.is_initialized:
-            if not self.initialize():
-                return None
-
-        try:
-            # Save to temp file
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-                temp_path = f.name
-
-            rate_mod = self._get_emotion_rate_mod(emotion)
-            self.engine.setProperty('rate', self.rate + rate_mod)
-            self.engine.save_to_file(text, temp_path)
-            self.engine.runAndWait()
-            return temp_path
-        except Exception as e:
-            print(f"[!] Audio save error: {e}")
-            return None
-
-    def _get_emotion_rate_mod(self, emotion):
-        """Get rate modifier for emotion.
-
-        Args:
-            emotion: Emotion type
-
-        Returns:
-            int: Rate adjustment
-        """
-        mods = {
-            'excited': 20,
-            'urgent': 30,
-            'annoyed': 10,
-            'concerned': -10,
-            'caring': -15,
-            'playful': 15,
-            'sarcastic': -5,
-            'neutral': 0,
-        }
-        return mods.get(emotion, 0)
+# Compatibility names: code that still says KokoroTTS gets her voice.
+KokoroTTS = UnityVoiceTTS
+Pyttsx3TTS = UnityVoiceTTS
 
 
 def get_tts_engine(config=None):
-    """Get appropriate TTS engine based on config.
-
-    CORA always uses Kokoro (af_bella voice) by default.
-
-    Args:
-        config: Configuration dict with TTS settings
-
-    Returns:
-        TTSEngine: Initialized TTS engine
-    """
-    if config is None:
-        config = {}
-
-    tts_config = config.get('tts', {})
-    # Default to Kokoro (sexy af_bella voice) - CORA's signature voice
-    engine_name = tts_config.get('engine', 'kokoro')
-
-    if engine_name == 'kokoro':
-        voice = tts_config.get('kokoro', {}).get('voice', 'af_bella')
-        speed = tts_config.get('kokoro', {}).get('speed', 1.0)
-        engine = KokoroTTS(voice=voice, speed=speed)
-        if engine.initialize():
-            return engine
-        # Fallback to pyttsx3 if Kokoro fails
-        print("[!] Kokoro failed, falling back to pyttsx3")
-
-    # pyttsx3 fallback
-    rate = tts_config.get('rate', 150)
-    volume = tts_config.get('volume', 1.0)
-    fallback = Pyttsx3TTS(rate=rate, volume=volume)
-    if fallback.initialize():
-        return fallback
-
-    return None
+    """The one engine. Returns None when the sidecar cannot be reached."""
+    engine = UnityVoiceTTS()
+    return engine if engine.initialize() else None
 
 
-def speak(text, emotion='neutral', config=None):
-    """Quick speak function.
-
-    Args:
-        text: Text to speak
-        emotion: Emotion type
-        config: Optional config dict
-
-    Returns:
-        bool: True if spoken successfully
-    """
+def speak(text, emotion='neutral', config=None) -> bool:
+    """Blocking speak."""
     engine = get_tts_engine(config)
-    if engine:
-        return engine.speak(text, emotion)
-    return False
+    return engine.speak(text, emotion) if engine else False
 
 
 def list_voices():
-    """List available pyttsx3 voices.
-
-    Returns:
-        list: Available voice info
-    """
-    try:
-        import pyttsx3
-        engine = pyttsx3.init()
-        voices = engine.getProperty('voices')
-        return [{'id': v.id, 'name': v.name, 'languages': v.languages}
-                for v in voices]
-    except Exception:
-        return []
+    """Only one voice exists: hers."""
+    return [{'id': 'unity-voice-v2', 'name': 'Unity voice v2 (A2 low warm alto)', 'languages': ['en-US']}]
 
 
-# ============ TTS QUEUE (Non-blocking speech) ============
-
+# --------------------------------------------------------------------------- queue
 class TTSQueue:
-    """Queue-based TTS for non-blocking speech.
+    """Queue-based TTS for non-blocking speech (one background thread)."""
 
-    Queues multiple TTS requests and processes them in order.
-    Runs in a background thread to not block the main application.
-    Uses TTS mutex to prevent overlapping speech across processes.
-    """
-
-    def __init__(self, config=None, use_mutex: bool = True, check_presence: bool = True):
-        """Initialize TTS queue.
-
-        Args:
-            config: TTS configuration dict
-            use_mutex: Whether to use TTS mutex (prevents overlapping)
-            check_presence: Whether to check if user is present before speaking
-        """
+    def __init__(self, config=None, use_mutex: bool = True, check_presence: Optional[bool] = None):
         self.config = config or {}
-        self.queue = queue.Queue()
-        self.engine = None
+        self.queue: "queue.Queue" = queue.Queue()
+        self.engine: Optional[UnityVoiceTTS] = None
         self.is_running = False
         self._thread = None
         self._stop_event = threading.Event()
         self.on_speak_start: Optional[Callable] = None
         self.on_speak_end: Optional[Callable] = None
         self.use_mutex = use_mutex and TTS_MUTEX_AVAILABLE
-        self._mutex = None
+        self._mutex = get_mutex("CORA") if self.use_mutex else None
+        if check_presence is None:
+            check_presence = bool(_tts_config().get('presence_gate', False))
         self.check_presence = check_presence and PRESENCE_AVAILABLE
-        self._last_presence_check = 0
-        self._presence_cache_seconds = 5  # Cache presence result for 5 seconds
-
-        if self.use_mutex:
-            self._mutex = get_mutex("CORA")
+        self._init_failures = 0
 
     def start(self):
-        """Start the TTS queue processing thread."""
         if self.is_running:
             return
-
-        self.engine = get_tts_engine(self.config)
-        if not self.engine:
-            print("[!] TTS engine failed to initialize")
-            return
-
+        self.engine = UnityVoiceTTS()
+        if not self.engine.initialize():
+            print("[!] TTS engine failed to initialize (unity-voice-v2 sidecar down)")
+        if self.check_presence:
+            try:
+                get_monitor(start=True)
+            except Exception:
+                pass
         self.is_running = True
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._process_queue, daemon=True)
+        self._thread = threading.Thread(target=self._process_queue, name='tts-queue', daemon=True)
         self._thread.start()
 
     def stop(self):
-        """Stop the TTS queue processing thread."""
         self._stop_event.set()
         self.is_running = False
-        # Add None to wake up the queue
         self.queue.put(None)
         if self._thread:
             self._thread.join(timeout=2.0)
 
-    def speak(self, text: str, emotion: str = 'neutral', priority: int = 5):
-        """Add text to speak queue.
-
-        Args:
-            text: Text to speak
-            emotion: Emotion for TTS
-            priority: 1-10 (1=highest, processed first)
-        """
+    def speak(self, text: str, emotion: str = 'neutral', priority: int = 5, skip_presence: bool = False):
         if not self.is_running:
             self.start()
-
-        self.queue.put({
-            'text': text,
-            'emotion': emotion,
-            'priority': priority
-        })
+        self.queue.put({'text': text, 'emotion': emotion, 'priority': priority, 'skip_presence': skip_presence})
 
     def speak_now(self, text: str, emotion: str = 'neutral'):
-        """Interrupt current speech and speak immediately.
-
-        Args:
-            text: Text to speak
-            emotion: Emotion for TTS
-        """
-        # Clear existing queue
-        self.clear()
-        # Add with highest priority
-        self.speak(text, emotion, priority=1)
+        """Interrupt the current line and speak this next."""
+        stop_speaking()
+        self.speak(text, emotion, priority=1, skip_presence=True)
 
     def clear(self):
-        """Clear all pending items from the queue."""
         while not self.queue.empty():
             try:
                 self.queue.get_nowait()
@@ -592,116 +363,94 @@ class TTSQueue:
                 break
 
     def pending_count(self) -> int:
-        """Get number of items waiting in queue."""
         return self.queue.qsize()
 
     def _is_user_present(self) -> bool:
-        """Check if user is present (cached for performance).
-
-        Returns:
-            bool: True if user is present or presence check disabled
-        """
-        import time as time_module
         if not self.check_presence:
             return True
-
-        # Check cache
-        now = time_module.time()
-        if now - self._last_presence_check < self._presence_cache_seconds:
-            return getattr(self, '_presence_cache', True)
-
-        # Do fresh check
         try:
-            result = check_human_present()
-            self._presence_cache = result.present
-            self._last_presence_check = now
-            return result.present
+            return user_is_present()
         except Exception:
-            # On error, assume present
             return True
 
     def _process_queue(self):
-        """Process queue items in background thread."""
         while not self._stop_event.is_set():
             try:
                 item = self.queue.get(timeout=0.5)
                 if item is None:
                     continue
-
                 text = item.get('text', '')
                 emotion = item.get('emotion', 'neutral')
-                skip_presence = item.get('skip_presence', False)
-
-                # Check if user is present before speaking
-                if not skip_presence and not self._is_user_present():
+                if not item.get('skip_presence') and not self._is_user_present():
                     print(f"[TTS] User not present, skipping: {text[:30]}...")
                     continue
-
-                if text and self.engine:
-                    # Callback for speech start
-                    if self.on_speak_start:
+                if not text:
+                    continue
+                if self.engine is None or not self.engine.is_initialized:
+                    if self.engine is None:
+                        self.engine = UnityVoiceTTS()
+                    if not self.engine.initialize():
+                        self._init_failures += 1
+                        if self._init_failures <= 3:
+                            print(f"[TTS] dropped (voice down): {text[:40]}")
+                        continue
+                    self._init_failures = 0
+                if self.on_speak_start:
+                    try:
                         self.on_speak_start(text)
-
-                    # Speak with or without mutex
-                    if self.use_mutex and self._mutex:
-                        # Use mutex to prevent overlapping speech
-                        with self._mutex.locked(timeout=10) as acquired:
-                            if acquired:
-                                self.engine.speak(text, emotion)
-                            else:
-                                print(f"[TTS] Skipped (someone else speaking): {text[:30]}...")
-                    else:
-                        # No mutex, speak directly
-                        self.engine.speak(text, emotion)
-
-                    # Callback for speech end
-                    if self.on_speak_end:
+                    except Exception:
+                        pass
+                if self.use_mutex and self._mutex:
+                    with self._mutex.locked(timeout=10) as acquired:
+                        if acquired:
+                            self.engine.speak(text, emotion)
+                        else:
+                            print(f"[TTS] Skipped (someone else speaking): {text[:30]}...")
+                else:
+                    self.engine.speak(text, emotion)
+                if self.on_speak_end:
+                    try:
                         self.on_speak_end(text)
-
+                    except Exception:
+                        pass
             except queue.Empty:
                 continue
             except Exception as e:
                 print(f"[!] TTS queue error: {e}")
 
 
-# Global TTS queue instance
 _tts_queue: Optional[TTSQueue] = None
+_tts_queue_lock = threading.Lock()
 
 
 def get_tts_queue(config=None) -> TTSQueue:
-    """Get or create the global TTS queue.
-
-    Args:
-        config: TTS configuration
-
-    Returns:
-        TTSQueue instance
-    """
+    """Get or create the global TTS queue."""
     global _tts_queue
     if _tts_queue is None:
-        _tts_queue = TTSQueue(config)
-        _tts_queue.start()
+        with _tts_queue_lock:
+            if _tts_queue is None:
+                _tts_queue = TTSQueue(config)
+                _tts_queue.start()
     return _tts_queue
 
 
 def queue_speak(text: str, emotion: str = 'neutral', priority: int = 5):
-    """Queue text for speaking (non-blocking).
+    """Queue text for speaking (non-blocking)."""
+    get_tts_queue().speak(text, emotion, priority)
 
-    Args:
-        text: Text to speak
-        emotion: Emotion type
-        priority: 1-10 (1=highest)
-    """
-    tts = get_tts_queue()
-    tts.speak(text, emotion, priority)
+
+def speak_async(text: str, emotion: str = 'neutral'):
+    """Non-blocking speak (what cli_popup and the handlers always imported)."""
+    queue_speak(text, emotion)
 
 
 def speak_interrupt(text: str, emotion: str = 'neutral'):
-    """Clear queue and speak immediately.
+    """Clear the queue and speak immediately."""
+    get_tts_queue().speak_now(text, emotion)
 
-    Args:
-        text: Text to speak
-        emotion: Emotion type
-    """
-    tts = get_tts_queue()
-    tts.speak_now(text, emotion)
+
+def voice_status() -> dict:
+    """For boot checks: is her voice reachable, which URL, last error."""
+    up = uv.is_up()
+    return {'engine': 'unity-voice-v2', 'url': uv.VOICE_URL, 'up': up,
+            'model_dir': str(uv.MODEL_DIR), 'model_present': uv.MODEL_DIR.exists()}

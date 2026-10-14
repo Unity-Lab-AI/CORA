@@ -53,8 +53,8 @@
 | Questions | No AskUserQuestion until everything is complete and working. |
 
 ### Additional tasks surfaced during the work
-- [ ] **UPG-023 (M)** Wire the kept modules into the live app: `ui/code_editor.py` (code window), `ui/query_panel.py` + `config/hotbar.json` (hotbar), `ui/monitor_panel.py`, `ui/image_panel.py`/`fullscreen_image.py` (image results), `voice/converse.py` (converse mode), `services/cli_popup.py` (popups speak), `ui/app.py` + `ui/panels.py` (GUI app launchable via `src/gui_launcher.py` and from boot_display), `src/cora.py` CLI uses the shared dispatcher + history
-- [ ] **UPG-024 (S)** Pull/verify models: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b` (both pulling 2026-10-14); switch `config.models.primary` when the abliterated pull lands; `CORA.bat` + stats_server pull the configured models, not the old list
+- [~] **UPG-023 (M)** Wire the kept modules into the live app: `ui/code_editor.py` (code window), `ui/query_panel.py` + `config/hotbar.json` (hotbar), `ui/monitor_panel.py`, `ui/image_panel.py`/`fullscreen_image.py` (image results), `voice/converse.py` (converse mode), `services/cli_popup.py` (popups speak), `ui/app.py` + `ui/panels.py` (GUI app launchable via `src/gui_launcher.py` and from boot_display), `src/cora.py` CLI uses the shared dispatcher + history
+- [~] **UPG-024 (S)** Pull/verify models: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b` (both pulling 2026-10-14); switch `config.models.primary` when the abliterated pull lands; `CORA.bat` + stats_server pull the configured models, not the old list
 - [ ] **UPG-025 (S)** Seed the Unity workflow memory templates (`.claude/memory-templates`) into the user-profile memory folder (what `start.bat` does) — currently not seeded
 - [ ] **UPG-026 (S)** `tools/mpv/stats_server.py` is a stale copy inside the gitignored `tools/` folder (not tracked; deletion was blocked by the sandbox) — remove manually or leave; nothing imports it
 
@@ -70,27 +70,27 @@
 - [x] **UPG-002 (S)** Send `options.num_ctx` >=16384 + `keep_alive` from `ai/ollama.py`; pass `CHAT_HISTORY` as `messages` in the live chat path; trim `config/system_prompt.txt` to <=3k tokens
 - [x] **UPG-003 (S)** `cora_tools/files.py` default `base_dir=PROJECT_DIR`; gate or remove `self_modify.run_script`
 - [x] **UPG-004 (S)** `services/stats_server.py`: CORS origin allowlist + launch token + model-name allowlist; delete `tools/mpv/stats_server.py`
-- [~] **UPG-005 (S)** Untrack `data/*.json`, `backups/*`, `config/settings.json`; extend `.gitignore`; make the private-repo boot phase opt-in
+- [x] **UPG-005 (S)** Untrack `data/*.json`, `backups/*`, `config/settings.json`; extend `.gitignore`; make the private-repo boot phase opt-in
 - [x] **UPG-006 (S)** Requirements: remove kokoro-onnx, pyttsx3, pytest, pytest-cov; add the 11 missing packages; bump pins; delete `config/requirements.txt` and `config/system_prompt1.txt`
 - [x] **UPG-007 (S)** Close SEC-002/003/005, MEM-001/002 below (verified fixed in code)
 
 ### Phase 1 — runtime and models
-- [ ] **UPG-008 (M)** Python 3.12 side by side; `CORA.bat` uses `py -3.12` + venv, re-runs pip on requirements hash change, upgrades yt-dlp
-- [ ] **UPG-009 (M)** Single model config (`OLLAMA_URL`, `models.{chat,vision,code}`); remove hardcoded names in `ai/ollama.py`, `cora_tools/code.py`, `services/presence.py`, `voice/commands.py`, `services/stats_server.py`, `web/index.html`
-- [ ] **UPG-010 (S)** Switch chat to `qwen3.5:9b` (or `gemma4:12b`), vision to `qwen3-vl:4b`, code to `qwen3-coder`; warm at boot; unify timeouts
-- [ ] **UPG-011 (S)** Pollinations: Bearer/`sk_` key, fully qualified model IDs, drop nologo/enhance, move web off the legacy host
+- [x] **UPG-008 (M)** Python 3.12 side by side; `CORA.bat` uses `py -3.12` + venv, re-runs pip on requirements hash change, upgrades yt-dlp
+- [~] **UPG-009 (M)** Single model config (`OLLAMA_URL`, `models.{chat,vision,code}`); remove hardcoded names in `ai/ollama.py`, `cora_tools/code.py`, `services/presence.py`, `voice/commands.py`, `services/stats_server.py`, `web/index.html`
+- [x] **UPG-010 (S)** Switch chat to `qwen3.5:9b` (or `gemma4:12b`), vision to `qwen3-vl:4b`, code to `qwen3-coder`; warm at boot; unify timeouts
+- [x] **UPG-011 (S)** Pollinations: Bearer/`sk_` key, fully qualified model IDs, drop nologo/enhance, move web off the legacy host
 
 ### Phase 2 — V2 voice (user decision: unity-voice-v2 replaces Kokoro/pyttsx3)
-- [ ] **UPG-012 (M)** `voice/unity_voice.py` client (health, `voice_text()` port, sentence chunking, emotion/act mapping, `delivery_support` validation, `stop_speaking`, `speak_async`); sidecar discovery/autostart via `UNITY_VOICE_TTS_URL` / `UNITY_VOICE_MODEL_DIR` / `UNITY_VOICE_PYTHON`; shared lock dir with unity-speak; new `tts.unity_voice` config block; delete `KokoroTTS`/`Pyttsx3TTS`, `src/cora.py` TTS functions, `tts_handler.py` engine code, `web/kokoro-worker.js`, all Kokoro/af_bella strings; presence check off the TTS thread
-- [ ] **UPG-013 (M)** Stream LLM output sentence-by-sentence into the V2 queue; barge-in via `stop_speaking`
+- [~] **UPG-012 (M)** `voice/unity_voice.py` client (health, `voice_text()` port, sentence chunking, emotion/act mapping, `delivery_support` validation, `stop_speaking`, `speak_async`); sidecar discovery/autostart via `UNITY_VOICE_TTS_URL` / `UNITY_VOICE_MODEL_DIR` / `UNITY_VOICE_PYTHON`; shared lock dir with unity-speak; new `tts.unity_voice` config block; delete `KokoroTTS`/`Pyttsx3TTS`, `src/cora.py` TTS functions, `tts_handler.py` engine code, `web/kokoro-worker.js`, all Kokoro/af_bella strings; presence check off the TTS thread
+- [~] **UPG-013 (M)** Stream LLM output sentence-by-sentence into the V2 queue; barge-in via `stop_speaking`
 
 ### Phase 3 — the assistant loop
 - [ ] **UPG-014 (L)** One dispatcher: `cora_tools` as JSON-schema `tools` on `/api/chat`, loop on `message.tool_calls`; delete the four routers; re-wire git/email/media/terminal/viewfile only after their security fixes
-- [ ] **UPG-015 (M)** Boot per spec: speak today's calendar / overdue tasks / upcoming reminders; start `ReminderManager.start_checking()`; merge the two reminder stores; gate or remove the YouTube/GitHub/image-gen demo phases
+- [x] **UPG-015 (M)** Boot per spec: speak today's calendar / overdue tasks / upcoming reminders; start `ReminderManager.start_checking()`; merge the two reminder stores; gate or remove the YouTube/GitHub/image-gen demo phases
 - [ ] **UPG-016 (M)** Conversation summarization at ~75% of `num_ctx`; honor `settings.ai.context_window`
 
 ### Phase 4 — STT and wake word
-- [ ] **UPG-017 (M)** `faster-whisper` on CUDA for commands; openWakeWord "cora" model; delete Vosk, `recognize_google`, `webkitSpeechRecognition`; bound the audio queue; VAD for barge-in
+- [x] **UPG-017 (M)** `faster-whisper` on CUDA for commands; openWakeWord "cora" model; delete Vosk, `recognize_google`, `webkitSpeechRecognition`; bound the audio queue; VAD for barge-in
 
 ### Phase 5 — cleanup and fundamentals
 - [ ] **UPG-018 (M)** Delete dead modules (`src/cora.py`, `src/gui_launcher.py`, `ui/app.py`, `ui/panels.py`, `ai/tool_executor.py`, `ai/prompts.py`, `ai/router.py`, `ui/code_editor.py`, `ui/fullscreen_image.py`, `ui/image_panel.py`, `ui/monitor_panel.py`, `ui/query_panel.py`, `voice/converse.py`, transitively `voice/commands.py`, `cora_tools/modal_tools.py`) or finish one GUI; consolidate the two webcam pipelines + three windowing helpers; split the 12 files over 800 lines

@@ -1288,26 +1288,24 @@ class BootDisplay:
         # Run in thread so UI doesn't freeze
         threading.Thread(target=process, daemon=True).start()
 
-    def _speak(self, text: str):
-        """Speak text via TTS - shows text first, then speaks in background.
+    def _speak(self, text: str, emotion: str = None):
+        """Speak text through the shared unity-voice-v2 queue (non-blocking).
 
-        Note: Waveform start/stop is handled automatically by KokoroTTS.speak()
-        via the set_boot_display() registration.
+        The waveform is fed by the engine's playback callback via the shared
+        audio buffer, so nothing here needs to start or stop it.
         """
-        # Log the speech to show what CORA is saying
         self.log_speech(text)
-
-        def speak_thread():
-            try:
-                from voice.tts import KokoroTTS
-                tts = KokoroTTS(voice='af_bella', speed=1.0)
-                if tts.initialize():
-                    tts.speak(text)  # This handles waveform internally
-            except Exception as e:
-                print(f"[TTS ERROR] {e}")
-
-        # Run TTS in separate thread so UI stays responsive
-        threading.Thread(target=speak_thread, daemon=True).start()
+        try:
+            from voice.tts import queue_speak
+            if emotion is None:
+                try:
+                    from voice.emotion import detect_emotion
+                    emotion = detect_emotion(text)
+                except Exception:
+                    emotion = 'neutral'
+            queue_speak(text, emotion)
+        except Exception as e:
+            print(f"[TTS ERROR] {e}")
 
     def set_input_callback(self, callback):
         """Set callback for user input processing."""

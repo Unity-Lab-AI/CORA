@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
 C.O.R.A Image Generation
-Generate images using Pollinations.AI API (PolliLibPy)
+Generate images using the Pollinations.AI API.
 
-Per ARCHITECTURE.md v1.0.0:
+Updated 2026-10-14 for the current API:
+- auth is a Bearer token (POLLINATIONS_API_KEY in .env); a `pk_` key is also
+  passed as `?key=` for endpoints that still document it
+- model ids are fully qualified (e.g. black-forest-labs/flux.1-schnell); the
+  configured model (config.json models.image) is resolved against the live
+  /image/models list, so an alias like "flux" keeps working as long as a flux
+  model exists, and a missing model falls back to the service default
+- `nologo` / `enhance` are no longer documented and are only sent on request
+- `safe` is passed through as given
+
+Per ARCHITECTURE.md:
 - generate_boot_image(prompt) - returns image path, 1920x1080
 - show_fullscreen_image(path) - tkinter Toplevel with X button
 - Save to CORA data/images directory
 """
 
+import json
 import os
 import time
 import requests
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from urllib.parse import quote
 from datetime import datetime
 
@@ -26,58 +37,113 @@ from dotenv import load_dotenv
 load_dotenv(PROJECT_DIR / '.env')
 
 # Pollinations.AI API settings
-IMAGE_API = "https://gen.pollinations.ai/image"
-# API key from .env file (POLLINATIONS_API_KEY)
+IMAGE_API = os.environ.get("POLLINATIONS_IMAGE_API", "https://gen.pollinations.ai/image").rstrip('/')
 API_KEY = os.environ.get("POLLINATIONS_API_KEY", "")
+
+_models_cache: Dict[str, Any] = {'at': 0.0, 'models': []}
+
+
+def _configured_model() -> str:
+    try:
+        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+            return (json.load(f).get('models') or {}).get('image') or 'flux'
+    except Exception:
+        return 'flux'
+
+
+def _headers() -> Dict[str, str]:
+    h = {'User-Agent': 'CORA/3.0'}
+    if API_KEY:
+        h['Authorization'] = f'Bearer {API_KEY}'
+    return h
 
 
 def encode_prompt(prompt: str) -> str:
     """URL-encode a prompt string."""
-    return quote(prompt)
+    return quote(prompt, safe='')
+
+
+def list_image_models(max_age: float = 600.0) -> List[str]:
+    """Model ids the service currently offers (cached)."""
+    now = time.time()
+    if _models_cache['models'] and now - _models_cache['at'] < max_age:
+        return _models_cache['models']
+    try:
+        r = requests.get(f"{IMAGE_API}/models", headers=_headers(), timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        names: List[str] = []
+        if isinstance(data, list):
+            for m in data:
+                if isinstance(m, str):
+                    names.append(m)
+                elif isinstance(m, dict):
+                    n = m.get('id') or m.get('name')
+                    if n:
+                        names.append(n)
+        elif isinstance(data, dict):
+            names = [k for k in data.keys()]
+        _models_cache.update(at=now, models=names)
+    except Exception:
+        pass
+    return _models_cache['models']
+
+
+def resolve_model(requested: Optional[str] = None) -> Optional[str]:
+    """Map an alias/partial name to a live model id. None = service default."""
+    requested = (requested or _configured_model() or '').strip()
+    models = list_image_models()
+    if not models:
+        return requested or None
+    if requested in models:
+        return requested
+    rq = requested.lower()
+    if rq:
+        exact_tail = [m for m in models if m.lower().split('/')[-1] == rq]
+        if exact_tail:
+            return exact_tail[0]
+        partial = [m for m in models if rq in m.lower()]
+        if partial:
+            return partial[0]
+    return None
 
 
 def generate_image(
     prompt: str,
-    model: str = "flux",
+    model: Optional[str] = None,
     width: int = 1920,
     height: int = 1080,
     seed: Optional[int] = None,
     output_path: Optional[str] = None,
-    nologo: bool = True,
+    nologo: bool = False,
     enhance: bool = False,
-    safe: bool = False
+    safe: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    Generate an image from a text prompt using Pollinations.AI.
+    """Generate an image from a text prompt using Pollinations.AI.
 
     Args:
         prompt: Description of the image to generate
-        model: AI model to use (flux, turbo, etc.)
+        model: Model id or alias (default: config models.image, resolved live)
         width: Image width in pixels
         height: Image height in pixels
         seed: Random seed for deterministic generation
         output_path: Path to save the image
-        nologo: Remove watermark
-        enhance: Let AI improve the prompt
-        safe: Enable NSFW filtering
+        nologo: Request no watermark (legacy flag, sent only if True)
+        enhance: Let the service improve the prompt (legacy flag)
+        safe: Safety filter list, passed through as given
 
     Returns:
         Dict with success status, path, and metadata
     """
     start_time = time.time()
 
-    # Build URL
-    encoded_prompt = encode_prompt(prompt)
-    url = f"{IMAGE_API}/{encoded_prompt}"
-
-    # Build parameters
-    params = {
-        "model": model,
-        "width": width,
-        "height": height,
-        "key": API_KEY
-    }
-
+    url = f"{IMAGE_API}/{encode_prompt(prompt)}"
+    resolved = resolve_model(model)
+    params: Dict[str, Any] = {"width": width, "height": height}
+    if resolved:
+        params["model"] = resolved
+    if API_KEY.startswith('pk_'):
+        params["key"] = API_KEY
     if seed is not None:
         params["seed"] = seed
     if nologo:
@@ -85,51 +151,59 @@ def generate_image(
     if enhance:
         params["enhance"] = "true"
     if safe:
-        params["safe"] = "true"
+        params["safe"] = safe
 
     try:
-        # Make request with retry logic
+        response = None
+        last_err: Optional[Exception] = None
         for attempt in range(3):
             try:
-                response = requests.get(url, params=params, timeout=120)
+                response = requests.get(url, params=params, headers=_headers(), timeout=120)
+                if response.status_code == 401:
+                    raise PermissionError("Pollinations rejected the API key (401). Set POLLINATIONS_API_KEY in .env")
+                if response.status_code == 404 and 'model' in params:
+                    # unknown model id -> retry with the service default
+                    params.pop('model', None)
+                    _models_cache['at'] = 0.0
+                    continue
                 response.raise_for_status()
                 break
+            except PermissionError:
+                raise
             except requests.exceptions.RequestException as e:
+                last_err = e
                 if attempt < 2:
                     wait_time = 2 ** attempt
                     print(f"[!] Request failed, retrying in {wait_time}s...")
                     time.sleep(wait_time)
-                else:
-                    raise e
+        if response is None or not response.ok:
+            raise last_err or RuntimeError("image request failed")
 
         inference_time = time.time() - start_time
 
-        # Determine format
         content_type = response.headers.get('Content-Type', '')
-        file_ext = 'png' if 'png' in content_type else 'jpg'
+        if 'image' not in content_type:
+            raise RuntimeError(f"unexpected response ({content_type}): {response.text[:120]}")
+        file_ext = 'png' if 'png' in content_type else ('webp' if 'webp' in content_type else 'jpg')
 
-        # Generate output path if not provided
         if not output_path:
             IMAGES_DIR.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = IMAGES_DIR / f"generated_{timestamp}.{file_ext}"
         else:
             output_path = Path(output_path)
-            if not str(output_path).endswith(('.jpg', '.jpeg', '.png')):
+            if not str(output_path).lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
                 output_path = Path(f"{output_path}.{file_ext}")
 
-        # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Save image
         with open(output_path, 'wb') as f:
             f.write(response.content)
 
-        result = {
+        return {
             "success": True,
             "path": str(output_path),
             "prompt": prompt,
-            "model": model,
+            "model": params.get("model", "default"),
             "width": width,
             "height": height,
             "seed": seed,
@@ -137,11 +211,6 @@ def generate_image(
             "inference_time": inference_time,
             "size_bytes": len(response.content)
         }
-
-        # Note: Don't auto-show modal here - let caller decide whether to display
-        # This prevents double popups when boot_sequence also shows the image
-
-        return result
 
     except Exception as e:
         return {
@@ -153,15 +222,7 @@ def generate_image(
 
 
 def generate_boot_image(prompt: str = None) -> Dict[str, Any]:
-    """
-    Generate a boot/splash image for CORA at 1920x1080.
-
-    Args:
-        prompt: Custom prompt or uses default CORA boot prompt
-
-    Returns:
-        Dict with success status and image path
-    """
+    """Generate a boot/splash image for CORA at 1920x1080."""
     if prompt is None:
         prompt = (
             "futuristic AI assistant boot screen, holographic interface, "
@@ -169,14 +230,7 @@ def generate_boot_image(prompt: str = None) -> Dict[str, Any]:
             "text 'C.O.R.A' in elegant futuristic font, digital consciousness awakening"
         )
 
-    result = generate_image(
-        prompt=prompt,
-        width=1920,
-        height=1080,
-        model="flux",
-        nologo=True,
-        enhance=True
-    )
+    result = generate_image(prompt=prompt, width=1920, height=1080)
 
     if result["success"]:
         print(f"[+] Boot image generated: {result['path']}")
@@ -188,15 +242,12 @@ def generate_boot_image(prompt: str = None) -> Dict[str, Any]:
     return result
 
 
-def show_fullscreen_image(image_path: str) -> bool:
-    """
-    Display an image in fullscreen with a close button.
+def show_fullscreen_image(image_path: str, duration: Optional[float] = None) -> bool:
+    """Display an image fullscreen with a close button.
 
     Args:
         image_path: Path to the image file
-
-    Returns:
-        True if displayed successfully
+        duration: Optional seconds after which the window closes itself
     """
     try:
         import tkinter as tk
@@ -207,12 +258,10 @@ def show_fullscreen_image(image_path: str) -> bool:
             print(f"[!] Image not found: {image_path}")
             return False
 
-        # Use window manager for proper z-layering
         try:
             from ui.window_manager import create_image_window
             root = create_image_window(title="CORA", maximized=True)
-        except:
-            # Fallback if window manager not available
+        except Exception:
             root = tk.Toplevel() if tk._default_root else tk.Tk()
             root.title("CORA")
             root.state('zoomed')
@@ -220,46 +269,31 @@ def show_fullscreen_image(image_path: str) -> bool:
             root.lift()
             root.focus_force()
 
-        # Get screen dimensions
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
 
-        # Load and resize image
         img = Image.open(image_path)
         img = img.resize((screen_width, screen_height), Image.Resampling.LANCZOS)
         photo = ImageTk.PhotoImage(img)
 
-        # Display image
         label = tk.Label(root, image=photo, bg='black')
-        label.image = photo  # Keep reference
+        label.image = photo
         label.pack(fill=tk.BOTH, expand=True)
 
-        # Close button (red X, top-right)
         close_btn = tk.Button(
-            root,
-            text="X",
-            command=root.destroy,
-            font=('Arial', 16, 'bold'),
-            fg='white',
-            bg='#cc0000',
-            activebackground='#ff0000',
-            activeforeground='white',
-            width=3,
-            height=1,
-            relief=tk.FLAT,
-            cursor='hand2'
+            root, text="X", command=root.destroy, font=('Arial', 16, 'bold'),
+            fg='white', bg='#cc0000', activebackground='#ff0000', activeforeground='white',
+            width=3, height=1, relief=tk.FLAT, cursor='hand2'
         )
         close_btn.place(x=screen_width - 50, y=10)
 
-        # Bind Escape to close
         root.bind('<Escape>', lambda e: root.destroy())
-        # Click anywhere to close
         label.bind('<Button-1>', lambda e: root.destroy())
+        if duration:
+            root.after(int(duration * 1000), lambda: root.winfo_exists() and root.destroy())
 
-        # Start mainloop if we created the root
-        if not tk._default_root:
+        if not tk._default_root or tk._default_root is root:
             root.mainloop()
-
         return True
 
     except ImportError as e:
@@ -272,42 +306,20 @@ def show_fullscreen_image(image_path: str) -> bool:
 
 
 def get_recent_images(limit: int = 10) -> list:
-    """
-    Get list of recently generated images.
-
-    Args:
-        limit: Maximum number of images to return
-
-    Returns:
-        List of image paths sorted by modification time
-    """
+    """Recently generated images, newest first."""
     if not IMAGES_DIR.exists():
         return []
-
     images = []
-    for ext in ['*.png', '*.jpg', '*.jpeg']:
+    for ext in ['*.png', '*.jpg', '*.jpeg', '*.webp']:
         images.extend(IMAGES_DIR.glob(ext))
-
-    # Sort by modification time, newest first
     images.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-
     return [str(p) for p in images[:limit]]
 
 
 if __name__ == "__main__":
     print("=== CORA Image Generation Test ===")
-    print()
-
-    # Test boot image generation
-    print("1. Generating boot image...")
-    result = generate_boot_image()
-
-    if result["success"]:
-        print(f"\n2. Displaying image...")
-        show_fullscreen_image(result["path"])
-
-    print("\n3. Recent images:")
-    for img in get_recent_images(5):
-        print(f"   - {img}")
-
-    print("\n=== Test Complete ===")
+    print(f"API: {IMAGE_API}  key: {'set' if API_KEY else 'missing'}")
+    print(f"models: {list_image_models()[:10]}")
+    print(f"resolved '{_configured_model()}' -> {resolve_model()}")
+    result = generate_image("a small neon test pattern, dark background", width=512, height=512)
+    print(result)
