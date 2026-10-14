@@ -84,7 +84,7 @@ def _chat_payload(messages, model, system, temperature, max_tokens, tools, strea
         'messages': msgs,
         'stream': stream,
         'keep_alive': _settings.keep_alive(),
-        'options': _settings.base_options(temperature, max_tokens),
+        'options': _settings.base_options(temperature, max_tokens, model),
     }
     if tools:
         payload['tools'] = tools
@@ -235,7 +235,7 @@ def warm_up(model: Optional[str] = None, timeout: int = 180) -> bool:
         resp = requests.post(f"{_url()}/api/chat", json={
             'model': model, 'messages': [], 'stream': False,
             'keep_alive': _settings.keep_alive(),
-            'options': {'num_ctx': _settings.num_ctx()},
+            'options': {'num_ctx': _settings.num_ctx(model)},
         }, timeout=timeout)
         return resp.status_code == 200
     except Exception:
@@ -388,7 +388,7 @@ def generate(
             'stream': False,
             'raw': raw,
             'keep_alive': _settings.keep_alive(),
-            'options': _settings.base_options(temperature, max_tokens),
+            'options': _settings.base_options(temperature, max_tokens, model),
         }
         if system:
             payload['system'] = system
@@ -617,7 +617,7 @@ async def async_generate(
         payload = {
             'model': model, 'prompt': prompt, 'stream': False,
             'keep_alive': _settings.keep_alive(),
-            'options': _settings.base_options(temperature, max_tokens),
+            'options': _settings.base_options(temperature, max_tokens, model),
         }
         if system:
             payload['system'] = system

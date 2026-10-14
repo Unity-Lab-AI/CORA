@@ -13,6 +13,7 @@ Per ARCHITECTURE.md v1.0.0:
 
 import os
 import sys
+import re
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -223,30 +224,22 @@ def cmd_weather(args: str, context: Dict) -> CommandResult:
     """Show current weather."""
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from services.location import get_location
-        from services.weather import get_current_weather, format_weather
+        from services.weather import get_weather, get_weather_summary
 
-        location = get_location()
-        if not location:
-            return CommandResult(
-                success=False,
-                message="Couldn't determine location",
-                should_speak=True
-            )
-
-        weather = get_current_weather(location['lat'], location['lon'])
-        if not weather:
+        where = (args or '').strip() or None
+        weather = get_weather(where)
+        if not weather or not weather.get('success'):
             return CommandResult(
                 success=False,
                 message="Couldn't get weather data",
                 should_speak=True
             )
 
-        summary = format_weather(weather)
+        summary = get_weather_summary(where)
         return CommandResult(
             success=True,
             message=summary,
-            data={'weather': weather, 'location': location},
+            data={'weather': weather},
             should_speak=True
         )
     except Exception as e:
@@ -320,42 +313,28 @@ def cmd_remind(args: str, context: Dict) -> CommandResult:
 
     try:
         sys.path.insert(0, str(PROJECT_DIR))
-        from cora_tools.reminders import add_reminder, parse_time_string
+        from ai.tools_registry import execute
 
-        # Parse time from args
-        # Format: "remind me to X in Y minutes/hours"
-        # or: "remind me to X at Y:YY"
+        # "remind me to X in Y minutes" / "X at 6pm" / "X tomorrow at 9"
+        text, when = args.strip(), ''
+        m = re.search(r'\b(in|at|tomorrow|next|tonight|on)\b', args, flags=re.IGNORECASE)
+        if m:
+            text = args[:m.start()].strip() or args.strip()
+            when = args[m.start():].strip()
+        text = re.sub(r'^(me\s+)?(to\s+)?', '', text, flags=re.IGNORECASE).strip() or args.strip()
+        result = execute('set_reminder', {'text': text, 'when': when or 'in 30 minutes'})
 
-        text = args
-        remind_time = None
-
-        # Look for time indicators
-        time_words = ['in', 'at', 'tomorrow', 'next']
-        for word in time_words:
-            if word in args.lower():
-                parts = args.lower().split(word, 1)
-                text = parts[0].strip()
-                time_part = parts[1].strip() if len(parts) > 1 else ""
-                remind_time = parse_time_string(time_part)
-                break
-
-        if not remind_time:
-            remind_time = datetime.now() + timedelta(minutes=30)
-
-        reminder_id = add_reminder(text, remind_time)
-
-        if reminder_id:
-            time_str = remind_time.strftime("%I:%M %p")
+        if result.get('ok'):
             return CommandResult(
                 success=True,
-                message=f"OK, I'll remind you at {time_str}.",
-                data={'reminder_id': reminder_id, 'time': remind_time.isoformat()},
+                message=result.get('message') or "Reminder set.",
+                data={'reminder_id': result.get('id'), 'time': result.get('time')},
                 should_speak=True
             )
         else:
             return CommandResult(
                 success=False,
-                message="Couldn't create reminder",
+                message=result.get('error') or result.get('message') or "Couldn't create reminder",
                 should_speak=True
             )
 
@@ -590,7 +569,6 @@ def cmd_analyze_camera(args: str, context: Dict) -> CommandResult:
         result = generate_with_image(
             prompt=prompt,
             image_path=str(frame_path),
-            model="llava"
         )
 
         if result and result.content:
@@ -1445,7 +1423,7 @@ def cmd_github_create(args: str, context: Dict) -> CommandResult:
 # ============ EMAIL COMMANDS ============
 
 @register_command("send email", aliases=["email", "send message", "message"])
-def handle_send_email(args: str = "") -> CommandResult:
+def handle_send_email(args: str = "", context: Dict = None) -> CommandResult:
     """Send an email using default mail app."""
     try:
         from cora_tools.email_tool import parse_email_command, send_email
@@ -1483,7 +1461,7 @@ def handle_send_email(args: str = "") -> CommandResult:
 
 
 @register_command("check email", aliases=["read email", "read emails", "check emails", "open email", "open inbox", "inbox"])
-def handle_check_email(args: str = "") -> CommandResult:
+def handle_check_email(args: str = "", context: Dict = None) -> CommandResult:
     """Open email inbox in default mail app."""
     try:
         from cora_tools.email_tool import read_emails
@@ -1501,7 +1479,7 @@ def handle_check_email(args: str = "") -> CommandResult:
 
 
 @register_command("add contact", aliases=["save contact", "new contact"])
-def handle_add_contact(args: str = "") -> CommandResult:
+def handle_add_contact(args: str = "", context: Dict = None) -> CommandResult:
     """Add a contact to the address book."""
     try:
         from cora_tools.email_tool import add_contact
@@ -1533,7 +1511,7 @@ def handle_add_contact(args: str = "") -> CommandResult:
 
 
 @register_command("list contacts", aliases=["show contacts", "my contacts", "contacts"])
-def handle_list_contacts(args: str = "") -> CommandResult:
+def handle_list_contacts(args: str = "", context: Dict = None) -> CommandResult:
     """List saved email contacts."""
     try:
         from cora_tools.email_tool import list_contacts
@@ -1559,7 +1537,7 @@ def handle_list_contacts(args: str = "") -> CommandResult:
 # ============ HEARING/TRANSCRIPT COMMANDS ============
 
 @register_command("what did you hear", aliases=["what did i say", "what did i just say", "what was that", "repeat that", "what did you just hear"])
-def handle_what_did_you_hear(args: str = "") -> CommandResult:
+def handle_what_did_you_hear(args: str = "", context: Dict = None) -> CommandResult:
     """Tell user what was heard before the wake word."""
     try:
         from voice.stt import WakeWordDetector
@@ -1583,7 +1561,7 @@ def handle_what_did_you_hear(args: str = "") -> CommandResult:
 
 
 @register_command("be more chatty", aliases=["talk more", "be more involved", "be active", "friend mode"])
-def handle_be_more_chatty(args: str = "") -> CommandResult:
+def handle_be_more_chatty(args: str = "", context: Dict = None) -> CommandResult:
     """Increase CORA's ambient interjection frequency."""
     try:
         from voice.ambient_awareness import get_ambient_awareness
@@ -1605,7 +1583,7 @@ def handle_be_more_chatty(args: str = "") -> CommandResult:
 
 
 @register_command("be quiet", aliases=["be less chatty", "talk less", "quiet mode", "shut up", "give me space", "leave me alone"])
-def handle_be_quiet(args: str = "") -> CommandResult:
+def handle_be_quiet(args: str = "", context: Dict = None) -> CommandResult:
     """Decrease CORA's ambient interjection frequency."""
     try:
         from voice.ambient_awareness import get_ambient_awareness
@@ -1627,7 +1605,7 @@ def handle_be_quiet(args: str = "") -> CommandResult:
 
 
 @register_command("how aware are you", aliases=["awareness level", "friend threshold", "how chatty are you"])
-def handle_awareness_level(args: str = "") -> CommandResult:
+def handle_awareness_level(args: str = "", context: Dict = None) -> CommandResult:
     """Check CORA's current ambient awareness level."""
     try:
         from voice.ambient_awareness import get_ambient_awareness

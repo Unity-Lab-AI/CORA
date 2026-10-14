@@ -81,7 +81,17 @@ class TTSMutex:
         """
         try:
             self._lock_file = open(self.lock_path, 'w')
-            portalocker.lock(self._lock_file, portalocker.LOCK_EX, timeout=timeout)
+            # portalocker >= 3 has no timeout on lock(): poll a non-blocking
+            # exclusive lock until we get it or the timeout runs out.
+            deadline = time.time() + max(0.0, float(timeout))
+            while True:
+                try:
+                    portalocker.lock(self._lock_file, portalocker.LOCK_EX | portalocker.LOCK_NB)
+                    break
+                except (portalocker.LockException, BlockingIOError, PermissionError, OSError):
+                    if time.time() >= deadline:
+                        raise portalocker.LockException("timeout")
+                    time.sleep(0.05)
 
             # Update state file
             self._update_state('acquired')
@@ -96,6 +106,12 @@ class TTSMutex:
 
         except Exception as e:
             self._log(f"Lock error: {e}")
+            if self._lock_file:
+                try:
+                    self._lock_file.close()
+                except Exception:
+                    pass
+                self._lock_file = None
             return False
 
     def release(self):

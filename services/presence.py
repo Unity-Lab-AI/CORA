@@ -69,23 +69,18 @@ def capture_webcam(camera_index: int = 0, save_path: Optional[Path] = None) -> O
         return None
     with _camera_lock:
         try:
-            backend = cv2.CAP_DSHOW if os.name == 'nt' else 0
-            cap = cv2.VideoCapture(camera_index, backend) if backend else cv2.VideoCapture(camera_index)
-            if not cap.isOpened():
-                print(f"[!] Could not open camera {camera_index}")
-                return None
-            ret, frame = cap.read()
-            cap.release()
-            if not ret or frame is None:
-                print("[!] Failed to capture frame")
-                return None
+            # services.camera: probed device, hard timeout per attempt, never hangs
+            from services import camera as _camera
             if save_path is None:
                 SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 save_path = SNAPSHOT_DIR / f'snapshot_{timestamp}.jpg'
-            cv2.imwrite(str(save_path), frame)
+            path = _camera.capture_to_file(save_path)
+            if not path:
+                print(f"[!] Webcam capture failed: {_camera.last_error() or 'no camera'}")
+                return None
             _prune_snapshots()
-            return save_path
+            return path
         except Exception as e:
             print(f"[!] Webcam capture error: {e}")
             return None

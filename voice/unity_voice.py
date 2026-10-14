@@ -425,6 +425,31 @@ def synth_with_fallback(sentence: str, emotion: Optional[str], original_had_bang
         raise
 
 
+def synth_delivery(sentence: str, emotion: Optional[str], speech_act: Optional[str],
+                   intensity: Optional[float] = None) -> np.ndarray:
+    """Synth one sentence with the designators her brain chose (a say() call:
+    emotion + act, the exact names the voice was trained on). Unknown names
+    fall to neutral/statement, an untrained pair goes to the nearest trained
+    one, and a 422 retries once as neutral/statement."""
+    e = (emotion or 'neutral').strip().lower()
+    a = (speech_act or 'statement').strip().lower()
+    if e not in EMOTIONS:
+        e = 'neutral'
+    if a not in SPEECH_ACTS:
+        a = 'statement'
+    e, a = _fallback_pair(e, a)
+    body: Dict[str, object] = {"text": sentence, "emotion": e, "speech_act": a}
+    if e != 'neutral':
+        i = DEFAULT_INTENSITY if intensity is None else float(intensity)
+        body["intensity"] = round(max(0.1, min(1.0, i)), 2)
+    try:
+        return synth(body)
+    except VoiceRefused:
+        if e != 'neutral' or a != 'statement':
+            return synth({"text": sentence, "emotion": "neutral", "speech_act": "statement"})
+        raise
+
+
 if __name__ == '__main__':
     print("URL:", VOICE_URL, " model dir:", MODEL_DIR, " exists:", MODEL_DIR.exists())
     print("support pairs:", len(delivery_support() or []))

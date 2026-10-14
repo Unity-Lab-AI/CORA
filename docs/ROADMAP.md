@@ -227,7 +227,7 @@ These need fixing BEFORE any new feature work:
 | Role | Member |
 |------|--------|
 | Project Lead | Unity |
-| Development | Hackall360, Sponge, GFourteen |
+| Development | Hackall360, Sponge, GFourteen, Alfreddo |
 | Architecture | Unity AI Lab |
 | AI Integration | OLLAMA |
 
@@ -440,7 +440,7 @@ C.O.R.A/
 |------|--------|
 | Project Lead | Unity |
 | Architecture | Unity AI Lab |
-| Development | Hackall360, Sponge, GFourteen |
+| Development | Hackall360, Sponge, GFourteen, Alfreddo |
 | AI Integration | OLLAMA |
 | Quality | INTOLERANT |
 

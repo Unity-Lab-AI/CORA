@@ -345,79 +345,103 @@ class CoraApp(ctk.CTk):
             daemon=True
         ).start()
 
-    def _process_command(self, message):
-        """Process a command (runs in background thread).
+    # CLI verbs that bypass the model and run cora.py's command table directly
+    _DIRECT_CLI = {'add', 'list', 'ls', 'done', 'complete', 'delete', 'del', 'rm', 'pri', 'priority',
+                   'due', 'note', 'status', 'show', 'search', 'learn', 'recall', 'kb', 'remember', 'mem',
+                   'stats', 'today', 'undo', 'backup', 'settings', 'config', 'help', '?', 'about', 'version',
+                   'chathistory', 'history', 'tools', 'list_tools', 'create_tool', 'modify_tool', 'pull'}
 
-        INT-001: Wire to cora.py command processing
+    def _process_command(self, message):
+        """Process a message (runs in background thread).
+
+        A leading CLI verb ("add buy milk", "list", "done T003") runs the
+        cora.py command directly; everything else goes through the shared
+        assistant dispatcher (model + tools + her voice).
         """
         response = ""
+        parts = message.split()
+        cmd = parts[0].lower() if parts else ''
 
-        if not CORA_AVAILABLE:
-            response = "CORA module not available. Check imports."
-            self.after(0, lambda: self._add_message("CORA", response))
-            self.after(0, lambda: self._set_status("Ready"))
-            return
-
-        try:
-            # Capture cora.py output
+        if CORA_AVAILABLE and cmd in self._DIRECT_CLI and hasattr(cora, 'COMMANDS') and cmd in cora.COMMANDS:
             old_stdout = sys.stdout
-            sys.stdout = StringIO()
+            try:
+                sys.stdout = StringIO()
+                tasks = cora.load_tasks()
+                cora.COMMANDS[cmd](parts[1:], tasks)
+                response = sys.stdout.getvalue().strip() or "Done."
+                if EMOTION_AVAILABLE:
+                    if cmd in ('done', 'complete'):
+                        apply_event('task_completed')
+                    elif cmd == 'add':
+                        apply_event('help_given')
+            except Exception as e:
+                response = f"Error: {e}"
+                if EMOTION_AVAILABLE:
+                    apply_event('error')
+            finally:
+                sys.stdout = old_stdout
+            if self.current_panel == "tasks":
+                self.after(0, self._load_tasks_into_panel)
+        else:
+            try:
+                from ai.dispatcher import get_dispatcher
+                d = get_dispatcher()
+                d.confirm_callback = self._confirm_on_ui
+                speak_it = True
+                try:
+                    import json as _json
+                    with open(Path(__file__).parent.parent / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+                        speak_it = bool((_json.load(f).get('tts') or {}).get('enabled', True))
+                except Exception:
+                    pass
 
-            # Parse command like cora.py does
-            parts = message.split()
-            if not parts:
-                response = "What?"
-            else:
-                cmd = parts[0].lower()
-                args = parts[1:]
+                def on_event(kind, payload):
+                    if kind == 'tool_call':
+                        self.after(0, lambda p=payload: self._add_message("CORA (tool)", f"{p['tool']} {p.get('arguments') or ''}"))
+                    elif kind == 'tool_result':
+                        r = payload.get('result') or {}
+                        msg = r.get('message') or r.get('error') or ''
+                        self.after(0, lambda m=msg, p=payload: self._add_message("CORA (result)", f"{p['tool']}: {str(m)[:300]}"))
+                    elif kind == 'confirm_needed':
+                        self.after(0, lambda p=payload: self._add_message("CORA", f"Needs your OK: {p['tool']} - say yes or no"))
 
-                # Check if it's a known command
-                if hasattr(cora, 'COMMANDS') and cmd in cora.COMMANDS:
-                    # Call the command handler
-                    handler = cora.COMMANDS[cmd]
-                    tasks = cora.load_tasks()
-                    handler(args, tasks)
-                    response = sys.stdout.getvalue().strip()
-                    if not response:
-                        response = "Done."
-
-                    # Apply emotional event for task completion
+                result = d.handle(message, speak=speak_it, on_event=on_event)
+                response = result.text or ("Done." if result.tool_calls else "...")
+                if result.error:
+                    response = f"{response}\n({result.error})" if response != '...' else f"Error: {result.error}"
                     if EMOTION_AVAILABLE:
-                        if cmd in ['done', 'complete']:
-                            apply_event('task_completed')
-                        elif cmd in ['add', 'new']:
-                            apply_event('help_given')
-                elif cmd == 'chat' or not cmd.startswith('/'):
-                    # Treat as chat message
-                    if hasattr(cora, 'cmd_chat'):
-                        if cmd != 'chat':
-                            args = [message]  # Full message as chat
-                        tasks = cora.load_tasks()
-                        cora.cmd_chat(args, tasks)
-                        response = sys.stdout.getvalue().strip()
-                        if not response:
-                            response = "..."
-                else:
-                    response = f"Unknown command: {cmd}"
+                        apply_event('error')
+            except Exception as e:
+                response = f"Error: {e}"
+                if EMOTION_AVAILABLE:
+                    apply_event('error')
 
-            sys.stdout = old_stdout
-
-        except Exception as e:
-            sys.stdout = old_stdout
-            response = f"Error: {str(e)}"
-            if EMOTION_AVAILABLE:
-                apply_event('error')
-
-        # Get mood indicator
         mood_text = ""
         if EMOTION_AVAILABLE:
             mood = get_mood()
             if mood != 'neutral':
                 mood_text = f" [{mood}]"
 
-        # Update UI from main thread
         self.after(0, lambda: self._add_message(f"CORA{mood_text}", response))
         self.after(0, lambda: self._set_status("Ready"))
+
+    def _confirm_on_ui(self, question: str):
+        """Yes/no dialog on the Tk thread for destructive tools (called from a worker)."""
+        done = threading.Event()
+        answer = {'v': None}
+
+        def ask():
+            try:
+                from tkinter import messagebox
+                answer['v'] = bool(messagebox.askyesno("CORA needs your OK", f"Allow this action?\n\n{question}", parent=self))
+            except Exception:
+                answer['v'] = None
+            finally:
+                done.set()
+
+        self.after(0, ask)
+        done.wait(120)
+        return answer['v']
 
     def _on_enter_pressed(self, event):
         """Handle Enter key press."""
@@ -561,8 +585,8 @@ class CoraApp(ctk.CTk):
             return
         self._hide_current_panel()
         if "tasks" not in self.panels:
-            self.panels["tasks"] = TasksPanel(self.main_frame)
-            self._load_tasks_into_panel()
+            self.panels["tasks"] = TasksPanel(self.main_frame, on_change=self._load_tasks_into_panel)
+        self._load_tasks_into_panel()
         self.panels["tasks"].grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
         self.current_panel = "tasks"
         self._set_status("Tasks")
@@ -577,6 +601,10 @@ class CoraApp(ctk.CTk):
         self._hide_current_panel()
         if "knowledge" not in self.panels:
             self.panels["knowledge"] = KnowledgePanel(self.main_frame)
+        try:
+            self.panels["knowledge"].refresh()
+        except Exception:
+            pass
         self.panels["knowledge"].grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
         self.current_panel = "knowledge"
         self._set_status("Knowledge")
@@ -604,18 +632,20 @@ class CoraApp(ctk.CTk):
             self.panels[self.current_panel].grid_forget()
 
     def _load_tasks_into_panel(self):
-        """Load tasks from cora into tasks panel."""
+        """Load tasks (shared data/tasks.json) into the tasks panel."""
         if "tasks" not in self.panels:
             return
         try:
-            if CORA_AVAILABLE:
-                tasks = cora.load_tasks()
-                task_list = [{"id": t.get("id", i), "text": t.get("text", ""),
-                             "priority": t.get("priority", 5), "status": t.get("status", "pending")}
-                            for i, t in enumerate(tasks)]
-                self.panels["tasks"].load_tasks(task_list)
-        except Exception:
-            pass
+            from cora_tools.tasks import get_manager
+            tm = get_manager()
+            tm.load()
+            task_list = [{"id": t.get("id", i), "text": t.get("text", ""),
+                          "priority": t.get("priority", 5), "status": t.get("status", "pending"),
+                          "due": t.get("due")}
+                         for i, t in enumerate(tm.tasks)]
+            self.panels["tasks"].load_tasks(task_list)
+        except Exception as e:
+            print(f"[GUI] tasks load: {e}")
 
     def _start_wake_detector(self):
         """Start the wake word detector in background."""
@@ -642,44 +672,39 @@ class CoraApp(ctk.CTk):
         self.after(0, lambda: self.voice_button.configure(fg_color="green", text="..."))
 
     def _on_voice_command(self, command):
-        """Called when voice command is recognized after wake word.
+        """Called when a command is recognized after the wake word.
 
-        P1-VOICE: Wire voice_command.json reading into main loop.
-        First tries to match against voice_commands.json, then falls back to text input.
+        Exact registered voice commands (voice_commands.json, e.g. "camera",
+        "what did you hear") run directly; everything else goes to the
+        assistant dispatcher like typed input.
         """
         if not command:
             self.after(0, lambda: self.voice_button.configure(fg_color=None, text="Mic"))
             return
 
-        # Try to execute as voice command first (P1-VOICE)
         if VOICE_COMMANDS_AVAILABLE:
-            # Parse command - first word is the command name
-            parts = command.lower().split()
-            cmd_name = parts[0] if parts else ""
-            cmd_args = " ".join(parts[1:]) if len(parts) > 1 else ""
+            try:
+                from voice.commands import parse_voice_input
+                cmd_name, cmd_args = parse_voice_input(command)
+            except Exception:
+                cmd_name, cmd_args = None, command
+            if cmd_name:
+                result = execute_command(cmd_name, cmd_args, context={'source': 'voice'})
+                if result.success:
+                    self.after(0, lambda: self._set_status(f"Voice: {cmd_name}"))
+                    self.after(0, lambda: self._add_message("You (voice)", command))
+                    self.after(0, lambda: self._add_message("CORA", result.message))
+                    if result.should_speak:
+                        try:
+                            from voice.tts import queue_speak
+                            queue_speak(result.message)
+                        except ImportError:
+                            pass
+                    self.after(0, lambda: self.voice_button.configure(fg_color=None, text="Mic"))
+                    self.after(2000, lambda: self._set_status("Ready"))
+                    return
 
-            # Try to execute via voice commands module
-            result = execute_command(cmd_name, cmd_args, context={'source': 'voice'})
-
-            if result.success:
-                # Voice command executed successfully
-                self.after(0, lambda: self._set_status(f"Voice: {cmd_name}"))
-                self.after(0, lambda: self._add_message("You (voice)", command))
-                self.after(0, lambda: self._add_message("CORA", result.message))
-
-                # Speak response if configured
-                if result.should_speak:
-                    try:
-                        from voice.tts import queue_speak
-                        queue_speak(result.message)
-                    except ImportError:
-                        pass
-
-                self.after(0, lambda: self.voice_button.configure(fg_color=None, text="Mic"))
-                self.after(2000, lambda: self._set_status("Ready"))
-                return
-
-        # Fall back to regular command processing
+        # Everything else: the assistant loop
         self.after(0, lambda: self.input_entry.delete(0, "end"))
         self.after(0, lambda: self.input_entry.insert(0, command))
         self.after(0, lambda: self._set_status(f"Heard: {command[:30]}"))

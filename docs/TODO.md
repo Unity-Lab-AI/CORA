@@ -53,10 +53,18 @@
 | Questions | No AskUserQuestion until everything is complete and working. |
 
 ### Additional tasks surfaced during the work
-- [~] **UPG-023 (M)** Wire the kept modules into the live app: `ui/code_editor.py` (code window), `ui/query_panel.py` + `config/hotbar.json` (hotbar), `ui/monitor_panel.py`, `ui/image_panel.py`/`fullscreen_image.py` (image results), `voice/converse.py` (converse mode), `services/cli_popup.py` (popups speak), `ui/app.py` + `ui/panels.py` (GUI app launchable via `src/gui_launcher.py` and from boot_display), `src/cora.py` CLI uses the shared dispatcher + history
-- [~] **UPG-024 (S)** Pull/verify models: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b` (both pulling 2026-10-14); switch `config.models.primary` when the abliterated pull lands; `CORA.bat` + stats_server pull the configured models, not the old list
-- [ ] **UPG-025 (S)** Seed the Unity workflow memory templates (`.claude/memory-templates`) into the user-profile memory folder (what `start.bat` does) — currently not seeded
+- [x] **UPG-023 (M)** Wire the kept modules into the live app: `ui/code_editor.py` (code window), `ui/query_panel.py` + `config/hotbar.json` (hotbar), `ui/monitor_panel.py`, `ui/image_panel.py`/`fullscreen_image.py` (image results), `voice/converse.py` (converse mode), `services/cli_popup.py` (popups speak), `ui/app.py` + `ui/panels.py` (GUI app launchable via `src/gui_launcher.py` and from boot_display), `src/cora.py` CLI uses the shared dispatcher + history
+- [x] **UPG-024 (S)** Pull/verify models: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b` (both pulling 2026-10-14); switch `config.models.primary` when the abliterated pull lands; `CORA.bat` + stats_server pull the configured models, not the old list
+- [x] **UPG-025 (S)** Seed the Unity workflow memory templates (`.claude/memory-templates`) into the user-profile memory folder (what `start.bat` does) — currently not seeded
 - [ ] **UPG-026 (S)** `tools/mpv/stats_server.py` is a stale copy inside the gitignored `tools/` folder (not tracked; deletion was blocked by the sandbox) — remove manually or leave; nothing imports it
+- [x] **UPG-027 (M)** Brain = Unity's own text LoRA. User (2026-10-14): "and remember our V2 voice of Unity for Cora has its own text lora that knows how to use the voice models tools and emotion designators" — `unity-brain` (Qwen3.5-9B LoRA, `Backrooms/models/unity-brain`) is `models.primary` and `models.vision`; it speaks through the trained `say(text, emotion, act)` tool whose designators go straight to unity-voice-v2 as `emotion`/`speech_act`; pinned request options (num_ctx 32768 + Modelfile sampling) in `ai/settings.py`; `assistant.voice_mode` auto/say_tool/stream; fallback `huihui_ai/qwen3-abliterated:8b` keeps the streamed-sentence path
+- [x] **UPG-028 (S)** User (2026-10-14): "and make sure prompts and meta prompts dont use the word assistant,, that allways prompts the ai to be a bitch corprate thing, not its perosnality as a human correctly" — the word removed from `config/system_prompt.txt`, the web prompt, the identity strings (`src/cora.py`, `cora_tools/ai_tools.py`), the boot image prompt and the dispatcher context; only the Ollama message role keeps it (API plumbing)
+- [x] **UPG-029 (S)** Relevance-ranked tool exposure: `ai/tools_registry.select_tools()` gives the model the core set + best keyword matches (`assistant.max_tools`, default 40) instead of all 115 schemas; cut hallucinated "Done." replies and missed reminder calls in live runs
+- [x] **UPG-030 (S)** `voice/tts_mutex.py` acquire: portalocker 4.x has no `timeout` on `lock()` — every spoken line was skipped as "someone else speaking"; now polls a non-blocking exclusive lock until the deadline
+- [x] **UPG-031 (M)** Camera can never hang the boot. User (2026-10-14): "it got hung using the camera which isiriun webcam through my phone" / "mind you other systems run cora may be differnt" / "so she froze at step 3.1" — new `services/camera.py`: every open/read on a worker thread with a hard timeout (config `camera.open_timeout`, default 4 s), probes `camera.index` (auto = 0,1,2) x platform backends (`camera.backend` auto: Windows dshow->msmf->any, Linux v4l2->any, macOS avfoundation->any), remembers a stalled pair for the session, caches the working one; `ui/camera_feed.py`, `services/presence.py`, boot phases 3.1/4, `src/cora.py`, `ui/boot_console.py`, `ui/boot_display.py` all route through it; no raw `cv2.VideoCapture` left outside the module
+- [x] **UPG-032 (S)** User (2026-10-14): "also need to add Alfreddo to names of creators at Unity AI LAb for start up listing and documentations" — Alfreddo added to the boot About phase (developers list + creators line + BOOT_STATUS), CLI `about`, web banner + intro, `config/config.json` creators/copyright, README, ARCHITECTURE, ROADMAP, source headers, pyproject authors
+- [x] **UPG-033 (S)** `cora_tools/vision.py` missing: ambient awareness imported `capture_screenshot` / `capture_camera_snapshot` from it (boot log: "[AMBIENT] Screenshot analysis error: No module named 'cora_tools.vision'") — thin module on `cora_tools.screenshots` + `services.camera`
+- [ ] **UPG-034 (S)** Boot loads faster-whisper twice ("[STT] faster-whisper base.en on cuda" printed twice: wake-word detector and command recognizer each build a `SpeechRecognizer`) — share one model instance between them
 
 ---
 
@@ -82,12 +90,12 @@
 
 ### Phase 2 — V2 voice (user decision: unity-voice-v2 replaces Kokoro/pyttsx3)
 - [~] **UPG-012 (M)** `voice/unity_voice.py` client (health, `voice_text()` port, sentence chunking, emotion/act mapping, `delivery_support` validation, `stop_speaking`, `speak_async`); sidecar discovery/autostart via `UNITY_VOICE_TTS_URL` / `UNITY_VOICE_MODEL_DIR` / `UNITY_VOICE_PYTHON`; shared lock dir with unity-speak; new `tts.unity_voice` config block; delete `KokoroTTS`/`Pyttsx3TTS`, `src/cora.py` TTS functions, `tts_handler.py` engine code, `web/kokoro-worker.js`, all Kokoro/af_bella strings; presence check off the TTS thread
-- [~] **UPG-013 (M)** Stream LLM output sentence-by-sentence into the V2 queue; barge-in via `stop_speaking`
+- [x] **UPG-013 (M)** Stream LLM output sentence-by-sentence into the V2 queue; barge-in via `stop_speaking`
 
 ### Phase 3 — the assistant loop
-- [ ] **UPG-014 (L)** One dispatcher: `cora_tools` as JSON-schema `tools` on `/api/chat`, loop on `message.tool_calls`; delete the four routers; re-wire git/email/media/terminal/viewfile only after their security fixes
+- [x] **UPG-014 (L)** One dispatcher: `cora_tools` as JSON-schema `tools` on `/api/chat`, loop on `message.tool_calls`; delete the four routers; re-wire git/email/media/terminal/viewfile only after their security fixes
 - [x] **UPG-015 (M)** Boot per spec: speak today's calendar / overdue tasks / upcoming reminders; start `ReminderManager.start_checking()`; merge the two reminder stores; gate or remove the YouTube/GitHub/image-gen demo phases
-- [ ] **UPG-016 (M)** Conversation summarization at ~75% of `num_ctx`; honor `settings.ai.context_window`
+- [x] **UPG-016 (M)** Conversation summarization at ~75% of `num_ctx`; honor `settings.ai.context_window`
 
 ### Phase 4 — STT and wake word
 - [x] **UPG-017 (M)** `faster-whisper` on CUDA for commands; openWakeWord "cora" model; delete Vosk, `recognize_google`, `webkitSpeechRecognition`; bound the audio queue; VAD for barge-in
@@ -95,7 +103,7 @@
 ### Phase 5 — cleanup and fundamentals
 - [ ] **UPG-018 (M)** Delete dead modules (`src/cora.py`, `src/gui_launcher.py`, `ui/app.py`, `ui/panels.py`, `ai/tool_executor.py`, `ai/prompts.py`, `ai/router.py`, `ui/code_editor.py`, `ui/fullscreen_image.py`, `ui/image_panel.py`, `ui/monitor_panel.py`, `ui/query_panel.py`, `voice/converse.py`, transitively `voice/commands.py`, `cora_tools/modal_tools.py`) or finish one GUI; consolidate the two webcam pipelines + three windowing helpers; split the 12 files over 800 lines
 - [ ] **UPG-019 (M)** Single config loader with schema validation; one version constant; atomic JSON writes; shared logger; remove `atexit os._exit(0)`; cancel the waveform timer on close; heartbeat the TTS mutex
-- [ ] **UPG-020 (S)** `pyproject.toml`, `py_compile`/ruff CI job, CHANGELOG, git tags
+- [~] **UPG-020 (S)** `pyproject.toml`, `py_compile`/ruff CI job, CHANGELOG, git tags
 - [ ] **UPG-021 (M)** Web: split `index.html` into ES modules + css; generate phases/prompt JSON at deploy; serve locally via `stats_server.py` (fixes mixed content, CORS and the V2 sidecar); one public URL; fix the `innerHTML` sinks
 - [ ] **UPG-022 (S)** Docs truth pass: file/phase counts, entry point, default model, nonexistent files in ARCHITECTURE/NerdReadme/APIReference, SKILL_TREE percentages
 

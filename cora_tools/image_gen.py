@@ -225,7 +225,7 @@ def generate_boot_image(prompt: str = None) -> Dict[str, Any]:
     """Generate a boot/splash image for CORA at 1920x1080."""
     if prompt is None:
         prompt = (
-            "futuristic AI assistant boot screen, holographic interface, "
+            "futuristic AI boot screen, holographic interface, "
             "glowing blue circuits, dark background, sleek modern design, "
             "text 'C.O.R.A' in elegant futuristic font, digital consciousness awakening"
         )

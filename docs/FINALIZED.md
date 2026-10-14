@@ -437,6 +437,30 @@ User's words: "get to fixing it all we need it 100% operationsal and complete wi
 
 Open from these phases: cuBLAS/cuDNN CUDA-12 DLLs for ctranslate2 being installed (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`); UPG-013 streaming; UPG-012 leftovers in `src/cora.py`, `ui/panels.py`, web.
 
+## Session: 2026-10-14 (Repair Phase 3 — one conversation loop, unity-brain)
+
+User, verbatim: "get to fixing it all we need it 100% operationsal and complete with all code wired up and working with edits and fixes where needed" / "Keep everything, wire every module in" / "and remember our V2 voice of Unity for Cora has its own text lora that knows how to use the voice models tools and emotion designators" / "and make sure prompts and meta prompts dont use the word assistant,, that allways prompts the ai to be a bitch corprate thing, not its perosnality as a human correctly" / "need to write now.md NOW"
+
+| Task | Done |
+|---|---|
+| UPG-014 | `ai/tools_registry.py` (116 tools as JSON-schema `tools`, confirmation flags, `execute()`, `select_tools()`) + `ai/dispatcher.py` (one `Dispatcher.handle()` for every entry point: native tool loop on `message.tool_calls`, JSON fallback protocol for models without a tools template, pending yes/no confirmation for destructive tools, shared `ai/history.py` transcript with summary folding). The four old routers stay reachable (`assistant.legacy_regex`, CLI command table) per the user's "keep everything" |
+| UPG-023 | `ui/boot_display.py` typed input -> dispatcher (tool/result/speech log lines, Tk-thread confirm dialog). `ui/app.py` -> dispatcher (direct CLI verbs still run `cora.COMMANDS`, now a module-level table built by `build_commands()`), voice commands via `parse_voice_input`, tasks from `cora_tools.tasks`. `ui/panels.py` rewritten: tasks add/toggle/delete, knowledge on `data/knowledge.json` (learn/forget tools), settings write `config/config.json` (voice volume/intensity, chat+vision model from installed list, context, whisper model, demo phases) with no pyttsx3. `voice/converse.py` rewritten on local STT + dispatcher + her voice + shared echo filter. `src/cora.py`: unknown input -> `cmd_chat` -> dispatcher. `voice/commands.py`: eight `handle_*` handlers take `(args, context)`, `cmd_weather` on `services.weather`, `cmd_remind` via the `set_reminder` tool, camera analysis uses the configured vision model |
+| UPG-027 | unity-brain is the chat + vision model. `ai/settings.py` `_MODEL_OPTIONS` / `model_options()` / `num_ctx(model)` / `base_options(model=)` and `ai/ollama.py` carry the pinned 32K context + Modelfile sampling on every request. `say` tool -> `voice.tts.queue_speak(speech_act=)` -> `voice/unity_voice.synth_delivery()` (enum check, nearest trained pair, 422 retry). Dispatcher `voice_mode()`: say_tool for unity-brain (plain text screen-only; `infer_delivery()` port of her training rules speaks a reply that never called say), stream for other models. Live: "Remind me to stretch in 3 minutes." -> `set_reminder` then `say(..., emotion=warm, act=reassurance)`; weather+time -> two tools then `say`; 2.6-3.6 s per turn warm |
+| UPG-028 | "assistant" removed from every model-facing string (system prompt, web prompt, identity, image prompt, dispatcher context) |
+| UPG-029 | `select_tools()` relevance ranking, `assistant.max_tools` |
+| UPG-030 | TTS mutex fixed for portalocker 4.x (lines were silently skipped) |
+| UPG-031 | `services/camera.py`: thread-guarded, timeout-bounded, host-agnostic webcam access (probed index x backend, config `camera.*`); all seven capture sites routed through it after boot froze at phase 3.1 on a phone-camera virtual webcam. Probe on this host: index 0 via dshow, 640x480, 0.6 s |
+| UPG-025 | 32 `.claude/memory-templates/*.md` seeded into the user-profile memory folder, index lines merged into `MEMORY.md` (existing entries kept) |
+| UPG-020 (part) | `pyproject.toml` (setuptools, dynamic deps from requirements.txt, ruff errors-only), `.github/workflows/compile.yml` (byte-compile + ruff on 3.13, no tests by policy), `CHANGELOG.md` 3.0.0. Git tag `v3.0.0` comes with the final push |
+| UPG-032 | Alfreddo listed with the creators everywhere the three were: boot About phase, CLI about, web, config, README/ARCHITECTURE/ROADMAP, source headers, pyproject |
+| UPG-032 (b) | User: "she didnt say alfreddo os part of unity ai lab, so u didnt fix it" — the spoken intro built its own developers string; now `ai.settings.creators()` reads config.json creators and feeds the boot intro ("Say all four names"), the screen listing (roles from config), BOOT_STATUS, and the dispatcher context so she names all four when asked who built her |
+| Boot verified | `src/boot_sequence.py` run 3 (2026-10-14, after the camera fixes): 13/13 systems, 15/15 tools, 168 s, wake word on faster-whisper CUDA, ambient awareness started; phases 0.9 (About, all four creators), 2/2.1 (unity-brain), 3.1 (camera open+snapshot+close), 4.5 (daily briefing), 5-10 clean |
+| UPG-033 | `cora_tools/vision.py` added for ambient awareness |
+| UPG-031 (b) | Second freeze at 3.1 was the close, not the open: `ui/camera_feed.py` feed thread now owns release()/destroyWindow (releasing from the boot thread while read() blocks deadlocks DirectShow); `stop()` joins with a 4 s timeout and abandons a stuck device. Measured: open 0.4 s, close 0.1 s |
+| UPG-013 / UPG-016 | Closed: sentence streaming + barge-in live in the dispatcher; summary folding in `ai/history.py` |
+| UPG-009 (part) | `cora_tools/code.py` model from `ai.settings.code_model()`; `voice/commands.py` llava kwarg gone; `web/index.html` model list still hardcoded (UPG-021) |
+| docs/NOW.md | Created from `.claude/templates/NOW.md`: the live single-focus snapshot |
+
 ---
 
 ## Cumulative Stats

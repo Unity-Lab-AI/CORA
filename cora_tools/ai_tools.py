@@ -272,7 +272,7 @@ def generate_response(context, personality, user_input, model='llama3.2'):
     """
     # Build system prompt from personality
     system_prompt = f"""You are {personality.get('name', 'CORA')}.
-Identity: {personality.get('identity', 'personal assistant')}
+Identity: {personality.get('identity', 'the woman who runs his day')}
 Tone: {personality.get('personality', {}).get('tone', 'helpful')}
 Style: {personality.get('personality', {}).get('style', 'professional')}
 

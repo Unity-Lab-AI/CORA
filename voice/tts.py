@@ -163,15 +163,23 @@ class UnityVoiceTTS(TTSEngine):
         clean = uv.prepare_text(raw)
         return [(s, had_bang and i == 0) for i, s in enumerate(uv.split_sentences(clean))], clean
 
-    def get_audio(self, text, emotion='neutral'):
+    def _synth_fn(self, emotion, speech_act):
+        """How one sentence is synthesised: with the brain's designators (a say
+        call) or with CORA's mood name mapped onto the voice (streamed text)."""
+        if speech_act:
+            return lambda s, b: uv.synth_delivery(s, emotion, speech_act)
+        return lambda s, b: uv.synth_with_fallback(s, emotion, b)
+
+    def get_audio(self, text, emotion='neutral', speech_act=None):
         """All sentences synthesised and concatenated (no playback)."""
         if not self.is_initialized and not self.initialize():
             return None
         parts = []
         sents, _ = self._sentences(text)
+        synth_fn = self._synth_fn(emotion, speech_act)
         for s, bang in sents:
             try:
-                parts.append(uv.synth_with_fallback(s, emotion, bang))
+                parts.append(synth_fn(s, bang))
             except (uv.VoiceRefused, uv.VoiceDown) as e:
                 self.last_error = str(e)
                 print(f"[TTS] {e}")
@@ -228,7 +236,7 @@ class UnityVoiceTTS(TTSEngine):
                 _audio_buffer_singleton.current_chunk = None
         return not stopped[0]
 
-    def speak(self, text, emotion='neutral') -> bool:
+    def speak(self, text, emotion='neutral', speech_act=None) -> bool:
         """Speak a reply: sentences are synthesised one ahead of playback so
         the first audio starts fast and a refused sentence costs one sentence,
         not the whole reply."""
@@ -241,6 +249,7 @@ class UnityVoiceTTS(TTSEngine):
         _speaking.set()
         _update_speech_text(clean)
         spoke_any = False
+        synth_fn = self._synth_fn(emotion, speech_act)
         from concurrent.futures import ThreadPoolExecutor
         try:
             if not uv.take_turn():
@@ -249,12 +258,12 @@ class UnityVoiceTTS(TTSEngine):
                 return False
             try:
                 with ThreadPoolExecutor(max_workers=1) as pool:
-                    futures = [pool.submit(uv.synth_with_fallback, s, emotion, b) for s, b in sents[:1]]
+                    futures = [pool.submit(synth_fn, s, b) for s, b in sents[:1]]
                     for i, (s, b) in enumerate(sents):
                         if _stop_event.is_set():
                             break
                         if i + 1 < len(sents):
-                            futures.append(pool.submit(uv.synth_with_fallback, sents[i + 1][0], emotion, sents[i + 1][1]))
+                            futures.append(pool.submit(synth_fn, sents[i + 1][0], sents[i + 1][1]))
                         try:
                             audio = futures[i].result()
                         except uv.VoiceDown as e:
@@ -291,10 +300,10 @@ def get_tts_engine(config=None):
     return engine if engine.initialize() else None
 
 
-def speak(text, emotion='neutral', config=None) -> bool:
+def speak(text, emotion='neutral', config=None, speech_act=None) -> bool:
     """Blocking speak."""
     engine = get_tts_engine(config)
-    return engine.speak(text, emotion) if engine else False
+    return engine.speak(text, emotion, speech_act) if engine else False
 
 
 def list_voices():
@@ -345,15 +354,17 @@ class TTSQueue:
         if self._thread:
             self._thread.join(timeout=2.0)
 
-    def speak(self, text: str, emotion: str = 'neutral', priority: int = 5, skip_presence: bool = False):
+    def speak(self, text: str, emotion: str = 'neutral', priority: int = 5, skip_presence: bool = False,
+              speech_act: Optional[str] = None):
         if not self.is_running:
             self.start()
-        self.queue.put({'text': text, 'emotion': emotion, 'priority': priority, 'skip_presence': skip_presence})
+        self.queue.put({'text': text, 'emotion': emotion, 'priority': priority, 'skip_presence': skip_presence,
+                        'speech_act': speech_act})
 
-    def speak_now(self, text: str, emotion: str = 'neutral'):
+    def speak_now(self, text: str, emotion: str = 'neutral', speech_act: Optional[str] = None):
         """Interrupt the current line and speak this next."""
         stop_speaking()
-        self.speak(text, emotion, priority=1, skip_presence=True)
+        self.speak(text, emotion, priority=1, skip_presence=True, speech_act=speech_act)
 
     def clear(self):
         while not self.queue.empty():
@@ -381,6 +392,7 @@ class TTSQueue:
                     continue
                 text = item.get('text', '')
                 emotion = item.get('emotion', 'neutral')
+                speech_act = item.get('speech_act')
                 if not item.get('skip_presence') and not self._is_user_present():
                     print(f"[TTS] User not present, skipping: {text[:30]}...")
                     continue
@@ -403,11 +415,11 @@ class TTSQueue:
                 if self.use_mutex and self._mutex:
                     with self._mutex.locked(timeout=10) as acquired:
                         if acquired:
-                            self.engine.speak(text, emotion)
+                            self.engine.speak(text, emotion, speech_act)
                         else:
                             print(f"[TTS] Skipped (someone else speaking): {text[:30]}...")
                 else:
-                    self.engine.speak(text, emotion)
+                    self.engine.speak(text, emotion, speech_act)
                 if self.on_speak_end:
                     try:
                         self.on_speak_end(text)
@@ -434,19 +446,20 @@ def get_tts_queue(config=None) -> TTSQueue:
     return _tts_queue
 
 
-def queue_speak(text: str, emotion: str = 'neutral', priority: int = 5):
-    """Queue text for speaking (non-blocking)."""
-    get_tts_queue().speak(text, emotion, priority)
+def queue_speak(text: str, emotion: str = 'neutral', priority: int = 5, speech_act: Optional[str] = None):
+    """Queue text for speaking (non-blocking). speech_act = the brain's act designator
+    (statement, wh_question, ...) when the line came from a say() call."""
+    get_tts_queue().speak(text, emotion, priority, speech_act=speech_act)
 
 
-def speak_async(text: str, emotion: str = 'neutral'):
+def speak_async(text: str, emotion: str = 'neutral', speech_act: Optional[str] = None):
     """Non-blocking speak (what cli_popup and the handlers always imported)."""
-    queue_speak(text, emotion)
+    queue_speak(text, emotion, speech_act=speech_act)
 
 
-def speak_interrupt(text: str, emotion: str = 'neutral'):
+def speak_interrupt(text: str, emotion: str = 'neutral', speech_act: Optional[str] = None):
     """Clear the queue and speak immediately."""
-    get_tts_queue().speak_now(text, emotion)
+    get_tts_queue().speak_now(text, emotion, speech_act)
 
 
 def voice_status() -> dict:

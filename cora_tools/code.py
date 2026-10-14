@@ -75,17 +75,23 @@ class CodeAssistant:
     Uses local Ollama models for AI operations.
     """
 
-    # Coding model - separate from CORA's chat model (dolphin-mistral)
-    CODE_MODEL = "qwen2.5-coder:7b"  # Best coding model for local use (late 2024)
+    # Coding model: config/config.json models.code, else the chat model (ai.settings)
+    @staticmethod
+    def default_model() -> str:
+        try:
+            from ai.settings import code_model
+            return code_model()
+        except Exception:
+            return "unity-brain"
 
     def __init__(self, model: str = None, timeout: int = 60):
         """Initialize code assistant.
 
         Args:
-            model: Ollama model to use for code tasks (defaults to deepseek-coder)
+            model: Ollama model to use for code tasks (defaults to models.code / the chat model)
             timeout: Timeout for AI operations in seconds
         """
-        self.model = model or self.CODE_MODEL
+        self.model = model or self.default_model()
         self.timeout = timeout
         self._temp_dir = Path(tempfile.gettempdir()) / "cora_code"
         self._temp_dir.mkdir(exist_ok=True)

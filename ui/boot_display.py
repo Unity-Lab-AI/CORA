@@ -847,18 +847,113 @@ class BootDisplay:
             self.log("Mode: Normal chat", 'info')
 
     def _process_user_input(self, text: str):
-        """Process user input - route to AI chat with mode context."""
+        """Process user input - route to the assistant dispatcher (or a custom callback)."""
         self.log_user(text)
 
         if self.on_user_input:
             # Use callback to process input
             self.on_user_input(text)
-        else:
-            # Default: try to use AI chat directly
+        elif self._legacy_regex_enabled():
             self._default_process_input(text)
+        else:
+            self._dispatch_input(text)
+
+    @staticmethod
+    def _legacy_regex_enabled() -> bool:
+        """config.json assistant.legacy_regex -> use the old regex command chain
+        instead of the LLM tool dispatcher (kept for comparison/debugging)."""
+        try:
+            import json
+            with open(_PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+                return bool((json.load(f).get('assistant') or {}).get('legacy_regex', False))
+        except Exception:
+            return False
+
+    def _dispatch_input(self, text: str):
+        """Send the message through ai.dispatcher: the model picks tools, CORA
+        speaks sentence by sentence while the reply streams in."""
+        mode = self.current_mode
+        prompt = text
+        # The mode buttons become hints the model can act on with its tools
+        hints = {
+            'screenshot': 'Take a screenshot and describe what is on screen, then answer: ',
+            'vision': 'Look through the camera and describe what you see, then answer: ',
+            'imagine': 'Generate an image of: ',
+            'tasks': 'This is about my tasks (use the task tools): ',
+        }
+        if mode in hints:
+            prompt = hints[mode] + text
+
+        def run():
+            try:
+                from ai.dispatcher import get_dispatcher
+                d = get_dispatcher()
+                d.confirm_callback = self._confirm_on_ui
+                self.log_thinking("Thinking...")
+                tokens = []
+
+                def on_event(kind, payload):
+                    if kind == 'token':
+                        tokens.append(payload)
+                    elif kind == 'tool_call':
+                        self.log_tool(payload['tool'], str(payload.get('arguments') or '')[:120])
+                    elif kind == 'tool_result':
+                        r = payload.get('result') or {}
+                        msg = r.get('message') or r.get('error') or ''
+                        if r.get('ok', True) and not r.get('error'):
+                            self.log_result(f"{payload['tool']}: {str(msg)[:200]}")
+                        else:
+                            self.log_fail(f"{payload['tool']}: {str(msg)[:200]}")
+                    elif kind == 'sentence':
+                        self.log_speech(payload)
+                    elif kind == 'confirm_needed':
+                        self.log_warn(f"Needs your OK: {payload['tool']} {payload.get('arguments')} - say yes or no")
+                    elif kind == 'error':
+                        self.log_fail(str(payload))
+
+                result = d.handle(prompt, speak=True, on_event=on_event)
+                if result.error:
+                    self.log_fail(f"AI error: {result.error}")
+                elif result.text and not result.spoke:
+                    self.log_result(result.text)
+                try:
+                    self.update_operational_status(activity="Ready - Awaiting commands",
+                                                   last_action=(result.tool_calls[-1]['name'] if result.tool_calls else 'chat'))
+                except Exception:
+                    pass
+            except Exception as e:
+                self.log_fail(f"Error: {e}")
+
+        threading.Thread(target=run, daemon=True, name='dispatch').start()
+
+    def _confirm_on_ui(self, question: str):
+        """Ask the user to confirm a destructive tool. Runs the dialog on the Tk
+        thread and blocks the calling worker thread for the answer (<= 2 min)."""
+        if not self.root:
+            return None
+        import threading as _th
+        done = _th.Event()
+        answer = {'v': None}
+
+        def ask():
+            try:
+                from tkinter import messagebox
+                answer['v'] = bool(messagebox.askyesno("CORA needs your OK", f"Allow this action?\n\n{question}", parent=self.root))
+            except Exception:
+                answer['v'] = None
+            finally:
+                done.set()
+
+        try:
+            self.root.after(0, ask)
+        except Exception:
+            return None
+        done.wait(120)
+        return answer['v']
 
     def _default_process_input(self, text: str):
-        """Default input processing using AI chat with mode-based tool use."""
+        """Legacy input processing: regex command chain with mode-based tool use
+        (enabled by config.json assistant.legacy_regex)."""
         import threading
         import re
 
@@ -1116,30 +1211,21 @@ class BootDisplay:
                     prompt = text if text else "Describe what you see"
                     self.log_action("Looking through camera...")
                     try:
-                        import cv2
+                        import os
                         from pathlib import Path
-                        cap = cv2.VideoCapture(0)
-                        if cap.isOpened():
-                            ret, frame = cap.read()
-                            cap.release()
-                            if ret:
-                                import os
-                                proj_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent
-                                cam_path = proj_dir / 'data' / 'camera' / 'see_capture.jpg'
-                                cam_path.parent.mkdir(parents=True, exist_ok=True)
-                                cv2.imwrite(str(cam_path), frame)
-
-                                from ai.ollama import generate_with_image
-                                result = generate_with_image(prompt, str(cam_path))
-                                if result.content:
-                                    self.log_result(result.content)
-                                    self._speak(result.content)
-                                else:
-                                    self.log_warn("Vision analysis failed")
+                        from services import camera as _camera
+                        proj_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent
+                        cam_path = _camera.capture_to_file(proj_dir / 'data' / 'camera' / 'see_capture.jpg')
+                        if cam_path:
+                            from ai.ollama import generate_with_image
+                            result = generate_with_image(prompt, str(cam_path))
+                            if result.content:
+                                self.log_result(result.content)
+                                self._speak(result.content)
                             else:
-                                self.log_fail("Camera capture failed")
+                                self.log_warn("Vision analysis failed")
                         else:
-                            self.log_fail("No camera available")
+                            self.log_fail(f"Camera: {_camera.last_error() or 'no camera available'}")
                     except Exception as e:
                         self.log_fail(f"Vision error: {e}")
                     return

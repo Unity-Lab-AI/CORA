@@ -65,60 +65,57 @@ class LiveCameraFeed:
         if self.is_running:
             return True
 
-        # Try to open camera - try DirectShow first on Windows, then fallback
-        import platform
-
-        backends = []
-        if platform.system() == 'Windows':
-            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
-        else:
-            backends = [cv2.CAP_ANY, cv2.CAP_V4L2]
-
-        # Try multiple camera indices with multiple backends
-        for backend in backends:
-            for idx in [self.camera_index, 0, 1, 2]:
-                try:
-                    self.cap = cv2.VideoCapture(idx, backend)
-                    if self.cap.isOpened():
-                        # Warmup - some cameras need this
-                        time.sleep(0.3)
-                        ret, frame = self.cap.read()
-                        if ret and frame is not None:
-                            self.camera_index = idx
-                            print(f"[Camera] Opened camera at index {idx}")
-                            self.is_running = True
-                            self._thread = threading.Thread(target=self._run_loop, daemon=True)
-                            self._thread.start()
-                            return True
-                        self.cap.release()
-                except:
-                    continue
-
-        print("[Camera] No camera found")
-        return False
+        # services.camera finds the device (config camera.index/backend, else
+        # probes) with a hard timeout per attempt, so a stalled virtual webcam
+        # (phone camera app, OBS virtual cam with no source) cannot hang us.
+        from services import camera as _camera
+        self.cap = _camera.open_capture()
+        if self.cap is None:
+            print(f"[Camera] No camera found ({_camera.last_error() or 'no device'})")
+            return False
+        dev = _camera.working_device()
+        if dev:
+            self.camera_index = dev[0]
+        print(f"[Camera] Opened camera at index {self.camera_index}")
+        self.is_running = True
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        return True
 
     def _run_loop(self):
-        """Main camera loop running in separate thread."""
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.window_name, self.width, self.height)
-
-        print(f"[Camera] Live feed started. Press Q to close, S to snapshot.")
-
-        while self.is_running and self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret and frame is not None:
-                self.current_frame = frame.copy()
-                # Show clean frame - no overlay text
-                cv2.imshow(self.window_name, frame)
-
-            # Handle key presses
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q') or key == 27:  # Q or ESC
-                break
-            elif key == ord('s'):  # S for snapshot
-                self.take_snapshot()
-
-        self.stop()
+        """Camera loop on its own thread. This thread OWNS the device: it is the
+        one that releases it and destroys the window. Releasing from another
+        thread while read() is blocked inside DirectShow/MSMF deadlocks (boot
+        froze at phase 3.1 that way on a phone-camera virtual webcam)."""
+        try:
+            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(self.window_name, self.width, self.height)
+            print("[Camera] Live feed started. Press Q to close, S to snapshot.")
+            while self.is_running and self.cap is not None and self.cap.isOpened():
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    self.current_frame = frame.copy()
+                    cv2.imshow(self.window_name, frame)     # clean frame, no overlay
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q') or key == 27:           # Q or ESC
+                    break
+                elif key == ord('s'):                      # S for snapshot
+                    self.take_snapshot()
+        except Exception as e:
+            print(f"[Camera] feed error: {e}")
+        finally:
+            cap, self.cap = self.cap, None
+            try:
+                if cap is not None:
+                    cap.release()
+            except Exception:
+                pass
+            try:
+                cv2.destroyWindow(self.window_name)
+            except Exception:
+                pass
+            self.is_running = False
+            print("[Camera] Feed stopped")
 
     def take_snapshot(self) -> Optional[Path]:
         """Take a snapshot of the current frame."""
@@ -153,20 +150,20 @@ class LiveCameraFeed:
         except:
             return None
 
-    def stop(self):
-        """Stop the camera feed."""
+    def stop(self, timeout: float = 4.0) -> bool:
+        """Ask the feed thread to finish and wait up to `timeout` seconds. The
+        thread releases the device itself; if the device never returns from
+        its blocked read we abandon the thread (daemon) instead of hanging."""
         self.is_running = False
-
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-
-        try:
-            cv2.destroyWindow(self.window_name)
-        except:
-            pass
-
-        print("[Camera] Feed stopped")
+        t = self._thread
+        if t is not None and t.is_alive() and t is not threading.current_thread():
+            t.join(timeout)
+            if t.is_alive():
+                print(f"[Camera] device did not release within {timeout:.0f}s; abandoning it")
+                self._thread = None
+                return False
+        self._thread = None
+        return True
 
     def is_active(self) -> bool:
         """Check if camera feed is active."""
@@ -234,33 +231,12 @@ def quick_capture() -> Optional[Path]:
     Take a quick snapshot without keeping camera open.
     Better for sharing camera with other apps.
     """
-    import platform
-
-    backends = []
-    if platform.system() == 'Windows':
-        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
-    else:
-        backends = [cv2.CAP_ANY]
-
-    for backend in backends:
-        for idx in [0, 1, 2]:
-            try:
-                cap = cv2.VideoCapture(idx, backend)
-                if cap.isOpened():
-                    time.sleep(0.3)  # Warmup
-                    ret, frame = cap.read()
-                    cap.release()
-
-                    if ret and frame is not None:
-                        SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-                        path = SNAPSHOTS_DIR / 'quick_capture.jpg'
-                        cv2.imwrite(str(path), frame)
-                        print(f"[Camera] Quick capture saved: {path}")
-                        return path
-            except:
-                continue
-
-    print("[Camera] Quick capture failed - no camera available")
+    from services import camera as _camera
+    path = _camera.capture_to_file(SNAPSHOTS_DIR / 'quick_capture.jpg')
+    if path:
+        print(f"[Camera] Quick capture saved: {path}")
+        return path
+    print(f"[Camera] Quick capture failed - {_camera.last_error() or 'no camera available'}")
     return None
 
 

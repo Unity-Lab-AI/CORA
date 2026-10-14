@@ -23,7 +23,7 @@ import atexit
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Optional, List, Dict, Any
 
 # Add project paths
 PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent
@@ -265,9 +265,12 @@ def speak(text: str, blocking: bool = True, emotion: str = None):
             pass
 
 
-def cora_respond(context: str, result: str, status: str = "ok", mode: str = "quick") -> str:
+def cora_respond(context: str, result: str, status: str = "ok", mode: str = "quick",
+                 must_include: Optional[List[str]] = None) -> str:
     """
     CORA generates a unique response for each boot phase.
+    must_include: words the spoken line has to keep (names, numbers); if the
+    model drops any of them the exact `result` text is spoken instead.
 
     Args:
         context: What phase this is (e.g., "AI Engine", "Camera")
@@ -319,14 +322,23 @@ def cora_respond(context: str, result: str, status: str = "ok", mode: str = "qui
             text = re.sub(r'\n+', ' ', text)  # newlines to spaces
             text = re.sub(r'\s+', ' ', text).strip()  # clean up whitespace
 
-            # For quick mode, enforce length limit - if AI went crazy, use raw result
-            if mode == "quick" and len(text) > 100:
+            # Required data (creator names, counts) must survive the rewrite
+            low = text.lower()
+            missing = [w for w in (must_include or []) if w.lower() not in low]
+            if missing:
+                print(f"[WARN] AI response dropped {missing}, using raw result")
+                return result
+
+            # For quick mode, enforce length limit (1-2 short sentences) - if AI went crazy, use raw result
+            if mode == "quick" and len(text) > 220:
                 print(f"[WARN] AI response too long ({len(text)} chars), using raw result")
                 return result
 
-            # Take only first sentence if multiple
-            if mode == "quick" and '. ' in text:
-                text = text.split('. ')[0] + '.'
+            # Quick mode: at most two sentences
+            if mode == "quick":
+                sentences = re.split(r'(?<=[.!?])\s+', text)
+                if len(sentences) > 2:
+                    text = ' '.join(sentences[:2])
 
             if len(text) > 10:
                 return text
@@ -677,9 +689,15 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
     display_log("═══════════════════════════════════════════════", "system")
     display_log("", "info")
     display_log("Developers:", "info")
-    display_log("  Hackall360 - Lead Code Necromancer", "info")
-    display_log("  Sponge - Chaos Engineer", "info")
-    display_log("  GFourteen - Digital Alchemist", "info")
+    try:
+        from ai.settings import creators as _creators_cfg
+        _c = _creators_cfg()
+        for _n in _c['names']:
+            display_log(f"  {_n} - {_c['roles'].get(_n, 'Creator')}", "info")
+    except Exception:
+        for _line in ("Hackall360 - Lead Code Necromancer", "Sponge - Chaos Engineer",
+                      "GFourteen - Digital Alchemist", "Alfreddo - Co-Creator"):
+            display_log(f"  {_line}", "info")
     display_log("", "info")
     display_log("Links:", "info")
     display_log("  Website: https://www.unityailab.com", "info")
@@ -692,11 +710,11 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
 
     print("  C.O.R.A - Cognitive Operations & Reasoning Assistant")
     print("  Version: 1.0.0 | Unity AI Lab | 2025")
-    print("  Creators: Hackall360, Sponge, GFourteen")
+    print(f"  Creators: {', '.join(_c['names']) if '_c' in dir() else 'Hackall360, Sponge, GFourteen, Alfreddo'}")
     print("  www.unityailab.com | discord.gg/D33Bk6Ay")
 
-    BOOT_STATUS['version'] = '1.0.0'
-    BOOT_STATUS['creators'] = 'Hackall360, Sponge, GFourteen'
+    BOOT_STATUS['version'] = _app_version()
+    BOOT_STATUS['creators'] = ', '.join(_c['names']) if '_c' in dir() else 'Hackall360, Sponge, GFourteen, Alfreddo'
     display_phase("0.9 About CORA", "ok")
 
     # ================================================================
@@ -722,20 +740,27 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         display_phase("1.0 Voice Synthesis", "warn")
 
     # Opening announcement - CORA generates her own intro dynamically
+    # Who made her comes from config/config.json (one source for the screen, the CLI and her voice)
+    try:
+        from ai.settings import creators as _creators
+        _who = _creators()
+    except Exception:
+        _who = {'lab': 'Unity AI Lab', 'spoken': 'Hackall360, Sponge, GFourteen, and Alfreddo'}
     about_data = {
         'name': 'CORA',
-        'full_name': 'Cognitive Operations and Reasoning Assistant',
-        'version': '1.0.0',
-        'creator': 'Unity AI Lab',
-        'developers': 'Hackall360, Sponge, and GFourteen'
+        'version': _app_version(),
+        'creator': _who['lab'],
+        'developers': _who['spoken'],
     }
-    # CORA generates her own unique intro - natural speech
+    # CORA generates her own unique intro - natural speech. Every creator is
+    # named in what she says, by name, every boot.
     response = cora_respond(
         "About Me Introduction",
-        f"Hey, I'm {about_data['name']}. That stands for {about_data['full_name']}. "
-        f"Version {about_data['version']}. Made by {about_data['developers']} over at {about_data['creator']}. "
+        f"Hey, I'm {about_data['name']}. Version {about_data['version']}. "
+        f"Made by {about_data['developers']} over at {about_data['creator']}. "
         f"I've got voice, vision, and plenty of attitude. Let's get this boot going.",
-        "ok"
+        "ok", mode="full",
+        must_include=list(_who.get('names') or []) + [about_data['creator']]
     )
     speak(response)
     responsive_sleep(0.3)
@@ -2390,30 +2415,21 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
         print("  Testing camera...")
         display_tool("OpenCV", "Accessing camera device")
 
-        # Try camera indices 0, 1, 2 (some systems have multiple cameras)
+        # services.camera probes the host's devices/backends with a hard
+        # timeout per attempt (config camera.*), so a stalled device cannot
+        # freeze the boot the way a phone-camera virtual webcam did.
+        from services import camera as _camera
         cap = None
-        frame = None
-        working_index = -1
+        display_action("Probing camera devices (bounded)...")
+        frame = _camera.capture_frame()
+        dev = _camera.working_device()
+        working_index = dev[0] if dev else -1
+        if frame is not None:
+            display_result(f"Camera {working_index} ({dev[1]}) working!")
+        else:
+            display_action(_camera.last_error() or "No camera responded")
 
-        for cam_index in [0, 1, 2]:
-            display_action(f"Trying camera index {cam_index}...")
-            test_cap = cv2.VideoCapture(cam_index)
-            if test_cap.isOpened():
-                # Try to read a frame - some cameras open but don't capture
-                ret, test_frame = test_cap.read()
-                if ret and test_frame is not None:
-                    cap = test_cap
-                    frame = test_frame
-                    working_index = cam_index
-                    display_result(f"Camera {cam_index} working!")
-                    break
-                else:
-                    display_action(f"Camera {cam_index} opened but no frame")
-                    test_cap.release()
-            else:
-                test_cap.release()
-
-        if cap is not None and frame is not None:
+        if frame is not None:
             print(f"  [OK] Camera {working_index} working: {frame.shape[1]}x{frame.shape[0]}")
             display_result(f"Camera {working_index}: {frame.shape[1]}x{frame.shape[0]}")
             BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'OK'})
@@ -2498,7 +2514,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 print("  [WARN] Camera opened but no frame")
                 display_log("Camera opened but no frame captured", "warn")
                 BOOT_STATUS['tools_tested'].append({'name': 'Camera', 'status': 'WARN'})
-            cap.release()
+            if cap is not None:
+                cap.release()
             display_action("Camera released")
         else:
             print("  [INFO] No camera detected")

@@ -674,18 +674,9 @@ def create_default_boot_checks() -> List[tuple]:
 
     def check_webcam():
         try:
-            import cv2
-            cap = cv2.VideoCapture(0)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                cap.release()
-                return {
-                    'available': ret,
-                    'resolution': f"{width}x{height}" if ret else None
-                }
-            cap.release()
+            from services.camera import camera_status
+            st = camera_status()
+            return {'available': bool(st.get('available')), 'resolution': st.get('resolution')}
         except Exception:
             pass
         return {'available': False, 'resolution': None}

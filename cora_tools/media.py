@@ -1,4 +1,4 @@
-"""
+r"""
 # ================================================================
 #   ____   ___   ____      _
 #  / ___| / _ \ |  _ \    / \
@@ -13,7 +13,7 @@
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI
 # Contact: unityailabcontact@gmail.com
-# Creators: Hackall360, Sponge, GFourteen
+# Creators: Hackall360, Sponge, GFourteen, Alfreddo
 # ================================================================
 #
 # Media control with multiple backends:

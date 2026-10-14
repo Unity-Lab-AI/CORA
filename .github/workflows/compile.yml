@@ -1,0 +1,32 @@
+name: compile
+
+# No tests in this project (we code it right the first time). This job only
+# proves every Python file still parses and nothing references an undefined
+# name, on the interpreter CORA actually runs on.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Byte-compile every Python file
+        run: |
+          python - <<'EOF'
+          import compileall, sys
+          ok = True
+          for d in ("ai", "cora_tools", "services", "src", "ui", "voice", "scripts"):
+              ok &= compileall.compile_dir(d, quiet=1, force=True)
+          sys.exit(0 if ok else 1)
+          EOF
+      - name: Undefined names / syntax (ruff, errors only)
+        run: |
+          pip install --quiet ruff
+          ruff check .

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 # ================================================================
 #   ____   ___   ____      _
 #  / ___| / _ \ |  _ \    / \
@@ -14,7 +14,7 @@
 # Website: https://www.unityailab.com
 # GitHub: https://github.com/Unity-Lab-AI
 # Contact: unityailabcontact@gmail.com
-# Creators: Hackall360, Sponge, GFourteen
+# Creators: Hackall360, Sponge, GFourteen, Alfreddo
 # ================================================================
 #
 # A text-based cognitive assistant CLI application.
@@ -246,7 +246,7 @@ def load_personality():
     default_personality = {
         'name': 'C.O.R.A',
         'full_name': 'Cognitive Operations & Reasoning Assistant',
-        'identity': 'female personal assistant, hired employee',
+        'identity': 'the woman who runs his day: hired, paid, not owned',
         'never_say': ['I am an AI', 'I am a language model', 'As an AI'],
         'personality': {
             'tone': 'mean, berating, clingy, obsessive, dark, twisted, emotionally intense',
@@ -269,22 +269,11 @@ def generate_greeting(personality):
     # Try to generate via Ollama using the FULL system prompt
     if CONFIG and CONFIG.get('ollama', {}).get('enabled', True):
         try:
-            model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
-
-            # Use the full SYSTEM_PROMPT for proper CORA personality
-            # Extract key personality traits for the greeting prompt
-            prompt = f"""{SYSTEM_PROMPT}
-
-Generate a single greeting (under 15 words) that sounds like CORA - mean, sarcastic, edgy emo goth bitch energy. Use profanity naturally. Just the greeting, nothing else."""
-
-            result = subprocess.run(
-                ['ollama', 'run', model, prompt],
-                capture_output=True,
-                text=True,
-                timeout=15
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
+            from ai.ollama import generate
+            r = generate(prompt="Generate a single greeting (under 15 words) that sounds like you. Just the greeting, nothing else.",
+                         system=SYSTEM_PROMPT, max_tokens=40, timeout=20)
+            if r.content and not r.error:
+                return r.content.strip().strip('"')
         except Exception:
             pass
     # Fallback with CORA personality
@@ -292,64 +281,28 @@ Generate a single greeting (under 15 words) that sounds like CORA - mean, sarcas
 
 
 def check_ollama():
-    """Check if ollama is installed and running via HTTP API.
-
-    Per ARCHITECTURE.md v1.0.0: Use HTTP API instead of subprocess.
-    """
-    import urllib.request
-    import urllib.error
+    """Check if Ollama is running (configured URL via ai.settings)."""
     try:
-        req = urllib.request.Request(
-            'http://localhost:11434/api/version',
-            headers={'Accept': 'application/json'}
-        )
-        with urllib.request.urlopen(req, timeout=5) as response:
-            if response.status == 200:
-                return True
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
-        pass
-    return False
+        from ai.ollama import check_ollama as _check
+        return bool(_check().get('connected'))
+    except Exception:
+        return False
 
 
 def check_tts():
-    """Check if pyttsx3 is installed."""
+    """Check if CORA's voice (unity-voice-v2 sidecar) is reachable, starting it if needed."""
     try:
-        import pyttsx3
-        return True
-    except ImportError:
+        from voice import unity_voice as uv
+        ok, _msg = uv.ensure_sidecar(timeout=30)
+        return ok
+    except Exception:
         return False
 
 
 def auto_install_kokoro():
-    """Auto-install Kokoro TTS if not present.
-
-    Per ARCHITECTURE.md: Auto-install required components on first run.
-    """
-    try:
-        from kokoro import KPipeline
-        logger.info("Kokoro TTS already installed")
-        return True
-    except ImportError:
-        logger.info("Installing Kokoro TTS...")
-        try:
-            result = subprocess.run(
-                [sys.executable, '-m', 'pip', 'install', 'kokoro-onnx', 'sounddevice'],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            if result.returncode == 0:
-                logger.info("Kokoro TTS installed successfully")
-                return True
-            else:
-                logger.error(f"Failed to install Kokoro: {result.stderr}")
-                return False
-        except subprocess.TimeoutExpired:
-            logger.error("Timeout installing Kokoro TTS")
-            return False
-        except Exception as e:
-            logger.error(f"Error installing Kokoro: {e}")
-            return False
+    """Kept for callers: CORA's voice is the unity-voice-v2 sidecar now, so this
+    just makes sure the sidecar is up (nothing is pip-installed)."""
+    return check_tts()
 
 
 def auto_pull_model(model_name):
@@ -439,12 +392,12 @@ def first_run_setup():
         print("[!] Ollama not found.")
         print("    Download from: https://ollama.ai")
 
-    # Step 2: Check TTS
+    # Step 2: Check TTS (her own voice sidecar)
     progress_spinner("Checking text-to-speech...")
     if check_tts():
-        print("[OK] Text-to-speech available")
+        print("[OK] Voice (unity-voice-v2) available")
     else:
-        print("[!] TTS not available. Install with: pip install pyttsx3")
+        print("[!] Voice server not reachable (see data/voice-sidecar.log)")
 
     # Step 3: Create backup directory
     progress_spinner("Setting up backup directory...")
@@ -584,10 +537,11 @@ def boot_sequence():
     print("-" * 40)
 
     # Ollama / Language Model
+    from ai import settings as _ai_settings
     if check_ollama():
-        model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
+        model = _ai_settings.chat_model()
         print(f"[OK] Language Model: {model} loaded")
-        print(f"[OK] Neural Core: Ollama endpoint active @ localhost:11434")
+        print(f"[OK] Neural Core: Ollama endpoint active @ {_ai_settings.ollama_url()}")
         speak("Neural language processing online.")
     else:
         print("[!!] Language Model: Ollama not running")
@@ -595,12 +549,13 @@ def boot_sequence():
 
     # Vision Model Check
     try:
-        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, timeout=5)
-        if 'llava' in result.stdout.lower():
-            print("[OK] Vision Model: llava detected")
+        from ai.ollama import has_model
+        vm = _ai_settings.vision_model()
+        if has_model(vm):
+            print(f"[OK] Vision Model: {vm} detected")
             speak("Visual cortex initialized.")
         else:
-            print("[--] Vision Model: llava not installed (run: ollama pull llava)")
+            print(f"[--] Vision Model: {vm} not installed (run: ollama pull {vm})")
     except Exception:
         print("[--] Vision Model: Could not check")
 
@@ -608,12 +563,12 @@ def boot_sequence():
     print("\n[PHASE 5] VOICE & AUDIO SYSTEMS")
     print("-" * 40)
 
-    # TTS
+    # TTS - her own voice
     if check_tts():
-        print("[OK] Voice Synthesis: TTS engine initialized")
+        print("[OK] Voice Synthesis: unity-voice-v2 online")
         speak("Voice synthesis module online.")
     else:
-        print("[!!] Voice Synthesis: TTS not available")
+        print("[!!] Voice Synthesis: voice server not available")
 
     # Microphone check
     try:
@@ -635,20 +590,15 @@ def boot_sequence():
     print("-" * 40)
 
     try:
-        import cv2
-        cap = cv2.VideoCapture(0)
-        if cap.isOpened():
-            ret, _ = cap.read()
-            if ret:
-                print("[OK] Webcam: Camera accessible")
-                speak("Visual perception system active.")
-            else:
-                print("[--] Webcam: Device found but cannot capture")
-            cap.release()
+        from services import camera as _camera
+        if not _camera.CV2_AVAILABLE:
+            print("[--] Webcam: OpenCV not installed")
+        elif _camera.capture_frame() is not None:
+            dev = _camera.working_device()
+            print(f"[OK] Webcam: Camera accessible (index {dev[0]}, {dev[1]})" if dev else "[OK] Webcam: Camera accessible")
+            speak("Visual perception system active.")
         else:
-            print("[--] Webcam: No camera detected")
-    except ImportError:
-        print("[--] Webcam: OpenCV not installed")
+            print(f"[--] Webcam: {_camera.last_error() or 'No camera detected'}")
     except Exception as e:
         print(f"[--] Webcam: {e}")
 
@@ -1233,146 +1183,57 @@ def detect_emotion(text):
     return 'neutral'
 
 
-def speak_kokoro(text, emotion='neutral'):
-    """Speak text using Kokoro TTS with emotion (if available)."""
-    global CONFIG
-    tts_config = CONFIG.get('tts', {})
-    kokoro_config = tts_config.get('kokoro', {})
-
-    if not kokoro_config.get('enabled', False):
-        return False
-
-    try:
-        # Try to import kokoro
-        from kokoro import KPipeline
-        import sounddevice as sd
-
-        voice = kokoro_config.get('voice', 'af_bella')
-        speed = kokoro_config.get('speed', 1.0)
-
-        pipeline = KPipeline(lang_code='a')
-        generator = pipeline(text, voice=voice, speed=speed)
-
-        for _, _, audio in generator:
-            sd.play(audio, samplerate=24000)
-            sd.wait()
-
-        return True
-    except ImportError:
-        return False
-    except Exception:
-        return False
-
-
-def speak_pyttsx3(text):
-    """Speak text using pyttsx3."""
-    global CONFIG
-    tts_config = CONFIG.get('tts', {})
-
-    try:
-        import pyttsx3
-        engine = pyttsx3.init()
-        engine.setProperty('rate', tts_config.get('rate', 150))
-        engine.setProperty('volume', tts_config.get('volume', 1.0))
-        engine.say(text)
-        engine.runAndWait()
-        return True
-    except ImportError:
-        return False
-    except Exception:
-        return False
-
-
 def speak(text):
-    """Speak text using configured TTS engine with emotion detection.
+    """Speak text in CORA's own voice (unity-voice-v2) with emotion detection.
 
-    Per ARCHITECTURE.md emotion pipeline:
-    1. Response text generated
-    2. Analyze emotional tone
-    3. Build TTS instruction
-    4. Render with appropriate inflection
+    Blocking: returns when the line has been spoken (or False if the voice
+    sidecar is unavailable). There is no fallback voice by design.
     """
     global CONFIG
     if CONFIG is None:
         load_config()
 
-    # Check if TTS is enabled in config
     if not CONFIG.get('tts', {}).get('enabled', True):
         return False
 
-    # Detect emotion for TTS inflection
     emotion = detect_emotion(text)
+    try:
+        from voice.tts import speak as _voice_speak
+        return bool(_voice_speak(text, emotion))
+    except Exception as e:
+        logger.warning(f"voice unavailable: {e}")
+        return False
 
-    tts_config = CONFIG.get('tts', {})
-    engine = tts_config.get('engine', 'pyttsx3')
 
-    # Try Kokoro first if configured (supports emotion)
-    if engine == 'kokoro' or tts_config.get('kokoro', {}).get('enabled', False):
-        if speak_kokoro(text, emotion):
-            return True
+def speak_kokoro(text, emotion='neutral'):
+    """Legacy name - routes to her voice."""
+    return speak(text)
 
-    # Fallback to pyttsx3 (no emotion support, but still works)
-    return speak_pyttsx3(text)
+
+def speak_pyttsx3(text):
+    """Legacy name - routes to her voice."""
+    return speak(text)
 
 
 def get_tts_engine(config=None):
-    """Factory function to get TTS engine based on config.
-
-    Returns the appropriate TTS engine name ('kokoro', 'pyttsx3', or None).
-    Per ARCHITECTURE.md: TTS engine selection factory.
-    """
+    """Factory kept for callers: returns the engine name when the voice is reachable."""
     if config is None:
         config = CONFIG or {}
-
-    tts_config = config.get('tts', {})
-    if not tts_config.get('enabled', True):
+    if not config.get('tts', {}).get('enabled', True):
         return None
-
-    engine = tts_config.get('engine', 'pyttsx3')
-
-    # Check if Kokoro is available and configured
-    if engine == 'kokoro' or tts_config.get('kokoro', {}).get('enabled', False):
-        try:
-            from kokoro import KPipeline
-            return 'kokoro'
-        except ImportError:
-            pass
-
-    # Check if pyttsx3 is available
-    try:
-        import pyttsx3
-        return 'pyttsx3'
-    except ImportError:
-        pass
-
-    return None
+    return 'unity-voice-v2' if check_tts() else None
 
 
 def init_tts():
-    """Initialize TTS engine with config settings and voice selection."""
+    """Initialize the voice: returns the shared TTS queue (or None)."""
     global CONFIG
     if CONFIG is None:
         load_config()
-
-    tts_config = CONFIG.get('tts', {})
-    if not tts_config.get('enabled', True):
+    if not CONFIG.get('tts', {}).get('enabled', True):
         return None
-
     try:
-        import pyttsx3
-        engine = pyttsx3.init()
-        # Set rate and volume from config
-        engine.setProperty('rate', tts_config.get('rate', 150))
-        engine.setProperty('volume', tts_config.get('volume', 0.9))
-        # Set voice type if specified
-        voice_index = tts_config.get('voice_index', 0)
-        voices = engine.getProperty('voices')
-        if voices and voice_index < len(voices):
-            engine.setProperty('voice', voices[voice_index].id)
-        return engine
-    except ImportError:
-        logger.warning("TTS not available. Install with: pip install pyttsx3")
-        return None
+        from voice.tts import get_tts_queue
+        return get_tts_queue()
     except Exception as e:
         logger.error(f"TTS init error: {e}")
         return None
@@ -1409,17 +1270,11 @@ def ai_respond(action, context=None, use_ai=True):
     # Try AI-generated response
     if use_ai and CONFIG and CONFIG.get('ollama', {}).get('enabled', True):
         try:
-            model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
-            full_prompt = f"{SYSTEM_PROMPT}\n\nAction: {action}\nContext: {context_str}\n\nRespond briefly (under 20 words):"
-
-            result = subprocess.run(
-                ['ollama', 'run', model, full_prompt],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
+            from ai.ollama import generate
+            r = generate(prompt=f"Action: {action}\nContext: {context_str}\n\nRespond briefly (under 20 words):",
+                         system=SYSTEM_PROMPT, max_tokens=60, timeout=20)
+            if r.content and not r.error:
+                return r.content.strip()
         except Exception:
             pass  # Fall back to dynamic response
 
@@ -1480,7 +1335,7 @@ def cmd_speak(args, tasks):
     if speak(text):
         respond('info', {'message': "Done speaking."}, speak_it=False)
     else:
-        respond('error', {'message': "TTS not available. Install with: pip install pyttsx3"})
+        respond('error', {'message': "Voice not available (unity-voice-v2 sidecar down)"})
 
     return tasks
 
@@ -1636,82 +1491,44 @@ def cmd_chat(args, tasks):
         return tasks
 
     user_message = ' '.join(args)
-    model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
-
-    # Load chat history for context
-    load_chat_history()
-
-    # Build context-aware prompt with conversation memory
-    task_context = get_task_context(tasks)
-    chat_history = get_chat_history_context()
-
-    # Load CORA's full system prompt and add task context
-    system_prompt = get_system_prompt()
-    if task_context:
-        system_prompt += f"\n\nCurrent Task Context:\n{task_context}"
-
-    # Include conversation history if available (for subprocess fallback)
-    if chat_history:
-        full_prompt = f"{system_prompt}\n\nRecent conversation:\n{chat_history}\n\nUser: {user_message}\n\nCORA:"
-    else:
-        full_prompt = f"{system_prompt}\n\nUser: {user_message}\n\nCORA:"
 
     print(f"[You]: {user_message}")
     print("[CORA]: Thinking...")
 
     response = None
-
-    def _call_ollama_api():
-        """Execute Ollama HTTP API call - runs in thread pool for non-blocking."""
-        from ai.ollama import chat as ollama_chat
-        messages = [{'role': 'user', 'content': user_message}]
-        return ollama_chat(messages, model=model, system=system_prompt, timeout=60)
-
     try:
-        # Use ThreadPoolExecutor for non-blocking Ollama call (fixes async/sync mismatch)
-        # This prevents GUI freeze when called from tkinter main thread
-        from concurrent.futures import TimeoutError as FuturesTimeout
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_call_ollama_api)
-            try:
-                result = future.result(timeout=65)  # Slightly longer than Ollama timeout
+        # The shared assistant loop: tools, history and her voice all live there
+        from ai.dispatcher import get_dispatcher
+        d = get_dispatcher()
+        d.confirm_callback = lambda q: input(f"[CORA] Allow {q}? (y/n) ").strip().lower().startswith('y')
+        speak_it = bool(CONFIG.get('tts', {}).get('enabled', True))
 
-                if result.content and not result.error:
-                    response = result.content
-                    print(f"[CORA]: {response}")
-                else:
-                    response = fallback_response(user_message, tasks)
-                    print(f"[CORA]: {response}")
-                    if result.error:
-                        print(f"({result.error})")
-            except FuturesTimeout:
-                response = fallback_response(user_message, tasks)
-                print(f"[CORA]: {response}")
-                print("(Request timed out)")
+        def on_event(kind, payload):
+            if kind == 'tool_call':
+                print(f"  -> {payload['tool']} {payload.get('arguments') or ''}")
+            elif kind == 'tool_result':
+                r = payload.get('result') or {}
+                print(f"  <- {r.get('message') or r.get('error') or ''}"[:200])
 
-    except ImportError:
-        # ai/ollama.py not available - use subprocess fallback (blocking)
-        try:
-            proc = subprocess.run(
-                ['ollama', 'run', model, full_prompt],
-                capture_output=True, text=True, timeout=60
-            )
-            if proc.returncode == 0:
-                response = proc.stdout.strip()
-                print(f"[CORA]: {response}")
-            else:
-                response = fallback_response(user_message, tasks)
-                print(f"[CORA]: {response}")
-        except Exception:
+        result = d.handle(user_message, speak=speak_it, on_event=on_event)
+        if result.error:
+            logger.warning(f"Chat offline mode: {result.error}")
             response = fallback_response(user_message, tasks)
             print(f"[CORA]: {response}")
+            print(f"({result.error})")
+        else:
+            response = result.text or "(done)"
+            print(f"[CORA]: {response}")
+            # dispatcher already saved the exchange to the shared history
+            load_chat_history()
+            return load_tasks()
     except Exception as e:
         logger.warning(f"Chat offline mode: {e}")
         response = fallback_response(user_message, tasks)
         print(f"[CORA]: {response}")
         print(f"(Offline mode due to: {e})")
 
-    # Save conversation to history
+    # Save conversation to history (fallback path only)
     if response:
         add_to_chat_history('user', user_message)
         add_to_chat_history('assistant', response)
@@ -1942,7 +1759,7 @@ def cmd_about(args, tasks):
     print("  GitHub:   https://github.com/Unity-Lab-AI")
     print("  Email:    unityailabcontact@gmail.com")
     print("")
-    print("  Creators: Hackall360, Sponge, GFourteen")
+    print("  Creators: Hackall360, Sponge, GFourteen, Alfreddo")
     print("  ================================================================")
     print("")
     return tasks
@@ -2351,7 +2168,7 @@ def cmd_imagine(args, tasks):
 def cmd_see(args, tasks):
     """See through the camera - describe what's visible. Usage: see [question]
 
-    Uses webcam + Ollama llava vision model to analyze what's visible.
+    Uses webcam + the configured Ollama vision model to analyze what's visible.
     """
     try:
         from services.presence import capture_webcam, ask_vision
@@ -2535,6 +2352,37 @@ def parse_input(user_input):
     return parts[0].lower(), parts[1:]
 
 
+def build_commands() -> dict:
+    """The CLI command table (also used by the GUI app via cora.COMMANDS)."""
+    return {
+        'add': cmd_add, 'list': cmd_list, 'ls': cmd_list,
+        'done': cmd_done, 'complete': cmd_done,
+        'delete': cmd_delete, 'del': cmd_delete, 'remove': cmd_delete, 'rm': cmd_delete,
+        'pri': cmd_pri, 'priority': cmd_pri, 'due': cmd_due, 'deadline': cmd_due,
+        'note': cmd_note, 'status': cmd_status, 'show': cmd_show, 'view': cmd_show,
+        'search': cmd_search, 'find': cmd_search,
+        'learn': cmd_learn, 'recall': cmd_recall, 'knowledge': cmd_recall, 'kb': cmd_recall,
+        'remember': cmd_remember, 'mem': cmd_remember,
+        'stats': cmd_stats, 'count': cmd_stats, 'pull': cmd_pull_model,
+        'chat': cmd_chat, 'ai': cmd_chat, 'chathistory': cmd_chathistory, 'history': cmd_chathistory,
+        'speak': cmd_speak, 'say': cmd_speak, 'backup': cmd_backup,
+        'edit': cmd_edit, 'modify': cmd_edit, 'settings': cmd_settings, 'config': cmd_settings,
+        'help': cmd_help, '?': cmd_help, 'about': cmd_about, 'version': cmd_about,
+        'clear': cmd_clear, 'cls': cmd_clear, 'today': cmd_today, 'undo': cmd_undo,
+        'remind': cmd_remind, 'reminder': cmd_remind,
+        'open': cmd_open, 'launch': cmd_open, 'run': cmd_open,
+        'create_tool': cmd_create_tool, 'newtool': cmd_create_tool,
+        'modify_tool': cmd_modify_tool, 'edittool': cmd_modify_tool,
+        'list_tools': cmd_list_tools, 'tools': cmd_list_tools,
+        'see': cmd_see, 'look': cmd_see, 'vision': cmd_see, 'camera': cmd_see,
+        'imagine': cmd_imagine, 'generate': cmd_imagine, 'draw': cmd_imagine, 'create': cmd_imagine,
+        'cli': cmd_open_cli, 'terminal': cmd_open_cli, 'popup': cmd_open_cli,
+    }
+
+
+COMMANDS = build_commands()
+
+
 def main():
     """Main entry point with command loop."""
     global _system_tray
@@ -2597,78 +2445,8 @@ def main():
     # Load existing tasks
     tasks = load_tasks()
 
-    # Command dispatch table
-    commands = {
-        'add': cmd_add,
-        'list': cmd_list,
-        'ls': cmd_list,
-        'done': cmd_done,
-        'complete': cmd_done,
-        'delete': cmd_delete,
-        'del': cmd_delete,
-        'remove': cmd_delete,
-        'rm': cmd_delete,
-        'pri': cmd_pri,
-        'priority': cmd_pri,
-        'due': cmd_due,
-        'deadline': cmd_due,
-        'note': cmd_note,
-        'status': cmd_status,
-        'show': cmd_show,
-        'view': cmd_show,
-        'search': cmd_search,
-        'find': cmd_search,
-        'learn': cmd_learn,
-        'recall': cmd_recall,
-        'knowledge': cmd_recall,
-        'kb': cmd_recall,
-        'remember': cmd_remember,
-        'mem': cmd_remember,
-        'stats': cmd_stats,
-        'count': cmd_stats,
-        'pull': cmd_pull_model,
-        'chat': cmd_chat,
-        'ai': cmd_chat,
-        'chathistory': cmd_chathistory,
-        'history': cmd_chathistory,
-        'speak': cmd_speak,
-        'say': cmd_speak,
-        'backup': cmd_backup,
-        'edit': cmd_edit,
-        'modify': cmd_edit,
-        'settings': cmd_settings,
-        'config': cmd_settings,
-        'help': cmd_help,
-        '?': cmd_help,
-        'about': cmd_about,
-        'version': cmd_about,
-        'clear': cmd_clear,
-        'cls': cmd_clear,
-        'today': cmd_today,
-        'undo': cmd_undo,
-        'remind': cmd_remind,
-        'reminder': cmd_remind,
-        'open': cmd_open,
-        'launch': cmd_open,
-        'run': cmd_open,
-        'create_tool': cmd_create_tool,
-        'newtool': cmd_create_tool,
-        'modify_tool': cmd_modify_tool,
-        'edittool': cmd_modify_tool,
-        'list_tools': cmd_list_tools,
-        'tools': cmd_list_tools,
-        'see': cmd_see,
-        'look': cmd_see,
-        'vision': cmd_see,
-        'camera': cmd_see,
-        'imagine': cmd_imagine,
-        'generate': cmd_imagine,
-        'draw': cmd_imagine,
-        'create': cmd_imagine,
-        'cli': cmd_open_cli,
-        'terminal': cmd_open_cli,
-        'popup': cmd_open_cli,
-    }
+    # Command dispatch table (shared with the GUI app)
+    commands = COMMANDS
 
     # Main loop
     while True:
@@ -2688,11 +2466,12 @@ def main():
                     _system_tray.stop()
                 break
 
-            # Execute command
+            # Execute command; anything that is not a command is a chat message
+            # for the assistant (tools + her voice via ai.dispatcher)
             if cmd in commands:
                 tasks = commands[cmd](args, tasks)
             else:
-                respond('unknown_command', {'cmd': cmd})
+                tasks = cmd_chat(user_input.split(), tasks)
 
         except KeyboardInterrupt:
             print("\nGoodbye!")

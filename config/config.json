@@ -31,7 +31,7 @@
   "ollama": {
     "enabled": true,
     "api_url": "http://127.0.0.1:11434",
-    "model": "huihui_ai/qwen3-abliterated:8b",
+    "model": "unity-brain",
     "timeout": 120,
     "think_timeout": 30,
     "vision_timeout": 90,
@@ -39,13 +39,22 @@
     "keep_alive": "30m"
   },
   "models": {
-    "primary": "huihui_ai/qwen3-abliterated:8b",
-    "vision": "qwen3-vl:4b",
+    "primary": "unity-brain",
+    "vision": "unity-brain",
     "code": null,
     "think": null,
     "image": "flux",
-    "_note": "primary switches to huihui_ai/qwen3-abliterated:8b (uncensored + native tools) once pulled; dolphin3:8b is the uncensored fallback (no native tools, JSON tool protocol is used)",
-    "fallback": "dolphin3:8b"
+    "_note": "primary = unity-brain: Unity's own text LoRA (Qwen3.5-9B, Backrooms/models/unity-brain) trained to call say(text, emotion, act) with the exact emotions and speech acts unity-voice-v2 knows; it also reads images, so it is the vision model too. fallback = huihui_ai/qwen3-abliterated:8b (uncensored + native tools; plain text streams to the voice with inferred emotion). Always send unity-brain num_ctx 32768 (models.options).",
+    "fallback": "huihui_ai/qwen3-abliterated:8b",
+    "options": {
+      "unity-brain": {
+        "num_ctx": 32768,
+        "temperature": 1.0,
+        "top_k": 20,
+        "top_p": 0.95,
+        "presence_penalty": 1.5
+      }
+    }
   },
   "auto_setup": {
     "check_ollama": true,
@@ -85,9 +94,13 @@
       {
         "name": "GFourteen",
         "role": "Digital Alchemist"
+      },
+      {
+        "name": "Alfreddo",
+        "role": "Co-Creator"
       }
     ],
-    "copyright": "© 2025 Unity AI Lab. Creators: Hackall360, Sponge, GFourteen. All rights reserved."
+    "copyright": "© 2025 Unity AI Lab. Creators: Hackall360, Sponge, GFourteen, Alfreddo. All rights reserved."
   },
   "created": "2025-12-22",
   "updated": "2026-10-14",
@@ -112,5 +125,17 @@
   "boot": {
     "demo_phases": false,
     "github_import": false
+  },
+  "assistant": {
+    "voice_mode": "auto",
+    "legacy_regex": false,
+    "_note": "voice_mode: auto = say_tool for unity-brain (she speaks through the say tool with her own designators), stream for any other model (sentences streamed to the voice as they arrive). legacy_regex: route typed input through the old regex command chain instead of the dispatcher."
+  },
+  "camera": {
+    "enabled": true,
+    "index": "auto",
+    "backend": "auto",
+    "open_timeout": 4.0,
+    "_note": "index: auto (probes 0,1,2) or a number; backend: auto (Windows dshow->msmf->any, Linux v4l2->any, macOS avfoundation->any) or one of dshow/msmf/v4l2/avfoundation/any; open_timeout: seconds per open attempt before a stalled device (e.g. a phone-camera virtual webcam with no stream) is given up on for the session."
   }
 }

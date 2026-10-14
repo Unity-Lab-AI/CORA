@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cora"
+version = "3.0.0"
+description = "C.O.R.A - a local, voice-first desktop companion: Ollama brain (unity-brain), her own trained voice (unity-voice-v2), faster-whisper ears, tools for tasks, calendar, vision, web, files, media, git and email."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Unity AI Lab" }, { name = "Hackall360" }, { name = "Sponge" }, { name = "GFourteen" }, { name = "Alfreddo" }]
+dynamic = ["dependencies"]
+
+[project.urls]
+Homepage = "https://git.unityailab.com/UnityAILab/CORA"
+GitHub = "https://github.com/Unity-Lab-AI/CORA"
+
+[tool.setuptools]
+packages = ["ai", "cora_tools", "services", "ui", "voice"]
+py-modules = []
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+exclude = [".venv", "backups", "temp_scripts", "tools", "web", "Backrooms"]
+
+[tool.ruff.lint]
+# Only hard errors: undefined names, syntax, unused imports stay informational for now.
+select = ["E9", "F63", "F7", "F82"]
