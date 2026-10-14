@@ -27,6 +27,26 @@ TRUSTED_PRIVATE_HOSTS=(
   "git.unityailab.com"   # Forgejo instance owned + operated by Unity AI Lab
 )
 
+# Per-repo exemptions — github.com repos the operator has EXPLICITLY approved to
+# receive .claude/ even though they are PUBLIC. Scoped to one owner/repo each,
+# never a whole host. Lower-case "owner/repo". Mirrors TRUSTED_PUBLIC_REPOS in
+# the .cjs sibling. Every entry needs an operator decision in docs/FINALIZED.md.
+#   unity-lab-ai/cora — C.O.R.A mirror on GitHub. Operator approved 2026-10-14.
+TRUSTED_PUBLIC_REPOS=(
+  "unity-lab-ai/cora"
+)
+
+# Check if "owner/repo" (any case) is in the TRUSTED_PUBLIC_REPOS exemption list.
+is_trusted_repo() {
+  local or
+  or=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  local trusted
+  for trusted in "${TRUSTED_PUBLIC_REPOS[@]}"; do
+    if [ "$or" = "$trusted" ]; then return 0; fi
+  done
+  return 1
+}
+
 # Extract hostname from a git URL (ssh git@host:owner/repo.git, https://host/...,
 # ssh://git@host/owner/repo). Returns hostname in lowercase or empty string.
 parse_host() {
@@ -213,6 +233,13 @@ check_visibility() {
   local OWNER REPO
   OWNER=$(echo "$OR" | awk '{print $1}')
   REPO=$(echo "$OR" | awk '{print $2}')
+
+  # Operator-approved public repo exemption — see TRUSTED_PUBLIC_REPOS above.
+  if is_trusted_repo "$OWNER/$REPO"; then
+    cache_store "$url" "$ALLOWED_VISIBILITY" "$ALLOWED_OWNER" ""
+    echo "$ALLOWED_VISIBILITY|$ALLOWED_OWNER|"
+    return 0
+  fi
 
   if ! command -v gh >/dev/null 2>&1; then
     cache_store "$url" "UNKNOWN" "" "gh-not-installed"

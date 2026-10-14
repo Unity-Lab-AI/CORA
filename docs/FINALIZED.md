@@ -378,7 +378,9 @@ startProactiveInterjections()                 // Start 45-second interval
 | `/workflow` collision | C.O.R.A's command renamed to `/cora-workflow` (`.claude/commands/cora-workflow.md`); `/workflow` is now the template skill |
 | Task docs | Root TODO/FINALIZED/ROADMAP/ARCHITECTURE/SKILL_TREE moved into `docs/` (user decision); stale Dec-2025 `docs/TODO.md` and `docs/ROADMAP.md` appended as LEGACY sections |
 
-**Not done / follow-ups:** `.claude/settings.local.json` is still tracked although now gitignored (untrack with `git rm --cached` if wanted). `start.bat` was not run, so `.claude/memory-templates/` are not yet seeded into the user-profile memory folder. Template's Git Flow LAW says work in feature branches; this merge landed directly on `main` because the branch was already carrying uncommitted work.
+**Follow-up, same day.** User's words: "use rm to delete the nul file, git ignore the local.json you mentioned. and push cascade in the cora repos for github and forgejo" / "do it" / "claude UAL is on github". Done: `nul` deleted; `.claude/settings.local.json` untracked (`2a0cf4b`); `develop` fast-forwarded to `main`; `main` + `develop` pushed to Forgejo `origin` and to GitHub `Unity-Lab-AI/CORA` (added as remote `github`). GitHub repo is PUBLIC — user confirmed twice to push `.claude/` anyway since the template is already public under Unity-Lab-AI. Exception recorded as `TRUSTED_PUBLIC_REPOS` (`unity-lab-ai/cora`) in `pre-tool-public-repo-guard.{cjs,sh}` and in the CLAUDE.md conventions table.
+
+**Not done / follow-ups:** `start.bat` was not run, so `.claude/memory-templates/` are not yet seeded into the user-profile memory folder. Template's Git Flow LAW says work in feature branches; this merge landed directly on `main` because the branch was already carrying uncommitted work.
 
 ---
 

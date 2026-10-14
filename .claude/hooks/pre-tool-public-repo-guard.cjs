@@ -48,6 +48,16 @@ const TRUSTED_PRIVATE_HOSTS = new Set([
   'git.unityailab.com',  // Forgejo instance owned + operated by Unity AI Lab
 ]);
 
+// Per-repo exemptions — github.com repos the operator has EXPLICITLY approved to
+// receive .claude/ even though they are PUBLIC. Scoped to one owner/repo each,
+// never a whole host. Lower-case 'owner/repo'. Every entry needs an operator
+// decision recorded in docs/FINALIZED.md.
+//   unity-lab-ai/cora — C.O.R.A mirror on GitHub. Operator approved 2026-10-14
+//   (the Unity workflow template is already public under Unity-Lab-AI).
+const TRUSTED_PUBLIC_REPOS = new Set([
+  'unity-lab-ai/cora',
+]);
+
 function parseHost(url) {
   // Handles git@host:owner/repo.git, https://host/owner/repo, ssh://git@host/owner/repo
   const sshMatch = url.match(/^[^@\s]+@([^:/\s]+)[:/]/);
@@ -177,6 +187,17 @@ function checkVisibility(url, cache, now) {
   const parsed = parseGithubOwnerRepo(url);
   if (!parsed) {
     return { visibility: 'UNKNOWN', owner: null, error: 'non-github-url', checked_at: now };
+  }
+
+  // Operator-approved public repo exemption — see TRUSTED_PUBLIC_REPOS above.
+  if (TRUSTED_PUBLIC_REPOS.has((parsed.owner + '/' + parsed.repo).toLowerCase())) {
+    return {
+      visibility: ALLOWED_VISIBILITY,
+      owner: ALLOWED_OWNER,
+      error: null,
+      trusted_repo: parsed.owner + '/' + parsed.repo,
+      checked_at: now,
+    };
   }
 
   if (runCmd('gh', ['--version']) === null) {

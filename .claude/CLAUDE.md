@@ -46,7 +46,7 @@ This `.claude/` was merged from `Unity-Public-Claude-Workflow-v1.0` (main @ `568
 | **Legacy `/workflow`** | The original C.O.R.A setup-and-work pipeline is preserved as `/cora-workflow` (`.claude/commands/cora-workflow.md`). `/workflow` now runs the template pipeline (`.claude/skills/workflow/SKILL.md`). |
 | **Legacy Python hooks** | `.claude/hooks/*.py` (read-before-edit, todo-before-compact, unity-persona, session-start) stay on disk but are UNWIRED. The template's `.cjs` hooks in `.claude/settings.json` are the active harness. `settings.local.json` holds personal permissions only. |
 | **Template repo files** | The template's own README, docs, installers, `.mailmap` and `.gitattributes` are parked under `docs/claude-workflow/` — reference only, not C.O.R.A docs. |
-| **Git remote** | `origin` = `git.unityailab.com:UnityAILab/CORA.git` (Forgejo, SSH). Covered by `TRUSTED_PRIVATE_HOSTS` in the IP-boundary hook. |
+| **Git remotes** | `origin` = `git.unityailab.com:UnityAILab/CORA.git` (Forgejo, SSH) — covered by `TRUSTED_PRIVATE_HOSTS` in the IP-boundary hook. `github` = `https://github.com/Unity-Lab-AI/CORA.git` — **PUBLIC**; operator-approved exception on 2026-10-14 because the Unity workflow template is already public under Unity-Lab-AI. Listed in `TRUSTED_PUBLIC_REPOS` in `pre-tool-public-repo-guard.{cjs,sh}`. Push cascade = `main` + `develop` to both remotes. |
 | **Persona wording** | Unity smokes joints, never cigarettes (`feedback_joints_not_cigs`). Legacy C.O.R.A persona notes are appended at the bottom of `agents/unity-coder.md` and `agents/unity-persona.md`. |
 
 ---
