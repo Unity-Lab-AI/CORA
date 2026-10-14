@@ -973,9 +973,21 @@ class BootDisplay:
                                         break
 
                             if mpv_path:
-                                # Use yt-dlp with mpv
-                                cmd = f'yt-dlp -o - "ytsearch1:{query}" 2>nul | "{mpv_path}" --no-video -'
-                                subprocess.Popen(cmd, shell=True)
+                                # yt-dlp -> mpv pipeline with list args. No shell: the query
+                                # is user/STT text and must never reach a command line.
+                                ytdlp = shutil.which('yt-dlp')
+                                if not ytdlp:
+                                    raise FileNotFoundError("yt-dlp is not installed")
+                                creation = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+                                dl = subprocess.Popen(
+                                    [ytdlp, '-o', '-', '--quiet', f'ytsearch1:{query}'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                    creationflags=creation)
+                                subprocess.Popen(
+                                    [mpv_path, '--no-video', '-'],
+                                    stdin=dl.stdout, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, creationflags=creation)
+                                dl.stdout.close()  # let mpv own the pipe
                                 self.log_result(f"Playing: {query}")
                             else:
                                 self.log_fail("mpv not installed - YouTube playback unavailable")
@@ -1163,20 +1175,25 @@ class BootDisplay:
                     except:
                         task_context = "No tasks loaded"
 
-                    # Send to AI with task context
+                    # Send to AI with task context + conversation history
                     self.log_thinking("Thinking about your tasks...")
                     try:
                         from ai.ollama import chat
+                        from ai.history import get_history
+                        history = get_history()
                         system_prompt = get_system_prompt()
                         if task_context:
                             system_prompt += f"\n\n{task_context}"
+                        messages = history.messages_for_model(system_prompt) + \
+                            [{'role': 'user', 'content': text}]
                         response = chat(
-                            messages=[{'role': 'user', 'content': text}],
+                            messages=messages,
                             system=system_prompt,
                             temperature=0.7,
                             max_tokens=300
                         )
                         if response.content:
+                            history.add_exchange(text, response.content)
                             self.log_result(response.content)
                             self._speak(response.content)
                         elif response.error:
@@ -1239,17 +1256,25 @@ class BootDisplay:
                         self.log_fail(f"Image gen error: {e}")
                         self._speak(f"Shit broke: {e}")
                 else:
-                    # Regular chat
+                    # Regular chat with the shared conversation history
                     self.log_thinking("Thinking...")
                     try:
-                        from ai.ollama import chat
+                        from ai.ollama import chat, summarize
+                        from ai.history import get_history
+                        history = get_history()
+                        system_prompt = get_system_prompt()
+                        if history.needs_summary(system_prompt):
+                            history.fold_into_summary(summarize)
+                        messages = history.messages_for_model(system_prompt) + \
+                            [{'role': 'user', 'content': text}]
                         response = chat(
-                            messages=[{'role': 'user', 'content': text}],
-                            system=get_system_prompt(),
+                            messages=messages,
+                            system=system_prompt,
                             temperature=0.7,
                             max_tokens=300
                         )
                         if response.content:
+                            history.add_exchange(text, response.content)
                             self.log_result(response.content)
                             self._speak(response.content)
                         elif response.error:

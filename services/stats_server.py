@@ -1,28 +1,111 @@
 #!/usr/bin/env python3
 """
-C.O.R.A Stats Server
-Local HTTP server that provides system stats AND setup commands to the web version.
-Runs on localhost:11435 (next to Ollama on 11434)
+C.O.R.A Local Server
+Local HTTP server (127.0.0.1:11435) that gives the web version real system
+stats, setup commands, the V2 voice proxy and, when hosted locally, the web
+files themselves.
 
-The web version calls this to:
-- Get real GPU/CPU/RAM stats from the host machine
-- Install Ollama models (ollama pull)
-- Install Python requirements (pip install)
-- Start Ollama service
+Security model (2026-10-14):
+- Binds to 127.0.0.1 only.
+- Every state-changing POST requires the per-launch token in the
+  `X-CORA-Token` header. The token is written to data/.stats_token and injected
+  into the locally served web page; a page on another origin never sees it.
+- CORS is restricted to an allowlist: the local origins plus any origins in
+  config.json `web.allowed_origins`. `*` is never sent.
+- Model names for /setup/pull-model are validated against a strict pattern.
+- Only the repo's own requirements.txt can be installed.
 """
 
 import json
+import os
+import re
+import secrets
+import shutil
 import subprocess
 import threading
-import os
-import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from pathlib import Path
+from urllib.parse import urlparse
+
 import psutil
 
-# Port for stats server (Ollama is on 11434)
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 STATS_PORT = 11435
+TOKEN_PATH = PROJECT_DIR / 'data' / '.stats_token'
+WEB_DIR = PROJECT_DIR / 'web'
 
+_MODEL_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/-]{0,100}(:[A-Za-z0-9._-]{1,50})?$')
+
+
+def _config() -> dict:
+    try:
+        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _ollama_url() -> str:
+    try:
+        import sys
+        if str(PROJECT_DIR) not in sys.path:
+            sys.path.insert(0, str(PROJECT_DIR))
+        from ai import settings
+        return settings.ollama_url()
+    except Exception:
+        return os.environ.get('OLLAMA_URL', 'http://127.0.0.1:11434').rstrip('/')
+
+
+def _required_models() -> list:
+    try:
+        import sys
+        if str(PROJECT_DIR) not in sys.path:
+            sys.path.insert(0, str(PROJECT_DIR))
+        from ai import settings
+        s = settings.settings()
+        models = [s['chat_model'], s['vision_model']]
+        if s['code_model'] not in models:
+            models.append(s['code_model'])
+        return models
+    except Exception:
+        return []
+
+
+def _allowed_origins(port: int) -> set:
+    origins = {
+        f'http://127.0.0.1:{port}', f'http://localhost:{port}',
+        'http://127.0.0.1', 'http://localhost', 'null',
+    }
+    for o in (_config().get('web') or {}).get('allowed_origins') or []:
+        origins.add(str(o).rstrip('/'))
+    return origins
+
+
+# ----------------------------------------------------------------------------
+# Token
+# ----------------------------------------------------------------------------
+
+_TOKEN = None
+
+
+def get_token() -> str:
+    """Per-launch secret. Created once per process, persisted so the desktop
+    app and the locally served page can read it."""
+    global _TOKEN
+    if _TOKEN:
+        return _TOKEN
+    _TOKEN = secrets.token_urlsafe(32)
+    try:
+        TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        TOKEN_PATH.write_text(_TOKEN, encoding='utf-8')
+    except Exception:
+        pass
+    return _TOKEN
+
+
+# ----------------------------------------------------------------------------
+# Stats
+# ----------------------------------------------------------------------------
 
 def get_gpu_stats():
     """Get NVIDIA GPU stats using nvidia-smi."""
@@ -50,104 +133,78 @@ def get_gpu_stats():
 
 def get_system_stats():
     """Get full system stats."""
-    # CPU
     cpu_percent = psutil.cpu_percent(interval=0.1)
-
-    # Memory
     mem = psutil.virtual_memory()
-
-    # Disk
-    disk = psutil.disk_usage('/')
-
-    # GPU
-    gpu = get_gpu_stats()
-
+    try:
+        disk = psutil.disk_usage(os.environ.get('SystemDrive', 'C:') + '\\' if os.name == 'nt' else '/')
+    except Exception:
+        disk = psutil.disk_usage('/')
     return {
-        'cpu': {
-            'percent': cpu_percent,
-            'cores': psutil.cpu_count()
-        },
-        'memory': {
-            'percent': mem.percent,
-            'used_gb': round(mem.used / (1024**3), 1),
-            'total_gb': round(mem.total / (1024**3), 1)
-        },
-        'disk': {
-            'percent': disk.percent,
-            'used_gb': round(disk.used / (1024**3), 1),
-            'total_gb': round(disk.total / (1024**3), 1)
-        },
-        'gpu': gpu,
-        'network': {
-            'connected': True  # If we can respond, we're connected
-        }
+        'cpu': {'percent': cpu_percent, 'cores': psutil.cpu_count()},
+        'memory': {'percent': mem.percent, 'used_gb': round(mem.used / (1024**3), 1),
+                   'total_gb': round(mem.total / (1024**3), 1)},
+        'disk': {'percent': disk.percent, 'used_gb': round(disk.used / (1024**3), 1),
+                 'total_gb': round(disk.total / (1024**3), 1)},
+        'gpu': get_gpu_stats(),
+        'network': {'connected': True},
     }
 
 
-# =============================================================================
-# SETUP FUNCTIONS - Same logic as CORA.bat
-# =============================================================================
+# ----------------------------------------------------------------------------
+# Setup functions (same logic as CORA.bat)
+# ----------------------------------------------------------------------------
 
 def find_ollama():
-    """Find Ollama executable."""
-    # Check PATH first
+    """Find the Ollama executable."""
     ollama_path = shutil.which('ollama')
     if ollama_path:
         return ollama_path
-
-    # Check common locations (Windows)
-    locations = [
+    for loc in (
         os.path.expandvars(r'%LOCALAPPDATA%\Programs\Ollama\ollama.exe'),
         os.path.expandvars(r'%ProgramFiles%\Ollama\ollama.exe'),
         os.path.expandvars(r'%ProgramFiles(x86)%\Ollama\ollama.exe'),
         os.path.expandvars(r'%USERPROFILE%\Ollama\ollama.exe'),
-    ]
-    for loc in locations:
+    ):
         if os.path.exists(loc):
             return loc
     return None
 
 
 def check_ollama_running():
-    """Check if Ollama service is running."""
+    """Check if the Ollama service answers."""
     try:
         import urllib.request
-        req = urllib.request.urlopen('http://localhost:11434/api/tags', timeout=3)
+        req = urllib.request.urlopen(f'{_ollama_url()}/api/tags', timeout=3)
         return req.status == 200
-    except:
+    except Exception:
         return False
 
 
 def get_ollama_models():
-    """Get list of installed Ollama models."""
+    """Installed Ollama model names via the HTTP API."""
     try:
-        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            lines = result.stdout.strip().split('\n')[1:]  # Skip header
-            models = []
-            for line in lines:
-                if line.strip():
-                    parts = line.split()
-                    if parts:
-                        models.append(parts[0])
-            return models
-    except:
-        pass
-    return []
+        import urllib.request
+        with urllib.request.urlopen(f'{_ollama_url()}/api/tags', timeout=5) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        return [m.get('name', '') for m in data.get('models', []) if m.get('name')]
+    except Exception:
+        return []
 
 
 def pull_ollama_model(model_name):
     """Pull an Ollama model. Returns (success, output)."""
+    if not _MODEL_NAME_RE.match(model_name or ''):
+        return False, "Invalid model name"
+    ollama_exe = find_ollama()
+    if not ollama_exe:
+        return False, "Ollama not found"
     try:
         print(f"[SETUP] Pulling model: {model_name}")
-        result = subprocess.run(
-            ['ollama', 'pull', model_name],
-            capture_output=True, text=True, timeout=600  # 10 min timeout for large models
-        )
+        result = subprocess.run([ollama_exe, 'pull', model_name],
+                                capture_output=True, text=True, timeout=1800)
         if result.returncode == 0:
             return True, result.stdout
-        else:
-            return False, result.stderr
+        return False, result.stderr
     except subprocess.TimeoutExpired:
         return False, "Timeout - model download took too long"
     except Exception as e:
@@ -155,104 +212,163 @@ def pull_ollama_model(model_name):
 
 
 def start_ollama_service():
-    """Start Ollama service."""
+    """Start the Ollama service in the background."""
     ollama_exe = find_ollama()
     if not ollama_exe:
         return False, "Ollama not found"
-
     try:
-        # Start in background (Windows: start /min, Unix: nohup)
         if os.name == 'nt':
-            subprocess.Popen(
-                [ollama_exe, 'serve'],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            subprocess.Popen([ollama_exe, 'serve'], creationflags=subprocess.CREATE_NO_WINDOW,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
-            subprocess.Popen(
-                [ollama_exe, 'serve'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
-            )
+            subprocess.Popen([ollama_exe, 'serve'], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
         return True, "Ollama service started"
     except Exception as e:
         return False, str(e)
 
 
 def install_requirements():
-    """Install Python requirements."""
+    """Install the repo's own requirements.txt into the running interpreter."""
+    import sys
+    req_file = PROJECT_DIR / 'requirements.txt'
+    if not req_file.exists():
+        return False, "requirements.txt not found"
     try:
-        # Find requirements.txt relative to this file
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(script_dir)
-        req_file = os.path.join(project_root, 'requirements.txt')
-
-        if not os.path.exists(req_file):
-            # Try config folder
-            req_file = os.path.join(project_root, 'config', 'requirements.txt')
-
-        if not os.path.exists(req_file):
-            return False, "requirements.txt not found"
-
         print(f"[SETUP] Installing from: {req_file}")
-        result = subprocess.run(
-            ['pip', 'install', '-r', req_file],
-            capture_output=True, text=True, timeout=300
-        )
+        result = subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(req_file)],
+                                capture_output=True, text=True, timeout=900)
         if result.returncode == 0:
             return True, "Requirements installed"
-        else:
-            return False, result.stderr
+        return False, result.stderr[-2000:]
     except Exception as e:
         return False, str(e)
 
 
 def get_setup_status():
-    """Get full setup status."""
+    """Full setup status."""
     ollama_exe = find_ollama()
     ollama_running = check_ollama_running()
     models = get_ollama_models() if ollama_running else []
-
-    required_models = ['dolphin-mistral', 'llava', 'qwen2.5-coder']
+    required = _required_models()
     model_status = {}
-    for req in required_models:
-        model_status[req] = any(req in m for m in models)
-
+    for req in required:
+        base = req.split(':')[0]
+        model_status[req] = any(m == req or m.split(':')[0] == base for m in models)
     return {
         'ollama_installed': ollama_exe is not None,
         'ollama_path': ollama_exe,
         'ollama_running': ollama_running,
         'models_installed': models,
         'required_models': model_status,
-        'all_models_ready': all(model_status.values())
+        'all_models_ready': all(model_status.values()) if model_status else False,
     }
 
 
+def voice_health():
+    """Health of the unity-voice-v2 sidecar."""
+    try:
+        import urllib.request
+        url = os.environ.get('UNITY_VOICE_TTS_URL', 'http://127.0.0.1:5123').rstrip('/')
+        with urllib.request.urlopen(f'{url}/health', timeout=2) as r:
+            return {'ok': r.status == 200, 'url': url}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120]}
+
+
+# ----------------------------------------------------------------------------
+# HTTP handler
+# ----------------------------------------------------------------------------
+
+_MIME = {
+    '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
+    '.mjs': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+    '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.txt': 'text/plain; charset=utf-8',
+    '.woff2': 'font/woff2', '.woff': 'font/woff',
+}
+
+
 class StatsHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for stats endpoint."""
+    """HTTP request handler: stats, setup, voice proxy, static web files."""
+
+    server_version = 'CORA/1.0'
 
     def log_message(self, format, *args):
-        """Suppress logging."""
         pass
 
+    # -- helpers -------------------------------------------------------------
+    def _origin_allowed(self) -> bool:
+        origin = self.headers.get('Origin')
+        if not origin:
+            return True  # same-origin / non-browser client
+        return origin.rstrip('/') in _allowed_origins(self.server.server_port)
+
+    def _cors(self):
+        origin = self.headers.get('Origin')
+        if origin and origin.rstrip('/') in _allowed_origins(self.server.server_port):
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-CORA-Token')
+
     def send_json(self, data, status=200):
-        """Send JSON response with CORS headers."""
+        body = json.dumps(data).encode('utf-8')
         self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self._cors()
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        self.wfile.write(body)
+
+    def send_bytes(self, body: bytes, content_type: str, status=200):
+        self.send_response(status)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _authorized(self) -> bool:
+        return secrets.compare_digest(self.headers.get('X-CORA-Token', ''), get_token())
+
+    def _read_body(self) -> bytes:
+        length = int(self.headers.get('Content-Length', 0) or 0)
+        return self.rfile.read(length) if length > 0 else b''
+
+    def _serve_static(self, path: str):
+        """Serve files from web/ (locally hosted web version)."""
+        rel = path.lstrip('/') or 'index.html'
+        if rel.endswith('/'):
+            rel += 'index.html'
+        try:
+            target = (WEB_DIR / rel).resolve()
+            target.relative_to(WEB_DIR.resolve())
+        except Exception:
+            return self.send_json({'error': 'not found'}, 404)
+        if not target.is_file():
+            return self.send_json({'error': 'not found'}, 404)
+        body = target.read_bytes()
+        if target.name == 'index.html':
+            # Hand the page its token + Ollama URL without exposing them to other origins.
+            inject = ('<script>window.CORA_LOCAL={token:%s,ollama:%s,stats:"http://127.0.0.1:%d"};</script>'
+                      % (json.dumps(get_token()), json.dumps(_ollama_url()), self.server.server_port))
+            body = body.replace(b'<head>', b'<head>' + inject.encode('utf-8'), 1)
+        self.send_bytes(body, _MIME.get(target.suffix.lower(), 'application/octet-stream'))
+
+    # -- verbs ---------------------------------------------------------------
+    def do_OPTIONS(self):
+        self.send_response(204 if self._origin_allowed() else 403)
+        self._cors()
+        self.send_header('Content-Length', '0')
+        self.end_headers()
 
     def do_GET(self):
-        """Handle GET requests."""
-        parsed = urlparse(self.path)
-        path = parsed.path
-
-        if path == '/stats' or path == '/':
+        if not self._origin_allowed():
+            return self.send_json({'error': 'origin not allowed'}, 403)
+        path = urlparse(self.path).path
+        if path in ('/stats', '/api/stats'):
             self.send_json(get_system_stats())
         elif path == '/gpu':
             self.send_json(get_gpu_stats())
@@ -262,92 +378,84 @@ class StatsHandler(BaseHTTPRequestHandler):
             self.send_json(get_setup_status())
         elif path == '/setup/models':
             self.send_json({'models': get_ollama_models()})
+        elif path == '/voice/health':
+            self.send_json(voice_health())
+        elif path == '/' or path.startswith('/web/') or not path.startswith(('/setup', '/voice', '/api')):
+            self._serve_static(path[4:] if path.startswith('/web/') else path)
         else:
             self.send_json({'error': 'unknown endpoint'}, 404)
 
     def do_POST(self):
-        """Handle POST requests for setup commands."""
-        parsed = urlparse(self.path)
-        path = parsed.path
+        if not self._origin_allowed():
+            return self.send_json({'error': 'origin not allowed'}, 403)
+        path = urlparse(self.path).path
+        body = self._read_body()
 
-        # Read POST body if any
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length).decode() if content_length > 0 else ''
+        # Voice proxy: the page posts {"text", "emotion", ...}; we forward to the sidecar.
+        if path == '/voice/say':
+            if not self._authorized():
+                return self.send_json({'error': 'unauthorized'}, 401)
+            try:
+                import urllib.request
+                url = os.environ.get('UNITY_VOICE_TTS_URL', 'http://127.0.0.1:5123').rstrip('/')
+                req = urllib.request.Request(f'{url}/say', data=body,
+                                             headers={'Content-Type': 'application/json'})
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    return self.send_bytes(r.read(), 'audio/wav')
+            except Exception as e:
+                msg = getattr(e, 'read', lambda: b'')()
+                return self.send_json({'error': (msg.decode('utf-8', 'replace') if msg else str(e))[:300]}, 422)
+
+        if not path.startswith('/setup/'):
+            return self.send_json({'error': 'unknown endpoint'}, 404)
+        if not self._authorized():
+            return self.send_json({'error': 'unauthorized'}, 401)
 
         if path == '/setup/start-ollama':
             success, msg = start_ollama_service()
             self.send_json({'success': success, 'message': msg})
-
         elif path == '/setup/install-requirements':
             success, msg = install_requirements()
             self.send_json({'success': success, 'message': msg})
-
         elif path.startswith('/setup/pull-model/'):
-            model_name = path.replace('/setup/pull-model/', '')
+            model_name = path[len('/setup/pull-model/'):]
             if not model_name:
-                self.send_json({'success': False, 'message': 'No model specified'}, 400)
-            else:
-                success, msg = pull_ollama_model(model_name)
-                self.send_json({'success': success, 'message': msg})
-
+                return self.send_json({'success': False, 'message': 'No model specified'}, 400)
+            success, msg = pull_ollama_model(model_name)
+            self.send_json({'success': success, 'message': msg})
         elif path == '/setup/pull-all':
-            # Pull all required models
             results = {}
-            for model in ['dolphin-mistral:7b', 'llava', 'qwen2.5-coder:7b']:
+            for model in _required_models():
                 success, msg = pull_ollama_model(model)
                 results[model] = {'success': success, 'message': msg}
-            all_success = all(r['success'] for r in results.values())
-            self.send_json({'success': all_success, 'results': results})
-
+            self.send_json({'success': all(r['success'] for r in results.values()) if results else False,
+                            'results': results})
         else:
             self.send_json({'error': 'unknown endpoint'}, 404)
 
-    def do_OPTIONS(self):
-        """Handle preflight CORS requests."""
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.end_headers()
-
 
 def start_server(port=STATS_PORT):
-    """Start the stats server."""
+    """Start the local server (blocking)."""
+    get_token()
     server = HTTPServer(('127.0.0.1', port), StatsHandler)
-    print(f"[STATS] Server running on http://localhost:{port}")
-    print(f"[STATS] Endpoints:")
-    print(f"  GET  /stats              - System stats (CPU, RAM, GPU)")
-    print(f"  GET  /setup/status       - Setup status (Ollama, models)")
-    print(f"  POST /setup/start-ollama - Start Ollama service")
-    print(f"  POST /setup/pull-model/X - Pull Ollama model")
-    print(f"  POST /setup/pull-all     - Pull all required models")
-    print(f"  POST /setup/install-requirements - Install Python deps")
+    print(f"[STATS] Server running on http://127.0.0.1:{port}  (web UI at /)")
+    print(f"[STATS] Token file: {TOKEN_PATH}")
     server.serve_forever()
 
 
 def start_server_background(port=STATS_PORT):
-    """Start the stats server in a background thread."""
+    """Start the local server in a daemon thread."""
     thread = threading.Thread(target=start_server, args=(port,), daemon=True)
     thread.start()
     return thread
 
 
 if __name__ == "__main__":
-    print("C.O.R.A Stats Server")
+    print("C.O.R.A Local Server")
     print("=" * 40)
-    print(f"Starting on port {STATS_PORT}...")
-    print("Press Ctrl+C to stop")
-    print()
-
-    # Print initial stats
     stats = get_system_stats()
-    print(f"CPU: {stats['cpu']['percent']}%")
-    print(f"RAM: {stats['memory']['percent']}%")
-    print(f"Disk: {stats['disk']['percent']}%")
+    print(f"CPU: {stats['cpu']['percent']}%  RAM: {stats['memory']['percent']}%  Disk: {stats['disk']['percent']}%")
     if stats['gpu']['available']:
         print(f"GPU: {stats['gpu']['name']} - {stats['gpu']['utilization']}% ({stats['gpu']['temperature']}°C)")
-    else:
-        print("GPU: Not available")
     print()
-
     start_server()

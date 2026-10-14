@@ -1,6 +1,6 @@
 {
   "app_name": "C.O.R.A",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "tts": {
     "enabled": true,
     "engine": "kokoro",
@@ -26,21 +26,26 @@
   },
   "ollama": {
     "enabled": true,
-    "model": "llama3.2",
-    "api_url": "http://localhost:11434",
-    "timeout": 30
+    "api_url": "http://127.0.0.1:11434",
+    "model": "dolphin3:8b",
+    "timeout": 120,
+    "think_timeout": 30,
+    "vision_timeout": 90,
+    "num_ctx": 16384,
+    "keep_alive": "30m"
   },
   "models": {
-    "primary": "llama3.2",
+    "primary": "dolphin3:8b",
+    "vision": "qwen3-vl:4b",
     "code": null,
-    "system": null,
-    "image": null
+    "think": null,
+    "image": "flux",
+    "_note": "primary switches to huihui_ai/qwen3-abliterated:8b (uncensored + native tools) once pulled; dolphin3:8b is the uncensored fallback (no native tools, JSON tool protocol is used)"
   },
   "auto_setup": {
     "check_ollama": true,
     "check_tts": true,
-    "auto_pull_model": true,
-    "auto_install_kokoro": false
+    "auto_pull_model": true
   },
   "display": {
     "colors": false,
@@ -64,12 +69,39 @@
     "discord": "https://discord.gg/D33Bk6Ay",
     "email": "unityailabcontact@gmail.com",
     "creators": [
-      {"name": "Hackall360", "role": "Lead Code Necromancer"},
-      {"name": "Sponge", "role": "Chaos Engineer"},
-      {"name": "GFourteen", "role": "Digital Alchemist"}
+      {
+        "name": "Hackall360",
+        "role": "Lead Code Necromancer"
+      },
+      {
+        "name": "Sponge",
+        "role": "Chaos Engineer"
+      },
+      {
+        "name": "GFourteen",
+        "role": "Digital Alchemist"
+      }
     ],
     "copyright": "© 2025 Unity AI Lab. Creators: Hackall360, Sponge, GFourteen. All rights reserved."
   },
   "created": "2025-12-22",
-  "updated": "2025-12-25"
+  "updated": "2026-10-14",
+  "ai": {
+    "temperature": 0.7,
+    "max_tokens": 500,
+    "history_turns": 40
+  },
+  "files": {
+    "allowed_roots": []
+  },
+  "self_modify": {
+    "enabled": false
+  },
+  "web": {
+    "allowed_origins": [
+      "https://unity-lab-ai.github.io",
+      "https://unityailab.com",
+      "https://www.unityailab.com"
+    ]
+  }
 }

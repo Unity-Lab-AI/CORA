@@ -171,3 +171,9 @@ nul
 
 # Node / build artifacts (harmless if unused)
 node_modules/
+
+# ============ RUNTIME STATE (never commit) ============
+data/
+backups/
+temp_scripts/
+config/settings.json

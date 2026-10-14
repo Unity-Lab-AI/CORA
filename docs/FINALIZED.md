@@ -404,6 +404,23 @@ No code changed. Memory note saved: `unity-voice-v2-model`.
 
 ---
 
+## Session: 2026-10-14 (Repair Phase 0 — stop the bleeding)
+
+User's words: "get to fixing it all we need it 100% operationsal and complete with all code wired up and working with edits and fixes where needed"
+
+| Task | Done |
+|---|---|
+| UPG-001 | `ui/boot_display.py` yt-dlp/mpv playback is a list-args `Popen` pipeline; no shell |
+| UPG-002 | New `ai/settings.py` (single source for Ollama URL, models, `num_ctx`=16384, `keep_alive`, timeouts, env overrides). `ai/ollama.py` rewritten on top of it: every request sends `num_ctx` + `keep_alive`; native `tools` + `tool_calls` parsing; `chat_stream_events()`; `warm_up()`; `model_capabilities()`. New `ai/history.py` shared persisted transcript with context budgeting + fold-to-summary; wired into both chat paths of the live boot display. `config/system_prompt.txt` trimmed from 27.8k to ~10k chars (accessibility-justification filler removed, behaviour kept). Verified live: "CORA ONLINE" round trip, prompt_eval 30 tokens, 4.5 s |
+| UPG-003 | `cora_tools/files.py`: paths must sit inside allowed roots (project + Desktop/Documents/Downloads/Pictures/Videos/Music, configurable via `files.allowed_roots` / `CORA_FILE_ROOTS`), system dirs always denied, roots themselves can't be deleted; `delete_directory`, `list_directory`, `get_file_info` now validated. `cora_tools/self_modify.py`: `run_script`/`create_and_run` refuse unless `confirmed=True` or `self_modify.enabled` |
+| UPG-004 | `services/stats_server.py` rewritten: origin allowlist (no `*`), per-launch `X-CORA-Token` on every state-changing POST, strict model-name pattern, only the repo's requirements.txt, uses configured models, `/voice/say` proxy to the V2 sidecar, serves `web/` locally with the token injected |
+| UPG-006 | `requirements.txt` rewritten for Python 3.12 / numpy 2 (kokoro-onnx, pyttsx3, pytest, pytest-cov gone; 11 missing packages added; faster-whisper + openwakeword added). `config/requirements.txt` and `config/system_prompt1.txt` removed (git history keeps them) |
+| UPG-005 (partial) | `data/`, `backups/`, `config/settings.json` untracked and gitignored (files kept on disk). Private-repo boot phase opt-in lands with the boot_sequence edits in Phase 2 |
+| UPG-007 | Dec-2025 ids SEC-002/003/005, MEM-001/002 closed |
+| Runtime | Python 3.12.15 installed (python.org silent installer, current user). Pulls started: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b`. `config/config.json` v3.0.0 with `ollama`, `models`, `ai`, `files`, `self_modify`, `web` blocks |
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |

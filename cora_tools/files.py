@@ -11,13 +11,56 @@ import json
 import datetime
 from pathlib import Path
 
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+
+def _allowed_roots():
+    """Directories CORA's file tools may touch.
+
+    Default: the project itself plus the user's Desktop, Documents, Downloads,
+    Pictures, Videos and Music. Override with config/config.json
+    `files.allowed_roots` (list of paths; `~` expands) or the env var
+    CORA_FILE_ROOTS (os.pathsep-separated). System directories are never
+    allowed regardless of configuration.
+    """
+    roots = []
+    env = os.environ.get('CORA_FILE_ROOTS')
+    if env:
+        roots = [p for p in env.split(os.pathsep) if p.strip()]
+    else:
+        try:
+            with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            roots = list((cfg.get('files') or {}).get('allowed_roots') or [])
+        except Exception:
+            roots = []
+    if not roots:
+        home = Path.home()
+        roots = [str(PROJECT_DIR)] + [str(home / d) for d in
+                                      ('Desktop', 'Documents', 'Downloads', 'Pictures', 'Videos', 'Music')]
+    out = []
+    for r in roots:
+        try:
+            out.append(Path(os.path.expandvars(os.path.expanduser(r))).resolve())
+        except Exception:
+            continue
+    return out
+
+
+_DENIED_ROOTS = [p for p in (
+    os.environ.get('SystemRoot'), os.environ.get('ProgramFiles'),
+    os.environ.get('ProgramFiles(x86)'), os.environ.get('ProgramData'),
+    '/etc', '/usr', '/bin', '/sbin', '/boot', '/sys', '/proc',
+) if p]
+
 
 def _validate_path(file_path: str, base_dir: str = None) -> bool:
-    """Validate a path to prevent directory traversal attacks.
+    """Validate a path: no traversal, no null bytes, inside an allowed root.
 
     Args:
         file_path: Path to validate
-        base_dir: Optional base directory to restrict access to
+        base_dir: Optional base directory to restrict access to (in addition to
+                  the allowed roots)
 
     Returns:
         bool: True if path is safe, False if potentially malicious
@@ -25,13 +68,33 @@ def _validate_path(file_path: str, base_dir: str = None) -> bool:
     if not file_path:
         return False
 
-    # Normalize the path to resolve any .. or . components
     try:
-        # Resolve to absolute path
+        # Check for null bytes (common injection technique)
+        if '\x00' in str(file_path):
+            return False
+
+        # Resolve to absolute path (collapses .. and symlinks)
         resolved = Path(file_path).resolve()
 
-        # Check for null bytes (common injection technique)
-        if '\x00' in file_path:
+        # Never inside a system directory
+        for denied in _DENIED_ROOTS:
+            try:
+                resolved.relative_to(Path(denied).resolve())
+                return False
+            except ValueError:
+                pass
+
+        # Must be inside one of the allowed roots
+        inside = False
+        for root in _allowed_roots():
+            try:
+                resolved.relative_to(root)
+                inside = True
+                break
+            except ValueError:
+                continue
+        if not inside:
+            print(f"[!] Path outside allowed roots: {resolved}")
             return False
 
         # If base_dir specified, ensure path is within it
@@ -315,6 +378,10 @@ def get_file_info(file_path):
         dict: File info or None if error
     """
     try:
+        if not _validate_path(file_path):
+            print(f"[!] Invalid path: {file_path}")
+            return None
+
         if not os.path.exists(file_path):
             return None
 
@@ -347,6 +414,10 @@ def list_directory(dir_path, extensions=None, recursive=False):
         list: File paths
     """
     try:
+        if not _validate_path(dir_path):
+            print(f"[!] Invalid path: {dir_path}")
+            return []
+
         if not os.path.isdir(dir_path):
             print(f"[!] Not a directory: {dir_path}")
             return []
@@ -407,6 +478,17 @@ def delete_directory(dir_path, recursive=False):
         bool: True if deleted successfully
     """
     try:
+        # Validate path to prevent traversal / deleting outside allowed roots
+        if not _validate_path(dir_path):
+            print(f"[!] Invalid path: {dir_path}")
+            return False
+
+        # Never delete an allowed root itself or the project directory
+        resolved = Path(dir_path).resolve()
+        if resolved == PROJECT_DIR or resolved in _allowed_roots():
+            print(f"[!] Refusing to delete a root directory: {dir_path}")
+            return False
+
         if not os.path.exists(dir_path):
             print(f"[!] Directory not found: {dir_path}")
             return False

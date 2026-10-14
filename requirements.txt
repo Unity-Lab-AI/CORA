@@ -1,49 +1,53 @@
 # C.O.R.A - Cognitive Operations & Reasoning Assistant
-# Dependencies for v2.2.0
-# Unity AI Lab - 2025
+# Python 3.12 target (3.10 end-of-life 2026-10-01). Rewritten 2026-10-14 (AUD-001 / UPG-006).
 #
-# Version pinning: Using ~= for compatible releases (allows patch updates)
-# Example: requests~=2.31.0 allows 2.31.x but not 2.32.0
+# Pins are lower-bounded with an upper major bound so security fixes flow in
+# but breaking majors do not. Every package here is actually imported by the
+# code; every third-party import in the code is listed here.
+#
+# TTS is NOT a pip dependency any more: CORA speaks through the unity-voice-v2
+# sidecar (its own venv, see docs/SYSTEM_AUDIT_2026-10-14.md section 4).
 
-# Core
-requests~=2.31.0
-aiohttp~=3.9.0
+# ---- Core ----------------------------------------------------------------
+requests>=2.32,<3
+aiohttp>=3.14,<4
+python-dotenv>=1.1,<2
+python-dateutil>=2.9,<3
+portalocker>=4.4,<5
+psutil>=7.2,<8
 
-# Text-to-Speech
-pyttsx3~=2.90
-
-# Kokoro TTS (optional neural voice)
-kokoro-onnx~=0.4.0
-sounddevice~=0.4.6
-numpy~=1.26.0
-
-# Voice Recognition (optional)
+# ---- Audio / voice --------------------------------------------------------
+numpy>=2.2,<3
+sounddevice>=0.5,<0.6
+soundfile>=0.13,<0.15
+PyAudio>=0.2.14
+faster-whisper>=1.2,<2
+openwakeword>=0.6
+# legacy STT kept until the faster-whisper path is verified (Phase 4)
 vosk~=0.3.45
-SpeechRecognition~=3.10.0
-soundfile~=0.12.1
+SpeechRecognition>=3.14,<4
 
-# GUI
-customtkinter~=5.2.1
+# ---- GUI -----------------------------------------------------------------
+customtkinter~=5.2.2
 pystray~=0.19.5
-Pillow~=10.2.0
+Pillow>=12,<13
+tkinterdnd2>=0.6
 
-# Utilities
-python-dateutil~=2.8.2
-python-dotenv~=1.0.0
-
-# Screenshot/Window tools
+# ---- Windows integration --------------------------------------------------
+pywin32>=312; sys_platform == "win32"
+comtypes>=1.4; sys_platform == "win32"
+pycaw>=20240210; sys_platform == "win32"
+win10toast~=0.9; sys_platform == "win32"
 pygetwindow~=0.0.9
 pyautogui~=0.9.54
+pynput>=1.8
+keyboard>=0.13.5
+plyer>=2.1
+GPUtil~=1.4.0
 
-# System monitoring (optional)
-psutil~=5.9.8
+# ---- Vision ---------------------------------------------------------------
+opencv-python>=4.12,<5
 
-# OpenCV for presence detection (optional)
-opencv-python~=4.9.0.80
-
-# Testing
-pytest~=8.0.0
-pytest-cov~=4.1.0
-
-# File locking for safe concurrent access
-portalocker~=2.8.0
+# ---- Browser automation / media -----------------------------------------
+playwright>=1.64
+yt-dlp>=2026.8.19

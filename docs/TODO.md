@@ -38,19 +38,41 @@
 
 ---
 
+## DECISIONS LOCKED (user, 2026-10-14) — apply to every UPG task below
+
+> User's words: "get to fixing it all we need it 100% operationsal and complete with all code wired up and working with edits and fixes where needed" / "also set a cron to wake you every two minutes with that goal in mind" / "make sure crone is one and working and you have proper todo of everyhting in totality weve gone over and from here on out do not use ask me question till everything is comppleted and working, solve isssues yourself and continue the work toward the final goal of having all done"
+
+| Decision | Value |
+|---|---|
+| Chat model | "which ever is best for our uncensored needs" -> `huihui_ai/qwen3-abliterated:8b` (uncensored, native tools, thinking) as primary once pulled; `dolphin3:8b` (uncensored, no native tools) as fallback. Dispatcher supports native tools AND a JSON-in-text tool protocol so both work. Vision `qwen3-vl:4b`. Code = chat model. |
+| Dead code | "Keep everything, wire every module in" — NOTHING is deleted. CLI (`src/cora.py`), GUI app (`ui/app.py` + panels), voice registry (`voice/commands.py`), code editor, query panel, monitor panel, converse mode all get wired to the one dispatcher and launchable from the live app. |
+| Python | Install 3.12.15 side by side (done via python.org silent installer); `CORA.bat` -> `py -3.12` + venv. |
+| Web | Served locally by `services/stats_server.py` (same-origin: stats, Ollama, V2 voice proxy). GitHub Pages stays as landing page. |
+| TTS | unity-voice-v2 sidecar only (Backrooms/models/unity-voice-v2, :5123). No Kokoro, no pyttsx3, no fallback voice. |
+| Cron | Session cron `f4c9db56` every 2 min re-prompts the repair goal (expires in 7 days; session-only). |
+| Questions | No AskUserQuestion until everything is complete and working. |
+
+### Additional tasks surfaced during the work
+- [ ] **UPG-023 (M)** Wire the kept modules into the live app: `ui/code_editor.py` (code window), `ui/query_panel.py` + `config/hotbar.json` (hotbar), `ui/monitor_panel.py`, `ui/image_panel.py`/`fullscreen_image.py` (image results), `voice/converse.py` (converse mode), `services/cli_popup.py` (popups speak), `ui/app.py` + `ui/panels.py` (GUI app launchable via `src/gui_launcher.py` and from boot_display), `src/cora.py` CLI uses the shared dispatcher + history
+- [ ] **UPG-024 (S)** Pull/verify models: `huihui_ai/qwen3-abliterated:8b`, `qwen3-vl:4b` (both pulling 2026-10-14); switch `config.models.primary` when the abliterated pull lands; `CORA.bat` + stats_server pull the configured models, not the old list
+- [ ] **UPG-025 (S)** Seed the Unity workflow memory templates (`.claude/memory-templates`) into the user-profile memory folder (what `start.bat` does) — currently not seeded
+- [ ] **UPG-026 (S)** `tools/mpv/stats_server.py` is a stale copy inside the gitignored `tools/` folder (not tracked; deletion was blocked by the sandbox) — remove manually or leave; nothing imports it
+
+---
+
 ## UPGRADE PLAN — from AUD-001 (docs/SYSTEM_AUDIT_2026-10-14.md)
 
 > Added 2026-10-14. Effort S = hours, M = 1-2 days, L = a week+. Full rationale and file:line evidence in the audit doc.
 > User's words that drive this list: "see what tech is out dated models and anything else that needs updating and replacing to fuylly make this project everything it should be and everything its missing" / "we will use our V2 voice model from the backrooms folder and voice lab".
 
 ### Phase 0 — stop the bleeding
-- [ ] **UPG-001 (S)** Fix live shell injection at `ui/boot_display.py:977` — list-args `Popen` pipeline for yt-dlp into mpv
-- [ ] **UPG-002 (S)** Send `options.num_ctx` >=16384 + `keep_alive` from `ai/ollama.py`; pass `CHAT_HISTORY` as `messages` in the live chat path; trim `config/system_prompt.txt` to <=3k tokens
-- [ ] **UPG-003 (S)** `cora_tools/files.py` default `base_dir=PROJECT_DIR`; gate or remove `self_modify.run_script`
-- [ ] **UPG-004 (S)** `services/stats_server.py`: CORS origin allowlist + launch token + model-name allowlist; delete `tools/mpv/stats_server.py`
-- [ ] **UPG-005 (S)** Untrack `data/*.json`, `backups/*`, `config/settings.json`; extend `.gitignore`; make the private-repo boot phase opt-in
-- [ ] **UPG-006 (S)** Requirements: remove kokoro-onnx, pyttsx3, pytest, pytest-cov; add the 11 missing packages; bump pins; delete `config/requirements.txt` and `config/system_prompt1.txt`
-- [ ] **UPG-007 (S)** Close SEC-002/003/005, MEM-001/002 below (verified fixed in code)
+- [x] **UPG-001 (S)** Fix live shell injection at `ui/boot_display.py:977` — list-args `Popen` pipeline for yt-dlp into mpv
+- [x] **UPG-002 (S)** Send `options.num_ctx` >=16384 + `keep_alive` from `ai/ollama.py`; pass `CHAT_HISTORY` as `messages` in the live chat path; trim `config/system_prompt.txt` to <=3k tokens
+- [x] **UPG-003 (S)** `cora_tools/files.py` default `base_dir=PROJECT_DIR`; gate or remove `self_modify.run_script`
+- [x] **UPG-004 (S)** `services/stats_server.py`: CORS origin allowlist + launch token + model-name allowlist; delete `tools/mpv/stats_server.py`
+- [~] **UPG-005 (S)** Untrack `data/*.json`, `backups/*`, `config/settings.json`; extend `.gitignore`; make the private-repo boot phase opt-in
+- [x] **UPG-006 (S)** Requirements: remove kokoro-onnx, pyttsx3, pytest, pytest-cov; add the 11 missing packages; bump pins; delete `config/requirements.txt` and `config/system_prompt1.txt`
+- [x] **UPG-007 (S)** Close SEC-002/003/005, MEM-001/002 below (verified fixed in code)
 
 ### Phase 1 — runtime and models
 - [ ] **UPG-008 (M)** Python 3.12 side by side; `CORA.bat` uses `py -3.12` + venv, re-runs pip on requirements hash change, upgrades yt-dlp
@@ -100,7 +122,7 @@
 
 ## CRITICAL ISSUES (Fix Immediately)
 
-### SEC-002: eval() Used in Calculator
+### SEC-002: eval() Used in Calculator — **FIXED (verified 2026-10-14, see SYSTEM_AUDIT)**
 **Location:** `cora_tools/system.py:546-558`
 **Severity:** CRITICAL
 **Status:** `pending`
@@ -109,7 +131,7 @@
 
 ---
 
-### SEC-003: PowerShell Injection Vulnerability
+### SEC-003: PowerShell Injection Vulnerability — **FIXED (verified 2026-10-14, see SYSTEM_AUDIT)**
 **Location:** `cora_tools/system.py:318-326, 369`
 **Severity:** CRITICAL
 **Status:** `pending`
@@ -128,7 +150,7 @@
 
 ---
 
-### SEC-005: Git Command Injection
+### SEC-005: Git Command Injection — **FIXED (verified 2026-10-14, see SYSTEM_AUDIT)**
 **Location:** `voice/commands.py:1154-1370`
 **Severity:** CRITICAL
 **Status:** `pending`
@@ -167,7 +189,7 @@
 
 ---
 
-### MEM-001: TTS Audio Buffer Race Condition
+### MEM-001: TTS Audio Buffer Race Condition — **FIXED (verified 2026-10-14, see SYSTEM_AUDIT)**
 **Location:** `voice/tts.py:178-240`
 **Severity:** CRITICAL
 **Status:** `pending`
@@ -176,7 +198,7 @@
 
 ---
 
-### MEM-002: STT Transcript Buffer Memory Leak
+### MEM-002: STT Transcript Buffer Memory Leak — **FIXED (verified 2026-10-14, see SYSTEM_AUDIT)**
 **Location:** `voice/stt.py:266-272`
 **Severity:** CRITICAL
 **Status:** `pending`
