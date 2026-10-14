@@ -384,6 +384,26 @@ startProactiveInterjections()                 // Start 45-second interval
 
 ---
 
+## Session: 2026-10-14 (Full System Audit)
+
+### AUD-001: Full system check — outdated tech, models, missing pieces
+
+**User's verbatim words:** "okay now we need to do a full system check of the cora project and see what tech is out dated models and anything else that needs updating and replacing to fuylly make this project everything it should be and everything its missing" / "and we will use our V2 voice model from the backrooms folder and voice lab. so make sure you read up on it all"
+
+**Status:** DONE | **Date:** 2026-10-14 | **Output:** `docs/SYSTEM_AUDIT_2026-10-14.md` (10 sections, prioritized 22-item upgrade plan seeded into `docs/TODO.md` as UPG-001..UPG-022)
+
+| Pass | Headline |
+|------|----------|
+| Dependencies/runtime | Python 3.10 EOL 2026-10-01 (only interpreter installed); requirements list the wrong Kokoro package; 11 imported packages missing, 7 not installed; pytest shipped despite NO TESTS; target Python 3.12 |
+| AI/voice stack | `num_ctx` never set so Ollama's 4096 default silently clips the 27k persona prompt (root cause of "model ignores system prompt"); no history over HTTP, no native tools, no streaming; dolphin-mistral/llava/qwen2.5-coder outdated; Vosk stale; Pollinations API changed |
+| V2 voice | Read `Backrooms/models/unity-voice-v2` (serve.py :5123, POST /say, 9 emotions x 7 acts, `voice_text()` contract, own venv). Full CORA migration plan written; three divergent TTS stacks to delete |
+| Code health/security | NEW live shell injection `ui/boot_display.py:977`; `files.py` path validation is a no-op; `self_modify` unrestricted exec; stats_server CSRF; ~40% of Python is dead code; 12 files over 800 lines; Dec-2025 issues: 5 fixed, 5 partial, 20 open |
+| Vision vs implementation | Four command routers, reminders never scheduled, boot runs demo phases instead of the spec'd calendar/tasks narration, GUI panels are stubs, user data tracked in the public repo |
+
+No code changed. Memory note saved: `unity-voice-v2-model`.
+
+---
+
 ## Cumulative Stats
 
 | Metric | Value |

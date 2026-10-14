@@ -38,6 +38,50 @@
 
 ---
 
+## UPGRADE PLAN — from AUD-001 (docs/SYSTEM_AUDIT_2026-10-14.md)
+
+> Added 2026-10-14. Effort S = hours, M = 1-2 days, L = a week+. Full rationale and file:line evidence in the audit doc.
+> User's words that drive this list: "see what tech is out dated models and anything else that needs updating and replacing to fuylly make this project everything it should be and everything its missing" / "we will use our V2 voice model from the backrooms folder and voice lab".
+
+### Phase 0 — stop the bleeding
+- [ ] **UPG-001 (S)** Fix live shell injection at `ui/boot_display.py:977` — list-args `Popen` pipeline for yt-dlp into mpv
+- [ ] **UPG-002 (S)** Send `options.num_ctx` >=16384 + `keep_alive` from `ai/ollama.py`; pass `CHAT_HISTORY` as `messages` in the live chat path; trim `config/system_prompt.txt` to <=3k tokens
+- [ ] **UPG-003 (S)** `cora_tools/files.py` default `base_dir=PROJECT_DIR`; gate or remove `self_modify.run_script`
+- [ ] **UPG-004 (S)** `services/stats_server.py`: CORS origin allowlist + launch token + model-name allowlist; delete `tools/mpv/stats_server.py`
+- [ ] **UPG-005 (S)** Untrack `data/*.json`, `backups/*`, `config/settings.json`; extend `.gitignore`; make the private-repo boot phase opt-in
+- [ ] **UPG-006 (S)** Requirements: remove kokoro-onnx, pyttsx3, pytest, pytest-cov; add the 11 missing packages; bump pins; delete `config/requirements.txt` and `config/system_prompt1.txt`
+- [ ] **UPG-007 (S)** Close SEC-002/003/005, MEM-001/002 below (verified fixed in code)
+
+### Phase 1 — runtime and models
+- [ ] **UPG-008 (M)** Python 3.12 side by side; `CORA.bat` uses `py -3.12` + venv, re-runs pip on requirements hash change, upgrades yt-dlp
+- [ ] **UPG-009 (M)** Single model config (`OLLAMA_URL`, `models.{chat,vision,code}`); remove hardcoded names in `ai/ollama.py`, `cora_tools/code.py`, `services/presence.py`, `voice/commands.py`, `services/stats_server.py`, `web/index.html`
+- [ ] **UPG-010 (S)** Switch chat to `qwen3.5:9b` (or `gemma4:12b`), vision to `qwen3-vl:4b`, code to `qwen3-coder`; warm at boot; unify timeouts
+- [ ] **UPG-011 (S)** Pollinations: Bearer/`sk_` key, fully qualified model IDs, drop nologo/enhance, move web off the legacy host
+
+### Phase 2 — V2 voice (user decision: unity-voice-v2 replaces Kokoro/pyttsx3)
+- [ ] **UPG-012 (M)** `voice/unity_voice.py` client (health, `voice_text()` port, sentence chunking, emotion/act mapping, `delivery_support` validation, `stop_speaking`, `speak_async`); sidecar discovery/autostart via `UNITY_VOICE_TTS_URL` / `UNITY_VOICE_MODEL_DIR` / `UNITY_VOICE_PYTHON`; shared lock dir with unity-speak; new `tts.unity_voice` config block; delete `KokoroTTS`/`Pyttsx3TTS`, `src/cora.py` TTS functions, `tts_handler.py` engine code, `web/kokoro-worker.js`, all Kokoro/af_bella strings; presence check off the TTS thread
+- [ ] **UPG-013 (M)** Stream LLM output sentence-by-sentence into the V2 queue; barge-in via `stop_speaking`
+
+### Phase 3 — the assistant loop
+- [ ] **UPG-014 (L)** One dispatcher: `cora_tools` as JSON-schema `tools` on `/api/chat`, loop on `message.tool_calls`; delete the four routers; re-wire git/email/media/terminal/viewfile only after their security fixes
+- [ ] **UPG-015 (M)** Boot per spec: speak today's calendar / overdue tasks / upcoming reminders; start `ReminderManager.start_checking()`; merge the two reminder stores; gate or remove the YouTube/GitHub/image-gen demo phases
+- [ ] **UPG-016 (M)** Conversation summarization at ~75% of `num_ctx`; honor `settings.ai.context_window`
+
+### Phase 4 — STT and wake word
+- [ ] **UPG-017 (M)** `faster-whisper` on CUDA for commands; openWakeWord "cora" model; delete Vosk, `recognize_google`, `webkitSpeechRecognition`; bound the audio queue; VAD for barge-in
+
+### Phase 5 — cleanup and fundamentals
+- [ ] **UPG-018 (M)** Delete dead modules (`src/cora.py`, `src/gui_launcher.py`, `ui/app.py`, `ui/panels.py`, `ai/tool_executor.py`, `ai/prompts.py`, `ai/router.py`, `ui/code_editor.py`, `ui/fullscreen_image.py`, `ui/image_panel.py`, `ui/monitor_panel.py`, `ui/query_panel.py`, `voice/converse.py`, transitively `voice/commands.py`, `cora_tools/modal_tools.py`) or finish one GUI; consolidate the two webcam pipelines + three windowing helpers; split the 12 files over 800 lines
+- [ ] **UPG-019 (M)** Single config loader with schema validation; one version constant; atomic JSON writes; shared logger; remove `atexit os._exit(0)`; cancel the waveform timer on close; heartbeat the TTS mutex
+- [ ] **UPG-020 (S)** `pyproject.toml`, `py_compile`/ruff CI job, CHANGELOG, git tags
+- [ ] **UPG-021 (M)** Web: split `index.html` into ES modules + css; generate phases/prompt JSON at deploy; serve locally via `stats_server.py` (fixes mixed content, CORS and the V2 sidecar); one public URL; fix the `innerHTML` sinks
+- [ ] **UPG-022 (S)** Docs truth pass: file/phase counts, entry point, default model, nonexistent files in ARCHITECTURE/NerdReadme/APIReference, SKILL_TREE percentages
+
+### Later
+- [ ] RAG over `knowledge.json` with Ollama embeddings (M) / MCP client (M) / real self-modification with static check + sandbox (L) / installer and auto-update (L) / multi-language (M) / accessibility (M)
+
+---
+
 ## SCAN SUMMARY
 
 | Category | Critical | High | Medium | Low | Total | ⚠️ Need Input |
