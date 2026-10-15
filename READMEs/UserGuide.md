@@ -56,7 +56,7 @@ When CORA starts with visual boot, you'll see:
 | 6 | External Services | Weather, Location, Notifications |
 | 7 | News Headlines | Top 3 headlines from Google News |
 | 8 | Vision Test | Screenshot & webcam capture |
-| 9 | Image Generation | her own local image engine (Stable Diffusion sidecar) |
+| 9 | Image Generation | her selfie on her own local image engine, opened in the viewer (`boot.selfie`) |
 | 10 | Final Check | Summary & readiness status |
 
 3. **Live System Stats** - Real-time CPU, RAM, GPU, VRAM, Disk monitoring
@@ -317,7 +317,7 @@ Access via **Settings** button in sidebar:
 | Wake word / voice input | On/Off | Enable the ears |
 | Sensitivity | 0-1 | Voice detection threshold |
 | Whisper model | tiny.en-medium.en | Recognition model |
-| Demo phases at boot | On/Off | YouTube, GitHub import, image popups during boot |
+| Demo phases at boot | On/Off | YouTube, GitHub import, result popups during boot (the selfie is `boot.selfie`) |
 
 Click **Save Settings** to persist changes; they go to `config/config.json` (the one config everything reads).
 

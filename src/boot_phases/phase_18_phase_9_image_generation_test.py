@@ -3,7 +3,11 @@
 
 One phase of src.boot_sequence.run_boot_sequence, split out on 2026-10-14. `_m` is the live
 src.boot_sequence module (its names are read and assigned through it); `L` holds the locals
-shared across phases."""
+shared across phases.
+
+2026-10-14 (evening): the picture is her selfie on her own local image engine, and it opens
+in the viewer window every boot (config boot.selfie, default true) - the owner never saw it
+when the demo gate kept it off."""
 from __future__ import annotations
 import json
 import os
@@ -30,15 +34,34 @@ try:
 except Exception:
     pass
 
+def _selfie_prompt(_m) -> str:
+    """Her own idea for the moment of the selfie (picture words); her look itself comes from config
+    image.selfie_look and is added by generate_image(selfie=True)."""
+    try:
+        from ai.ollama import generate
+        r = generate(
+            prompt=("Write the image prompt for a selfie you are taking right now, one line, max 30 words: "
+                    "where you are, your pose and expression, the light. Picture words only, no quotes."),
+            system=_m.get_system_prompt(), temperature=1.0, max_tokens=60)
+        idea = (r.content or '').strip().strip('"\'')
+        idea = re.sub(r'\*\*([^*]+)\*\*', r'\1', idea)
+        idea = re.sub(r'\*([^*]+)\*', r'\1', idea)
+        idea = re.sub(r'\s+', ' ', idea).strip()
+        if 8 < len(idea) < 240:
+            return idea
+    except Exception as e:
+        print(f"  [INFO] selfie idea skipped: {e}")
+    return "at her desk, looking at the camera with a small smile"
+
 
 def run(_m, L):
 
     # ================================================================
-    # PHASE 9: IMAGE GENERATION TEST
+    # PHASE 9: IMAGE GENERATION (her selfie, on her own engine)
     # ================================================================
     _m.display_phase("9.0 Image Gen", "running")
     _m.display_log("PHASE 9: IMAGE GENERATION", "phase")
-    print("\n[PHASE 9] Image Generation Test")
+    print("\n[PHASE 9] Image Generation")
     print("=" * 50)
 
     try:
@@ -53,97 +76,51 @@ def run(_m, L):
         print(f"  [OK] Image engine online: {h.get('checkpoint')} on {h.get('device')} ({msg})")
         _m.display_log(f"Image engine online: local Stable Diffusion, {h.get('checkpoint')}", "ok")
         _m.BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
-        if not L._demo:
-            raise _m._SkippedPhase("boot.demo_phases is false")
+        if not bool(_m._boot_config().get('selfie', True)):
+            raise _m._SkippedPhase("boot.selfie is false")
 
-        # Have CORA generate her own unique prompt using Ollama
-        print("  Asking CORA for a fucked up image idea...")
-        _m.display_thinking("Creating something dark and twisted...")
+        print("  Taking her selfie...")
+        _m.display_thinking("Taking a selfie...")
+        _m.display_action("CORA is framing her selfie...")
+        cora_prompt = _selfie_prompt(_m)
+        print(f"  Selfie prompt: {cora_prompt}")
+        _m.display_result(f"Selfie: {cora_prompt[:90]}")
 
         import random
         random_seed = random.randint(1, 999999999)
-        cora_prompt = None
-
-        try:
-            from ai.ollama import generate
-
-            _m.display_action("CORA is dreaming up something disturbing...")
-            result = generate(
-                prompt="Generate a fucked up crazy image thats disturbing",
-                system=_m.get_system_prompt(),
-                temperature=1.2,
-                max_tokens=60
-            )
-
-            if result.content and len(result.content) > 10:
-                cora_prompt = result.content.strip()
-                # Clean up the prompt
-                cora_prompt = cora_prompt.strip('"\'').strip()
-                cora_prompt = re.sub(r'\*\*([^*]+)\*\*', r'\1', cora_prompt)
-                cora_prompt = re.sub(r'\*([^*]+)\*', r'\1', cora_prompt)
-                cora_prompt = re.sub(r'\n+', ' ', cora_prompt)
-                cora_prompt = re.sub(r'\s+', ' ', cora_prompt).strip()
-                print(f"  CORA's vision: {cora_prompt}")
-                _m.display_result(f"Vision: {cora_prompt}")
-        except Exception as e:
-            print(f"  [INFO] AI prompt generation skipped: {e}")
-
-        # Fallback if AI fails
-        if not cora_prompt:
-            cora_prompt = "Generate a fucked up crazy image thats disturbing"
-            print(f"  Using fallback prompt")
-
         print(f"  Seed: {random_seed}")
+        _m.display_tool("Image engine", "Rendering 576x768 selfie")
 
-        print("  Generating on her own image engine (local Stable Diffusion)...")
-        _m.display_tool("Image engine", f"Generating 1024x576 image")
-        _m.display_action(f"Prompt: {cora_prompt}")
-
-        result = generate_image(
-            prompt=cora_prompt,
-            width=1024,
-            height=576,
-            seed=random_seed
-        )
+        result = generate_image(prompt=cora_prompt, selfie=True, width=576, height=768, seed=random_seed)
 
         if result.get('success'):
             img_path = result.get('path')
             gen_time = result.get('inference_time', 0)
-            print(f"  [OK] Image generated: {img_path}")
+            print(f"  [OK] Selfie rendered: {img_path}")
             print(f"       Time: {gen_time:.1f}s")
-            _m.display_result(f"Image generated in {gen_time:.1f}s")
-            _m.display_action(f"Saving to: {img_path}")
+            _m.display_result(f"Selfie rendered in {gen_time:.1f}s")
+            _m.display_action(f"Saved to: {img_path}")
             _m.BOOT_STATUS['boot_image'] = img_path
 
-            print("  Displaying image...")
-            _m.display_action("Opening the image viewer (Save As / Open folder)...")
+            # the viewer is its own window (Save As / Open folder / Copy path); it stays open
+            print("  Opening the selfie...")
+            if show_image(img_path, caption=f"CORA's selfie: {cora_prompt}"):
+                _m.display_result("Selfie shown in the viewer (Save As / Open folder there)")
+            else:
+                _m.display_log("Viewer could not open; the file is saved", "warn")
 
-            # the viewer is its own process (Save As, Open folder, Copy path); closes itself after 20 s here
-            img_window = None
-            try:
-                if not _m._popups_enabled():
-                    raise _m._SkippedPhase("result popups are off (boot.popups)")
-                if show_image(img_path, caption=cora_prompt, close_after=20):
-                    _m.display_result("Image shown in the viewer")
-            except _m._SkippedPhase as e:
-                img_window = None
-            except Exception as e:
-                print(f"  [INFO] Image display skipped: {e}")
-                _m.display_log(f"Image display skipped: {e}", "info")
-
-            # Use AI vision to describe what CORA actually generated
+            # She looks at what she made
             image_description = None
             try:
                 from ai.ollama import generate_with_image
-                _m.display_action("Analyzing generated image with AI vision...")
+                _m.display_action("Looking at her selfie...")
                 vision_result = generate_with_image(
-                    prompt="Describe this image in detail. What do you see? Be specific about the scene, objects, colors, mood, and style.",
+                    prompt="This is your selfie. Describe it in two sentences: your look, your expression, the light, the room.",
                     image_path=img_path,
                     system=_m.get_system_prompt()
                 )
                 if vision_result and vision_result.content:
                     image_description = vision_result.content.strip()
-                    # Clean markdown
                     image_description = re.sub(r'\*\*([^*]+)\*\*', r'\1', image_description)
                     image_description = re.sub(r'\*([^*]+)\*', r'\1', image_description)
                     image_description = re.sub(r'\n+', ' ', image_description)
@@ -154,27 +131,23 @@ def run(_m, L):
             except Exception as e:
                 print(f"  [INFO] Image vision analysis skipped: {e}")
 
-            # CORA speaks what she sees in the generated image
             _m.display_phase("9.0 Image Gen", "ok")
             if image_description:
                 _m.speak(image_description)
             else:
-                response = _m.cora_respond("Image Generation", f"Image generated in {gen_time:.1f}s. Vision failed.", "warn")
+                response = _m.cora_respond("Image Generation", f"Selfie rendered in {gen_time:.1f}s and opened on screen.", "ok")
                 _m.speak(response)
-
-            # the viewer closes itself (close_after); nothing to tear down here
         else:
             L.error = result.get('error', 'Unknown error')
-            print(f"  [WARN] Image generation failed: {L.error}")
+            print(f"  [WARN] Selfie failed: {L.error}")
             _m.display_log(f"Image generation failed: {L.error}", "warn")
             _m.BOOT_STATUS['tools_tested'].append({'name': 'Image Gen Test', 'status': 'WARN'})
             _m.display_phase("9.0 Image Gen", "warn")
-            # Image gen failed
             response = _m.cora_respond("Image Generation", f"Image gen failed: {L.error[:50]}", "fail")
             _m.speak(response)
 
     except _m._SkippedPhase as e:
-        _m.display_log(f"Image generation test skipped ({e})", "info")
+        _m.display_log(f"Selfie skipped ({e})", "info")
         _m.display_phase("9.0 Image Gen", "ok")
     except Exception as e:
         print(f"  [WARN] Image generation: {e}")

@@ -46,10 +46,24 @@ def run(_m, L):
             _m.display_log("unity-voice-v2 sidecar unavailable (see data/voice-sidecar.log)", "fail")
             _m.display_phase("1.0 Voice Synthesis", "fail")
     else:
-        print("[BOOT] TTS skipped (silent mode)")
-        _m.display_log("TTS skipped (silent mode)", "warn")
+        # Silent boot: nothing is spoken, but her voice is still checked. Green when the
+        # sidecar answers (muted for this boot), yellow only when her voice is really down
+        # (owner, 2026-10-14: "step 1.0 still didnt green up" on a silent check boot).
         _m._tts_engine = None
-        _m.display_phase("1.0 Voice Synthesis", "warn")
+        try:
+            from voice.unity_voice import is_up as _voice_up, VOICE_URL as _voice_url
+            up = _voice_up(2.0)
+        except Exception:
+            up, _voice_url = False, ''
+        if up:
+            print(f"[BOOT] Silent boot: her voice is up at {_voice_url}, muted for this run")
+            _m.BOOT_STATUS['systems'].append({'name': 'Voice (unity-voice-v2)', 'status': 'OK'})
+            _m.display_log("unity-voice-v2 online (silent boot: muted)", "ok")
+            _m.display_phase("1.0 Voice Synthesis", "ok")
+        else:
+            print("[BOOT] Silent boot: her voice sidecar is not reachable")
+            _m.display_log("Silent boot: unity-voice-v2 sidecar not reachable", "warn")
+            _m.display_phase("1.0 Voice Synthesis", "warn")
 
     # Opening announcement - CORA generates her own intro dynamically
     # Who made her comes from config/config.json (one source for the screen, the CLI and her voice)

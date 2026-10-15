@@ -70,7 +70,7 @@ Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "rem
 | Voice | `unity-voice-v2` sidecar on 127.0.0.1:5123; `say(text, emotion, act)` from the brain goes straight to it | `voice/tts.py`, `voice/unity_voice.py` |
 | Ears | faster-whisper (CUDA) for commands and the transcript stream; fuzzy wake word; optional openWakeWord model | `voice/stt.py`, `voice/wake_word.py` |
 | Eyes | webcam through a timeout-guarded, host-agnostic camera layer; screenshots; the brain reads images itself | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py` |
-| Images | her own local image engine: Stable Diffusion (realistic-vision-v51) as a sidecar on the torch interpreter (127.0.0.1:5124); text to image, img2img edits, inpainting, camera recreations with the face kept (IP-Adapter); the viewer window has Save As / Open folder; `save_image` puts a picture where you say | `services/image_sidecar.py`, `cora_tools/image_gen.py`, `ui/image_viewer.py`, `config.json` `image` |
+| Images | her own local image engine: Stable Diffusion (realistic-vision-v51) as a sidecar on the torch interpreter (127.0.0.1:5124); text to image, img2img edits, inpainting, camera recreations with the face kept (IP-Adapter); her own look for selfies from config (`image.selfie_look`); the viewer window has Save As / Open folder; `save_image` puts a picture where you say | `services/image_sidecar.py`, `cora_tools/image_gen.py`, `ui/image_viewer.py`, `config.json` `image` |
 | Web | search (DuckDuckGo, Brave, Bing through a headless browser when the plain endpoints block), readable page fetch | `cora_tools/web.py` |
 | Web page | served locally with her voice, the configured models and her image engine (`/image/generate`, pictures under `/images/` with a download link) | `services/stats_server.py`, `web/` |
 | Boot | 10 phases with spoken status, daily briefing (calendar, overdue tasks, reminders), reminder checker | `src/boot_sequence.py` |
@@ -90,10 +90,10 @@ Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "rem
 | 4 / 4.5 | Core tools; daily briefing spoken; reminder checker started |
 | 5 | Ears: STT, echo filter, wake word |
 | 6 / 7 | Weather, location, news |
-| 8 / 9 | Vision and image generation checks |
+| 8 / 9 | Vision check; her selfie rendered on her own engine and opened in the viewer (`boot.selfie`) |
 | 10 | Summary, then she is listening |
 
-Demo phases (YouTube, GitHub import, image popups) are off by default: `boot.demo_phases`, `boot.popups` in config.
+Demo phases (YouTube, GitHub import, result popups) are off by default: `boot.demo_phases`, `boot.popups` in config. The process DPI awareness is pinned before the first window (`ui/dpi.py`), so a library import can no longer re-scale the display mid-boot.
 
 ---
 

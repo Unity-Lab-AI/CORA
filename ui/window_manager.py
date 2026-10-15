@@ -16,6 +16,13 @@ from tkinter import ttk
 from typing import Optional, Callable, Tuple, List
 from pathlib import Path
 
+# the process DPI awareness is pinned before the first window (see ui/dpi.py)
+try:
+    from ui.dpi import pin_process_dpi as _pin_dpi
+    _pin_dpi()
+except Exception:
+    pass
+
 # Track all open windows
 _open_windows = {}
 

@@ -60,6 +60,27 @@ def _error(model: str, msg: str) -> OllamaResponse:
     return OllamaResponse(content='', model=model, done=True, error=msg)
 
 
+_THINK_BLOCK = None
+
+
+def _clean_think(text: str) -> str:
+    """Thinking is off on every call, but the Qwen family still emits a stray
+    `</think>` now and then (seen on a camera description: the answer, then the
+    tag, then invented text). A whole <think>...</think> block is dropped; a lone
+    closing tag keeps the side that carries the answer."""
+    global _THINK_BLOCK
+    if not text or 'think>' not in text:
+        return text
+    import re
+    if _THINK_BLOCK is None:
+        _THINK_BLOCK = re.compile(r'<think>.*?</think>', re.S)
+    text = _THINK_BLOCK.sub('', text)
+    if '</think>' in text:
+        before, after = text.split('</think>', 1)
+        text = before if len(before.strip()) >= 20 else after
+    return text.replace('<think>', '').strip()
+
+
 def _parse_tool_calls(message: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Normalise Ollama's message.tool_calls into [{'name', 'arguments'}]."""
     calls = []
@@ -96,7 +117,7 @@ def _chat_payload(messages, model, system, temperature, max_tokens, tools, strea
 def _response_from_chat_json(data: Dict[str, Any], model: str) -> OllamaResponse:
     message = data.get('message', {}) or {}
     return OllamaResponse(
-        content=message.get('content', '') or '',
+        content=_clean_think(message.get('content', '') or ''),
         model=data.get('model', model),
         done=data.get('done', True),
         total_duration=data.get('total_duration'),
@@ -387,7 +408,7 @@ def chat_stream_events(
             if data.get('done', False):
                 break
         final = OllamaResponse(
-            content=''.join(full), model=last.get('model', model), done=True,
+            content=_clean_think(''.join(full)), model=last.get('model', model), done=True,
             total_duration=last.get('total_duration'), load_duration=last.get('load_duration'),
             prompt_eval_count=last.get('prompt_eval_count'), eval_count=last.get('eval_count'),
             tool_calls=calls)
@@ -428,7 +449,7 @@ def generate(
         if resp.status_code == 200:
             data = resp.json()
             return OllamaResponse(
-                content=data.get('response', ''),
+                content=_clean_think(data.get('response', '')),
                 model=data.get('model', model),
                 done=data.get('done', True),
                 total_duration=data.get('total_duration'),

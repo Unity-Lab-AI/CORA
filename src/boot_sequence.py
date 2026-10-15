@@ -32,6 +32,11 @@ sys.path.insert(0, str(PROJECT_DIR))
 sys.path.insert(0, str(PROJECT_DIR / 'src'))
 sys.path.insert(0, str(PROJECT_DIR / 'ui'))
 
+# The process picks its DPI awareness once, here, before the display exists: a later import
+# (pyautogui at phase 4.0) used to flip it and the window re-rendered at another size.
+from ui.dpi import pin_process_dpi
+pin_process_dpi()
+
 
 _shutting_down = False
 

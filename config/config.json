@@ -126,7 +126,8 @@
     "demo_phases": false,
     "github_import": false,
     "popups": false,
-    "_note": "popups: show the screenshot / camera / generated-image result windows during boot (off: results are logged and spoken; the 1280x720 capture window over the app looked like CORA reopening smaller)."
+    "selfie": true,
+    "_note": "popups: show the screenshot / camera result windows during boot (off: results are logged and spoken). selfie: phase 9 renders her selfie on her own image engine and opens it in the viewer every boot. The 'app reopens smaller at 4.0' was the process DPI awareness flipping on a library import; it is pinned at start now (ui/dpi.py)."
   },
   "assistant": {
     "voice_mode": "auto",
@@ -144,6 +145,9 @@
     "width": 768,
     "height": 768,
     "save_dir": "data/images",
+    "selfie_look": "candid phone selfie of one white American woman alone, 25 years old, youthful face, caucasian, european features, girl next door with a soft emo goth style, fair skin with a warm healthy glow, grey-green eyes, black hair with bright pink streaks and bangs, winged eyeliner, dark plum lipstick, black choker, black band t-shirt, small natural smile, cozy bedroom, warm lamp light, realistic photo",
+    "selfie_negative": "two people, two women, couple, group, second person, tan skin, dark skin, asian, latina, pale white skin, ghostly, black lipstick, heavy club makeup, neon lights, leather jacket, latex, tattoos, airbrushed, plastic skin, doll, cgi, render, anime, cartoon, oversaturated, blurry, lowres, deformed, bad anatomy, extra fingers, watermark, text, old, wrinkles, middle aged, child, teen",
+    "_look_note": "selfie_look / selfie_negative: who she is in pictures (owner, 2026-10-14: 'less like a pale freak and more like girl next door emo chick'). Every selfie and every picture of herself starts from selfie_look and bans selfie_negative; tune the words here, no code.",
     "_note": "Her own image engine: local Stable Diffusion (services/image_sidecar.py) on the interpreter that has torch + diffusers (python: null = auto-detect, the voice sidecar's interpreter first). device auto = GPU when there is one; offload keeps the model in RAM and streams layers to the GPU so her brain and voice keep their room. steps null = 25 on GPU / 12 on CPU. Pictures land in save_dir and open in the viewer (Save As / Open folder); save_image puts them where the user says."
   },
   "camera": {

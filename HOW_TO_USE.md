@@ -61,7 +61,7 @@ python src/boot_sequence.py --quick
    - External Services (Weather, Location)
    - News Headlines (Top 3 stories)
    - Vision Test (Screenshot & webcam)
-   - Image Generation (Creates AI art!)
+   - Image Generation (her selfie, rendered on her own engine and opened on screen)
    - Final Check (Ready status)
 3. **CORA Speaks** - She generates unique responses for each phase
 4. **Live Stats Panel** - Real-time system monitoring stays open

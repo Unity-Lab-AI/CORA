@@ -228,6 +228,7 @@ What it needs (`config/config.json` `image` block):
 | `url` | `http://127.0.0.1:5124` |
 | `width` / `height` / `steps` | defaults for a picture (768x768; steps `null` = 25 on GPU, 12 on CPU) |
 | `save_dir` | where pictures land (`data/images`) |
+| `selfie_look` / `selfie_negative` | who she is in pictures of herself (girl next door with a soft emo edge); every selfie leads with this and bans the negative. Tune the words here. |
 
 The engine starts on the first picture and the checkpoint loads then (about a second on an RTX 4070 Ti; a picture takes 3-5 s on the GPU, 1-2 minutes on a CPU). The face adapter weights (`h94/IP-Adapter`) download once into the Hugging Face cache. Health: `http://127.0.0.1:5124/health`; log: `data/image-sidecar.log`. The stop scripts end the engine when CORA started it, and every normal exit unloads it with her brain.
 

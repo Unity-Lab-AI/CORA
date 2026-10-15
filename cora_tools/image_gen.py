@@ -87,6 +87,16 @@ def _default_size() -> tuple:
         return 768, 768
 
 
+DEFAULT_SELFIE_LOOK = "candid phone selfie of one white American woman alone, 25 years old, youthful face, caucasian, european features, girl next door with a soft emo goth style, fair skin with a warm healthy glow, grey-green eyes, black hair with bright pink streaks and bangs, winged eyeliner, dark plum lipstick, black choker, black band t-shirt, small natural smile, cozy bedroom, warm lamp light, realistic photo"
+DEFAULT_SELFIE_NEGATIVE = "two people, two women, couple, group, second person, tan skin, dark skin, asian, latina, pale white skin, ghostly, black lipstick, heavy club makeup, neon lights, leather jacket, latex, tattoos, airbrushed, plastic skin, doll, cgi, render, anime, cartoon, oversaturated, blurry, lowres, deformed, bad anatomy, extra fingers, watermark, text, old, wrinkles, middle aged, child, teen"
+
+
+def selfie_defaults() -> tuple:
+    """(look, negative) for a picture of herself: config image.selfie_look / image.selfie_negative."""
+    c = _cfg()
+    return (str(c.get('selfie_look') or DEFAULT_SELFIE_LOOK), str(c.get('selfie_negative') or DEFAULT_SELFIE_NEGATIVE))
+
+
 def _steps() -> Optional[int]:
     try:
         return int(_cfg().get('steps')) if _cfg().get('steps') else None
@@ -367,11 +377,20 @@ def _post(endpoint: str, body: Dict[str, Any], out: Path, timeout: float = 900.0
 def generate_image(prompt: str, model: Optional[str] = None, width: Optional[int] = None, height: Optional[int] = None,
                    seed: Optional[int] = None, output_path: Optional[str] = None, negative: Optional[str] = None,
                    steps: Optional[int] = None, face: Optional[str] = None, face_scale: Optional[float] = None,
-                   **_legacy) -> Dict[str, Any]:
+                   selfie: bool = False, **_legacy) -> Dict[str, Any]:
     """Text to image on her own engine. `model` is accepted for the old callers and ignored
-    (there is one engine). `face` = path of a photo whose person the picture should show."""
+    (there is one engine). `face` = path of a photo whose person the picture should show.
+    `selfie` = a picture of herself: her look (config image.selfie_look) leads the prompt and
+    image.selfie_negative is banned, so she is the same girl every time."""
     dw, dh = _default_size()
-    body: Dict[str, Any] = {'prompt': str(prompt), 'width': int(width or dw), 'height': int(height or dh)}
+    prompt = str(prompt)
+    if selfie:
+        look, neg = selfie_defaults()
+        prompt = look + (', ' + prompt if prompt.strip() else '')
+        negative = negative or neg
+        if not width and not height:
+            width, height = 576, 768
+    body: Dict[str, Any] = {'prompt': prompt, 'width': int(width or dw), 'height': int(height or dh)}
     if seed is not None:
         body['seed'] = int(seed)
     if negative:
@@ -381,7 +400,7 @@ def generate_image(prompt: str, model: Optional[str] = None, width: Optional[int
     if face:
         body['face'] = _face_crop_b64(face) or _b64_file(face)
         body['face_scale'] = float(face_scale or 0.6)
-    r = _post('txt2img', body, _new_path('generated', output_path))
+    r = _post('txt2img', body, _new_path('selfie' if selfie else 'generated', output_path))
     r['prompt'] = prompt
     return r
 
