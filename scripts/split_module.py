@@ -391,6 +391,25 @@ def main():
             else:
                 keep.append(s)
         parts[p] = keep
+    # module-level statements in _base must find every name they use at import time:
+    # pull the (non-def) defining statements of such names out of the parts, transitively
+    changed = True
+    while changed:
+        changed = False
+        need = set()
+        for s in header:
+            if not isinstance(s, (cst.FunctionDef, cst.ClassDef)):
+                need |= module_level_names(s)
+        for p, stmts in list(parts.items()):
+            keep = []
+            for s in stmts:
+                if not isinstance(s, (cst.FunctionDef, cst.ClassDef)) and set(defined_names(s)) & need:
+                    header.append(s)
+                    header_names |= set(defined_names(s))
+                    changed = True
+                else:
+                    keep.append(s)
+            parts[p] = keep
     rebound &= header_names
     part_names = {p: set(names_of(s)) for p, s in parts.items()}
 
