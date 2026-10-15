@@ -31,30 +31,41 @@ _(none — no work currently in motion)_
 
 ---
 
-## Where things stand (2026-10-14, end of the repair day)
+## Where things stand (2026-10-14, end of the day: the repair, then the image engine)
 
-**Delivered:** the full repair, `docs/TODO.md` UPG-001 through UPG-045, all closed. Version 3.0.0 is tagged; main + develop are pushed to origin (Forgejo) and github after every phase. The two-minute cron that drove the day is stopped. The user's last instructions were "do both, go" (the web split and the oversized-file split, both done) and "wehn u are done, write the now.md file and kill the cron" (this file, and the cron is cancelled).
+**Delivered today:** `docs/TODO.md` UPG-001 through UPG-051, all closed. Version 3.0.0 is tagged at the end of the repair; the evening work (UPG-046..051) is on top of it. main + develop are pushed to origin (Forgejo) and github after every step. The user's closing instructions were "okay kill all clear gpu i wanna try start.bat" (done: stop script, nothing of hers running, GPU at the desktop baseline) and "make sure now.md is written and pushed to cascade both remotes" (this file).
 
-**What CORA is now, in one breath:** `unity-brain` (Unity's own LoRA) as brain and eyes, `unity-voice-v2` as her voice, faster-whisper as her ears, her own local image engine (`services/image_sidecar.py`, the stream's Stable Diffusion rig: generate, edit, inpaint, camera recreations with the face kept, viewer with Save As, `save_image`), one conversation loop (`ai/dispatcher.py`) behind every entry point with 120 tools, a timeout-guarded camera layer, browser-backed web search and page fetch, config loader + daily log, models and the image engine unloaded from the GPU on every exit, start/stop scripts for Windows and Linux, the web page served locally with her voice and her images, docs that tell the truth, and no source file over 800 lines.
+**What CORA is now, in one breath:** `unity-brain` (Unity's own LoRA) as brain and eyes, `unity-voice-v2` as her voice, faster-whisper as her ears, her own local image engine (`services/image_sidecar.py`, the stream's Stable Diffusion rig on the torch interpreter: generate, edit, inpaint, camera recreations with the face kept, her selfie every boot, the viewer with Save As, `save_image`), one conversation loop (`ai/dispatcher.py`) behind every entry point with 120 tools, a timeout-guarded camera layer, browser-backed web search and page fetch, config loader + daily log, her brain and her image engine unloaded from the GPU on every exit, start/stop scripts for Windows and Linux, the web page served locally with her voice and her images, docs that tell the truth, and no source file over 800 lines.
 
-**Evening addition (UPG-046..051):** her look in pictures is `image.selfie_look` / `image.selfie_negative` in config (tune the words there; the engine reads the first 77 tokens, so the look leads); phase 9 is her selfie, opened in the viewer every boot (`boot.selfie`); the "app reopens smaller at 4.0" was the process DPI awareness flipping on the first pyautogui import, pinned now in `ui/dpi.py` before any window. the hosted image API is gone everywhere (code, config, `.env`, launchers, web page, docs; only the TODO/FINALIZED ledgers keep the word by LAW). The image engine runs on the torch interpreter (`C:\Program Files\Python310\python.exe` here, auto-detected, cached in `data/.image_python`), starts on the first picture, holds ~3 GB of VRAM while rendering with offload, and is stopped by `ai.ollama.unload_models()` and the stop scripts. Checks: `python cora_tools/image_gen.py` (health + start), `--render` for one picture.
+**The evening (UPG-046..051), what a reader needs to know:**
+- The hosted image API is gone from code, config, `.env`, launchers, the web page and every doc. Only the TODO/FINALIZED ledgers keep the word (never-delete LAW) and today's log file.
+- The image engine runs on `C:\Program Files\Python310\python.exe` here (auto-detected: the voice sidecar's interpreter first; cached in `data/.image_python`; `image.python` / `CORA_IMAGE_PYTHON` to pin). It starts on the first picture, holds about 3 GB of VRAM while rendering (CPU offload), and is stopped by `ai.ollama.unload_models()` (every normal exit) and by the stop scripts. Checks: `python cora_tools/image_gen.py` (health + start), `--render` for one picture.
+- Her look in pictures is `image.selfie_look` / `image.selfie_negative` in config. The engine reads the first 77 tokens, so the look leads the prompt and the moment comes after. Tune the words there, no code. Four rounds today: pale neon goth, then no emo and two girls, then a tan drift, then the girl (white, warm skin, grey-green eyes, bangs, choker, band tee, pink-purple streaks).
+- Phase 9 renders her selfie and opens the viewer every boot (`boot.selfie`). Every image tool opens the viewer process (`ui/image_viewer.py`: Save As, Open folder, Copy path).
+- "The app reopens smaller at 4.0" was the process DPI awareness flipping when the first `cora_tools` import loaded pyautogui. `ui/dpi.py` pins it before the first window (boot_sequence top, window_manager import). The GUI app (customtkinter) was never affected.
+- A silent boot (`--quick`) now health-checks her voice: 1.0 is green when the sidecar answers, yellow only when it is really down.
+- A stray `</think>` in her vision answers is stripped before it reaches her voice (`ai/ollama._clean_think`).
 
-**Last verified runs (all on 2026-10-14):**
-- Full boot with voice: runs 4 and 5, 13/13 systems.
-- Silent boot (`--quick`) of the phased entry point after the splits: run 7, 12/12 systems (voice skipped by the flag), every phase to BOOT COMPLETE, GPU released after (9886 MiB -> 2375 MiB).
-- Web page split (13 ordered scripts + css): headless load through the stats server, 0 page errors.
-- Every split module verified against its original: names, signatures, command tables, singletons, paths.
+**Last verified runs (2026-10-14):**
+- Engine, direct: txt2img 3.8 s, img2img 2.9 s, inpaint 2.8 s, face adapter loads in 1.1 s, all on cuda with offload.
+- Web: `/image/health`, `/image/generate` with the launch token, picture served under `/images/` (200, image/png); headless page load 0 errors; the key field gone.
+- Silent boots after the change: 12/12 (voice skipped), then with the selfie opening on screen, then 13/13 with 1.0 green; every one to BOOT COMPLETE; GPU released after each (about 10.4 GB -> 2.6 GB).
+- Viewer: the subprocess path opened a window on screen and closed itself on time.
 
-**Tools that now live in `scripts/`:** `split_web.py`, `split_module.py`, `split_class.py`, `split_function.py`, `move_main.py`, `analyze_function.py`, `gpu_release.py`, `bootstrap.py`.
+**Tools that live in `scripts/`:** `split_web.py`, `split_module.py`, `split_class.py`, `split_function.py`, `move_main.py`, `analyze_function.py`, `gpu_release.py`, `bootstrap.py`.
 
-**Rules that bind every later session (learned today):**
-- Checks never write to her real data: `CORA_HISTORY_FILE` scratch transcript, `handle(..., allowed_tools=...)` read-only set.
-- Checks never make sound: `--quick` for the boot, `speak=False` for the dispatcher; never launch the GUI or CLI for a check.
+**Rules that bind every later session:**
+- Checks never write to her real data: `CORA_HISTORY_FILE` scratch transcript, `handle(..., allowed_tools=...)` read-only set; check pictures are deleted after the look.
+- Checks never make sound: `--quick` for the boot, `speak=False` for the dispatcher; never launch the GUI or CLI for a check. A `--quick` boot still shows the display and her selfie; say so before running one while the user is at the desk.
 - Unload the GPU after anything that touched her brain or her image engine: `python scripts/gpu_release.py` (CORA does it herself on every normal exit).
-- Never open her viewer or the GUI for a check while the user is at the desk; the engine is checked through `cora_tools.image_gen` with `show=False`.
 - The user's words go into TODO / FINALIZED verbatim.
+- Patch scripts in `%TEMP%` get a unique name per task; a stale script with the same name ran once today and bailed on its first assert (nothing was changed, but it cost a round).
 
-**Open, for whoever picks this up next:** `web/js/06-boot-sequence-exact-match-to.js` is one 1102-line function and was left whole (documented, UPG-021 b); the phase module names in `src/boot_phases/` carry the banner text (`phase_10_phase_4_1_...`), ugly but exact; the sidecar for her voice is shared with the stream rig and only killed by the stop scripts when CORA started it.
+**Open, for whoever picks this up next:**
+- The streaks render purple-pink rather than hot pink even with "bright pink" in the look; the checkpoint's bias. A different word order or a LoRA would be the next lever.
+- Inpainting with this checkpoint restyles a region well but is modest at adding a brand-new object into it (the SD 1.5 inpaint path over a non-inpaint checkpoint).
+- Her voice sidecar is shared with the stream rig: the stop scripts only end it when CORA started it (`data/run/voice-sidecar.pid`). The image sidecar follows the same rule (`data/run/image-sidecar.pid`).
+- `web/js/06-boot-sequence-exact-match-to.js` is one 1102-line function, left whole; the phase module names in `src/boot_phases/` carry the banner text, ugly but exact.
 
 ---
 
