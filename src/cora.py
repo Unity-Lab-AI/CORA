@@ -89,6 +89,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
+# Run from anywhere (`python src/cora.py`): the project root holds ai/, voice/, cora_tools/, services/
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 # ============ LOGGING SETUP ============
 # Configure logging for CORA - logs to file and console
 LOG_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / 'logs'
