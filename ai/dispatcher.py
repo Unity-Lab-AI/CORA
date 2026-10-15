@@ -320,7 +320,7 @@ class Dispatcher:
                         on_event('tool_call', {'tool': name, 'arguments': args})
                         tool = _tools.get_tool(name)
                         sig = (name, json.dumps(args, sort_keys=True, default=str))
-                        if name != 'say' and sig in seen_calls:
+                        if sig in seen_calls:        # the same say() text twice is never wanted either
                             result = {'ok': False, 'error': f'{name} was already called with exactly these arguments this turn; '
                                                             f'use what it returned, change the arguments, or tell the user what you found'}
                             on_event('tool_result', {'tool': name, 'result': result})

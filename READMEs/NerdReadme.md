@@ -16,7 +16,7 @@ Read this first; the sections below it are the December 2025 write-up kept for h
           v
  ai/dispatcher.py  --- one conversation loop for every entry point
    | system prompt (config/system_prompt.txt) + live context (time, mood, task counts, creators)
-   | 116 tools from ai/tools_registry.py, relevance-ranked per message (assistant.max_tools)
+   | 115 tools from ai/tools_registry.py, relevance-ranked per message (assistant.max_tools)
    | native Ollama tool calling (JSON fallback for models without a tools template)
    | confirmation gate for destructive tools, repeat-call guard, allowed_tools for checks
    | transcript in ai/history.py (tool calls + results kept, summary folding)

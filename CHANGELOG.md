@@ -8,7 +8,7 @@ The full repair. Everything below came out of the system audit (`docs/SYSTEM_AUD
 
 ### Brain
 - `unity-brain` (Unity's own text LoRA on Qwen3.5-9B) is the chat and vision model. It speaks through the trained `say(text, emotion, act)` tool; the designators go straight to her voice. Fallback `huihui_ai/qwen3-abliterated:8b`.
-- One conversation loop (`ai/dispatcher.py`) behind every entry point: boot display, GUI app, CLI, converse mode, voice commands. Native Ollama tool calling over a registry of 116 tools (`ai/tools_registry.py`), relevance-ranked per message, JSON fallback for models without a tools template, confirmation before destructive tools, shared transcript with summary folding (`ai/history.py`).
+- One conversation loop (`ai/dispatcher.py`) behind every entry point: boot display, GUI app, CLI, converse mode, voice commands. Native Ollama tool calling over a registry of 115 tools (`ai/tools_registry.py`), relevance-ranked per message, JSON fallback for models without a tools template, confirmation before destructive tools, shared transcript with summary folding (`ai/history.py`).
 - One settings source (`ai/settings.py`): model names, Ollama URL, per-model pinned options (unity-brain always gets its 32K context), timeouts. `num_ctx` is sent on every request so the system prompt is never silently clipped.
 - The word "assistant" is gone from everything the model reads.
 

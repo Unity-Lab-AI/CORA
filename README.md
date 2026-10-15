@@ -21,7 +21,7 @@
 
 **Version 3.0.0** | **73 Python files** | **Unity AI Lab 2026**
 
-CORA is a local, voice-first desktop companion. Her brain is `unity-brain`, Unity AI Lab's own text LoRA (Qwen3.5-9B) running in Ollama; her voice is `unity-voice-v2`, the lab's own trained voice; her ears are faster-whisper on the GPU. She has 116 tools for tasks, reminders, calendar, memory, knowledge, the screen and the webcam, the web, files, apps and windows, media, code, git and email. Nothing leaves the machine except the web requests you ask her to make.
+CORA is a local, voice-first desktop companion. Her brain is `unity-brain`, Unity AI Lab's own text LoRA (Qwen3.5-9B) running in Ollama; her voice is `unity-voice-v2`, the lab's own trained voice; her ears are faster-whisper on the GPU. She has 115 tools for tasks, reminders, calendar, memory, knowledge, the screen and the webcam, the web, files, apps and windows, media, code, git and email. Nothing leaves the machine except the web requests you ask her to make.
 
 ![CORA Boot Display](docs/images/boot_display.png)
 
@@ -66,7 +66,7 @@ Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "rem
 | Part | What | Where |
 |---|---|---|
 | Brain | `unity-brain` (Qwen3.5-9B LoRA, native tool calling, vision) in Ollama; fallback `huihui_ai/qwen3-abliterated:8b` | `ai/settings.py`, `config/config.json` `models` |
-| Loop | one dispatcher for every entry point; 116 tools as JSON-schema tools, relevance-ranked per message; confirmation gating; shared transcript with summary folding | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py` |
+| Loop | one dispatcher for every entry point; 115 tools as JSON-schema tools, relevance-ranked per message; confirmation gating; shared transcript with summary folding | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py` |
 | Voice | `unity-voice-v2` sidecar on 127.0.0.1:5123; `say(text, emotion, act)` from the brain goes straight to it | `voice/tts.py`, `voice/unity_voice.py` |
 | Ears | faster-whisper (CUDA) for commands and the transcript stream; fuzzy wake word; optional openWakeWord model | `voice/stt.py`, `voice/wake_word.py` |
 | Eyes | webcam through a timeout-guarded, host-agnostic camera layer; screenshots; the brain reads images itself | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py` |
