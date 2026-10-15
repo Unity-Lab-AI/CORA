@@ -2466,6 +2466,11 @@ def main():
             # Check for exit commands
             if cmd in ('exit', 'quit', 'q'):
                 respond('shutdown', {})
+                try:
+                    from ai.ollama import unload_models
+                    unload_models()          # her models leave the GPU on exit
+                except Exception:
+                    pass
                 # Stop system tray before exit
                 if _system_tray:
                     _system_tray.stop()

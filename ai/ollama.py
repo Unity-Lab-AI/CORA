@@ -227,6 +227,28 @@ def create_model(name: str, modelfile: str, callback: Optional[callable] = None)
         return False
 
 
+def loaded_models(timeout: int = 5) -> List[str]:
+    """Names of the models Ollama currently holds in memory (GPU)."""
+    try:
+        resp = requests.get(f"{_url()}/api/ps", timeout=timeout)
+        return [m.get('name', '') for m in resp.json().get('models', []) if m.get('name')] if resp.ok else []
+    except Exception:
+        return []
+
+
+def unload_models(names: Optional[List[str]] = None, timeout: int = 15) -> List[str]:
+    """Release the GPU: keep_alive 0 for every loaded model (or the given names).
+    Called on every normal CORA exit and by the stop scripts; returns what was unloaded."""
+    done = []
+    for name in (names or loaded_models()):
+        try:
+            requests.post(f"{_url()}/api/generate", json={'model': name, 'keep_alive': 0}, timeout=timeout)
+            done.append(name)
+        except Exception:
+            pass
+    return done
+
+
 def warm_up(model: Optional[str] = None, timeout: int = 180) -> bool:
     """Load a model into memory with the configured num_ctx so the first real
     request is not a cold start. Returns True when the model is resident."""

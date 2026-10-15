@@ -712,9 +712,19 @@ class CoraApp(ctk.CTk):
         self.after(0, lambda: self.voice_button.configure(fg_color=None, text="Mic"))
 
     def _on_closing(self):
-        """Handle window close."""
+        """Handle window close: ears off, her models off the GPU, window gone."""
         if self.wake_detector:
             self.wake_detector.stop()
+        try:
+            from voice.tts import stop_speaking
+            stop_speaking()
+        except Exception:
+            pass
+        try:
+            from ai.ollama import unload_models
+            unload_models()
+        except Exception:
+            pass
         self.destroy()
 
 

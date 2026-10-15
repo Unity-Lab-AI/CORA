@@ -49,6 +49,7 @@ def _orderly_shutdown():
         lambda: __import__('voice.tts', fromlist=['get_tts_queue']).get_tts_queue().stop(),
         lambda: __import__('voice.ambient_awareness', fromlist=['stop_ambient_monitoring']).stop_ambient_monitoring(),
         lambda: _boot_display.close() if _boot_display else None,
+        lambda: __import__('ai.ollama', fromlist=['unload_models']).unload_models(),   # her models leave the GPU
     ):
         try:
             step()
