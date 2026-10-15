@@ -96,6 +96,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+# Global system tray instance
+_system_tray = None
+
+# Cache for system prompt
+_cora_system_prompt_cache = None
+
 
 def get_system_prompt() -> str:
     from src.cora_parts.logging_setup import _PROJECT_DIR
@@ -111,6 +117,9 @@ def get_system_prompt() -> str:
     else:
         _cora_system_prompt_cache = ""
     return _cora_system_prompt_cache
+ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))).parent
+DATA_DIR = ROOT_DIR / 'data'
+CONFIG_DIR = ROOT_DIR / 'config'
 
 # Load paths from config if available, otherwise use defaults
 def get_path(name, default):
@@ -128,6 +137,23 @@ def init_paths():
     KNOWLEDGE_FILE = get_path('knowledge_file', 'knowledge.json')
     BACKUP_DIR = get_path('backup_dir', 'backups')
     PERSONALITY_FILE = get_path('personality_file', 'personality.json')
+
+
+# Default paths (will be overridden by init_paths after config loads)
+TASKS_FILE = DATA_DIR / 'tasks.json'
+KNOWLEDGE_FILE = DATA_DIR / 'knowledge.json'
+BACKUP_DIR = ROOT_DIR / 'backups'
+PERSONALITY_FILE = CONFIG_DIR / 'personality.json'
+
+# Chat history for conversation memory
+CHAT_HISTORY = []
+
+# Counters for ID generation
+task_counter = 0
+knowledge_counter = 0
+
+# Global config (loaded at startup)
+CONFIG = None
 
 
 def load_config():
@@ -152,118 +178,92 @@ def load_config():
     return CONFIG
 
 
-def main():
-    from src.cora_parts.logging_setup import COMMANDS, SYSTEM_TRAY_AVAILABLE, create_system_tray, load_personality, logger, parse_input
-    from src.cora_parts.boot import boot_sequence
-    from src.cora_parts.chat import generate_greeting, respond
-    """Main entry point with command loop."""
-    global _system_tray
+def first_run_setup():
+    from src.cora_parts.system import auto_pull_model, check_ollama, progress_spinner
+    from src.cora_parts.voice import check_tts
+    """Check and setup required components on first run."""
+    global CONFIG
+    if CONFIG is None:
+        load_config()
 
-    # Load config first
-    load_config()
+    setup_file = DATA_DIR / '.setup_complete'
+    if setup_file.exists():
+        return True
 
-    # Run first-time setup if needed
-    first_run_setup()
+    print("\n=== FIRST RUN SETUP ===")
+    print("Checking required components...\n")
 
-    # Run boot sequence (system diagnostics and startup checks)
-    # This runs the full 18-check boot sequence per ARCHITECTURE.md
-    try:
-        boot_sequence()
-    except Exception as e:
-        logger.warning(f"Boot sequence warning: {e}")
-        # Non-fatal - continue startup even if boot fails
+    # Step 1: Check Ollama
+    progress_spinner("Checking Ollama installation...")
+    if check_ollama():
+        print("[OK] Ollama is installed")
+        if CONFIG.get('auto_setup', {}).get('auto_pull_model', False):
+            model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
+            progress_spinner(f"Pulling model '{model}'...")
+            auto_pull_model(model)
+    else:
+        print("[!] Ollama not found.")
+        print("    Download from: https://ollama.ai")
 
-    # Start system tray icon (runs in background thread)
-    if SYSTEM_TRAY_AVAILABLE:
-        def on_tray_quit():
-            from src.cora_parts.logging_setup import logger
-            """Handle quit from system tray."""
-            logger.info("System tray quit requested")
-            os._exit(0)
+    # Step 2: Check TTS (her own voice sidecar)
+    progress_spinner("Checking text-to-speech...")
+    if check_tts():
+        print("[OK] Voice (unity-voice-v2) available")
+    else:
+        print("[!] Voice server not reachable (see data/voice-sidecar.log)")
 
-        def on_tray_settings():
-            from src.cora_parts.logging_setup import logger
-            """Handle settings from system tray."""
-            logger.info("System tray settings requested")
-            print("[*] Settings panel not implemented yet")
+    # Step 3: Create backup directory
+    progress_spinner("Setting up backup directory...")
+    BACKUP_DIR.mkdir(exist_ok=True)
+    print("[OK] Backup directory ready")
 
-        _system_tray = create_system_tray(
-            on_quit=on_tray_quit,
-            on_settings=on_tray_settings
-        )
-        if _system_tray:
-            _system_tray.start()
-            logger.info("System tray icon started")
+    # Step 4: Initialize data files
+    progress_spinner("Initializing data files...")
+    if not os.path.exists(TASKS_FILE):
+        save_tasks([])
+        print("[OK] Tasks file created")
+    if not os.path.exists(KNOWLEDGE_FILE):
+        save_knowledge([])
+        print("[OK] Knowledge file created")
 
-    # Load personality for greeting
-    personality = load_personality()
+    # Mark setup complete
+    with open(setup_file, 'w') as f:
+        f.write(datetime.now().isoformat())
 
-    print("")
-    print("  ==================================================")
-    print("    ____   ___   ____      _")
-    print("   / ___| / _ \\ |  _ \\    / \\")
-    print("  | |    | | | || |_) |  / _ \\")
-    print("  | |___ | |_| ||  _ <  / ___ \\")
-    print("   \\____| \\___/ |_| \\_\\/_/   \\_\\")
-    print("")
-    print(f"  {personality.get('name', 'C.O.R.A')} v{VERSION}")
-    print("  Cognitive Operations & Reasoning Assistant")
-    print("  ==================================================")
-    print("  Unity AI Lab | unityailab.com")
-    print("  ==================================================")
-    greeting = generate_greeting(personality)
-    print(f"\n  {greeting}\n")
-    speak(greeting)
-    print("  Type 'help' for commands, 'exit' to quit\n")
+    print("\n=== SETUP COMPLETE ===\n")
+    return True
 
-    # Load existing tasks
-    tasks = load_tasks()
 
-    # Command dispatch table (shared with the GUI app)
-    commands = COMMANDS
-
-    # Main loop
-    while True:
+def load_knowledge():
+    """Load knowledge entries from JSON file."""
+    global knowledge_counter
+    if os.path.exists(KNOWLEDGE_FILE):
         try:
-            user_input = input("cora> ").strip()
+            with open(KNOWLEDGE_FILE, 'r') as f:
+                data = json.load(f)
+                knowledge_counter = data.get('counter', 0)
+                return data.get('entries', [])
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
 
-            if not user_input:
-                continue
 
-            cmd, args = parse_input(user_input)
+def save_knowledge(entries):
+    """Save knowledge entries to JSON file."""
+    global knowledge_counter
+    data = {
+        'counter': knowledge_counter,
+        'entries': entries
+    }
+    with open(KNOWLEDGE_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
 
-            # Check for exit commands
-            if cmd in ('exit', 'quit', 'q'):
-                respond('shutdown', {})
-                try:
-                    from ai.ollama import unload_models
-                    unload_models()          # her models leave the GPU on exit
-                except Exception:
-                    pass
-                # Stop system tray before exit
-                if _system_tray:
-                    _system_tray.stop()
-                break
 
-            # Execute command; anything that is not a command is a chat message
-            # for the assistant (tools + her voice via ai.dispatcher)
-            if cmd in commands:
-                tasks = commands[cmd](args, tasks)
-            else:
-                tasks = cmd_chat(user_input.split(), tasks)
-
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            # Stop system tray
-            if _system_tray:
-                _system_tray.stop()
-            break
-        except EOFError:
-            print("\nGoodbye!")
-            # Stop system tray
-            if _system_tray:
-                _system_tray.stop()
-            break
+def generate_knowledge_id():
+    """Generate unique knowledge ID."""
+    global knowledge_counter
+    knowledge_counter += 1
+    return f"K{knowledge_counter:03d}"
 
 
 def load_chat_history():
@@ -318,6 +318,103 @@ def get_chat_history_context():
         history_parts.append(f"{role}: {msg['content']}")
 
     return "\n".join(history_parts)
+
+
+def load_tasks():
+    """Load tasks from JSON file."""
+    global task_counter
+    if os.path.exists(TASKS_FILE):
+        try:
+            with open(TASKS_FILE, 'r') as f:
+                data = json.load(f)
+                task_counter = data.get('counter', 0)
+                return data.get('tasks', [])
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def save_tasks(tasks):
+    """Save tasks to JSON file."""
+    global task_counter
+    data = {
+        'counter': task_counter,
+        'tasks': tasks
+    }
+    with open(TASKS_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def generate_id():
+    """Generate unique task ID."""
+    global task_counter
+    task_counter += 1
+    return f"T{task_counter:03d}"
+
+
+def cmd_delete(args, tasks):
+    from src.cora_parts.chat import respond
+    """Delete a task. Use 'undo' to restore."""
+    global _last_deleted_task
+    if not args:
+        respond('error', {'message': "Please provide task ID. Usage: delete <id>"})
+        return tasks
+
+    task_id = args[0].upper()
+    for i, task in enumerate(tasks):
+        if task['id'] == task_id:
+            removed = tasks.pop(i)
+            _last_deleted_task = removed.copy()  # Save for undo
+            save_tasks(tasks)
+            respond('task_deleted', {'id': task_id, 'text': removed['text'][:40]})
+            return tasks
+
+    respond('not_found', {'id': task_id})
+    return tasks
+
+
+# Global for undo functionality (declared here for cmd_delete to access)
+_last_deleted_task = None
+
+
+def speak(text):
+    from src.cora_parts.chat import detect_emotion
+    from src.cora_parts.logging_setup import logger
+    """Speak text in CORA's own voice (unity-voice-v2) with emotion detection.
+
+    Blocking: returns when the line has been spoken (or False if the voice
+    sidecar is unavailable). There is no fallback voice by design.
+    """
+    global CONFIG
+    if CONFIG is None:
+        load_config()
+
+    if not CONFIG.get('tts', {}).get('enabled', True):
+        return False
+
+    emotion = detect_emotion(text)
+    try:
+        from voice.tts import speak as _voice_speak
+        return bool(_voice_speak(text, emotion))
+    except Exception as e:
+        logger.warning(f"voice unavailable: {e}")
+        return False
+
+
+def init_tts():
+    from src.cora_parts.logging_setup import logger
+    """Initialize the voice: returns the shared TTS queue (or None)."""
+    global CONFIG
+    if CONFIG is None:
+        load_config()
+    if not CONFIG.get('tts', {}).get('enabled', True):
+        return None
+    try:
+        from voice.tts import get_tts_queue
+        return get_tts_queue()
+    except Exception as e:
+        logger.error(f"TTS init error: {e}")
+        return None
 
 
 def cmd_chat(args, tasks):
@@ -502,185 +599,8 @@ def cmd_settings(args, tasks):
     return tasks
 
 
-def speak(text):
-    from src.cora_parts.chat import detect_emotion
-    from src.cora_parts.logging_setup import logger
-    """Speak text in CORA's own voice (unity-voice-v2) with emotion detection.
-
-    Blocking: returns when the line has been spoken (or False if the voice
-    sidecar is unavailable). There is no fallback voice by design.
-    """
-    global CONFIG
-    if CONFIG is None:
-        load_config()
-
-    if not CONFIG.get('tts', {}).get('enabled', True):
-        return False
-
-    emotion = detect_emotion(text)
-    try:
-        from voice.tts import speak as _voice_speak
-        return bool(_voice_speak(text, emotion))
-    except Exception as e:
-        logger.warning(f"voice unavailable: {e}")
-        return False
-
-
-def init_tts():
-    from src.cora_parts.logging_setup import logger
-    """Initialize the voice: returns the shared TTS queue (or None)."""
-    global CONFIG
-    if CONFIG is None:
-        load_config()
-    if not CONFIG.get('tts', {}).get('enabled', True):
-        return None
-    try:
-        from voice.tts import get_tts_queue
-        return get_tts_queue()
-    except Exception as e:
-        logger.error(f"TTS init error: {e}")
-        return None
-
-
-def first_run_setup():
-    from src.cora_parts.system import auto_pull_model, check_ollama, progress_spinner
-    from src.cora_parts.voice import check_tts
-    """Check and setup required components on first run."""
-    global CONFIG
-    if CONFIG is None:
-        load_config()
-
-    setup_file = DATA_DIR / '.setup_complete'
-    if setup_file.exists():
-        return True
-
-    print("\n=== FIRST RUN SETUP ===")
-    print("Checking required components...\n")
-
-    # Step 1: Check Ollama
-    progress_spinner("Checking Ollama installation...")
-    if check_ollama():
-        print("[OK] Ollama is installed")
-        if CONFIG.get('auto_setup', {}).get('auto_pull_model', False):
-            model = CONFIG.get('ollama', {}).get('model', 'llama3.2')
-            progress_spinner(f"Pulling model '{model}'...")
-            auto_pull_model(model)
-    else:
-        print("[!] Ollama not found.")
-        print("    Download from: https://ollama.ai")
-
-    # Step 2: Check TTS (her own voice sidecar)
-    progress_spinner("Checking text-to-speech...")
-    if check_tts():
-        print("[OK] Voice (unity-voice-v2) available")
-    else:
-        print("[!] Voice server not reachable (see data/voice-sidecar.log)")
-
-    # Step 3: Create backup directory
-    progress_spinner("Setting up backup directory...")
-    BACKUP_DIR.mkdir(exist_ok=True)
-    print("[OK] Backup directory ready")
-
-    # Step 4: Initialize data files
-    progress_spinner("Initializing data files...")
-    if not os.path.exists(TASKS_FILE):
-        save_tasks([])
-        print("[OK] Tasks file created")
-    if not os.path.exists(KNOWLEDGE_FILE):
-        save_knowledge([])
-        print("[OK] Knowledge file created")
-
-    # Mark setup complete
-    with open(setup_file, 'w') as f:
-        f.write(datetime.now().isoformat())
-
-    print("\n=== SETUP COMPLETE ===\n")
-    return True
-
-
-def load_knowledge():
-    """Load knowledge entries from JSON file."""
-    global knowledge_counter
-    if os.path.exists(KNOWLEDGE_FILE):
-        try:
-            with open(KNOWLEDGE_FILE, 'r') as f:
-                data = json.load(f)
-                knowledge_counter = data.get('counter', 0)
-                return data.get('entries', [])
-        except (json.JSONDecodeError, IOError):
-            return []
-    return []
-
-
-def save_knowledge(entries):
-    """Save knowledge entries to JSON file."""
-    global knowledge_counter
-    data = {
-        'counter': knowledge_counter,
-        'entries': entries
-    }
-    with open(KNOWLEDGE_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
-
-
-def generate_knowledge_id():
-    """Generate unique knowledge ID."""
-    global knowledge_counter
-    knowledge_counter += 1
-    return f"K{knowledge_counter:03d}"
-
-
-def load_tasks():
-    """Load tasks from JSON file."""
-    global task_counter
-    if os.path.exists(TASKS_FILE):
-        try:
-            with open(TASKS_FILE, 'r') as f:
-                data = json.load(f)
-                task_counter = data.get('counter', 0)
-                return data.get('tasks', [])
-        except (json.JSONDecodeError, IOError):
-            return []
-    return []
-
-
-def save_tasks(tasks):
-    """Save tasks to JSON file."""
-    global task_counter
-    data = {
-        'counter': task_counter,
-        'tasks': tasks
-    }
-    with open(TASKS_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
-
-
-def generate_id():
-    """Generate unique task ID."""
-    global task_counter
-    task_counter += 1
-    return f"T{task_counter:03d}"
-
-
-def cmd_delete(args, tasks):
-    from src.cora_parts.chat import respond
-    """Delete a task. Use 'undo' to restore."""
-    global _last_deleted_task
-    if not args:
-        respond('error', {'message': "Please provide task ID. Usage: delete <id>"})
-        return tasks
-
-    task_id = args[0].upper()
-    for i, task in enumerate(tasks):
-        if task['id'] == task_id:
-            removed = tasks.pop(i)
-            _last_deleted_task = removed.copy()  # Save for undo
-            save_tasks(tasks)
-            respond('task_deleted', {'id': task_id, 'text': removed['text'][:40]})
-            return tasks
-
-    respond('not_found', {'id': task_id})
-    return tasks
+# Global for undo functionality
+_last_deleted_task = None
 
 
 def cmd_undo(args, tasks):
@@ -703,36 +623,116 @@ def cmd_undo(args, tasks):
     speak(f"Restored task {restored_id}")
     return tasks
 
-# Global system tray instance
-_system_tray = None
 
-# Cache for system prompt
-_cora_system_prompt_cache = None
+def main():
+    from src.cora_parts.logging_setup import COMMANDS, SYSTEM_TRAY_AVAILABLE, create_system_tray, load_personality, logger, parse_input
+    from src.cora_parts.boot import boot_sequence
+    from src.cora_parts.chat import generate_greeting, respond
+    """Main entry point with command loop."""
+    global _system_tray
 
+    # Load config first
+    load_config()
 
-# Default paths (will be overridden by init_paths after config loads)
-TASKS_FILE = DATA_DIR / 'tasks.json'
-KNOWLEDGE_FILE = DATA_DIR / 'knowledge.json'
-BACKUP_DIR = ROOT_DIR / 'backups'
-PERSONALITY_FILE = CONFIG_DIR / 'personality.json'
+    # Run first-time setup if needed
+    first_run_setup()
 
-# Chat history for conversation memory
-CHAT_HISTORY = []
+    # Run boot sequence (system diagnostics and startup checks)
+    # This runs the full 18-check boot sequence per ARCHITECTURE.md
+    try:
+        boot_sequence()
+    except Exception as e:
+        logger.warning(f"Boot sequence warning: {e}")
+        # Non-fatal - continue startup even if boot fails
 
-# Counters for ID generation
-task_counter = 0
-knowledge_counter = 0
+    # Start system tray icon (runs in background thread)
+    if SYSTEM_TRAY_AVAILABLE:
+        def on_tray_quit():
+            from src.cora_parts.logging_setup import logger
+            """Handle quit from system tray."""
+            logger.info("System tray quit requested")
+            os._exit(0)
 
-# Global config (loaded at startup)
-CONFIG = None
+        def on_tray_settings():
+            from src.cora_parts.logging_setup import logger
+            """Handle settings from system tray."""
+            logger.info("System tray settings requested")
+            print("[*] Settings panel not implemented yet")
 
+        _system_tray = create_system_tray(
+            on_quit=on_tray_quit,
+            on_settings=on_tray_settings
+        )
+        if _system_tray:
+            _system_tray.start()
+            logger.info("System tray icon started")
 
-# Global for undo functionality (declared here for cmd_delete to access)
-_last_deleted_task = None
+    # Load personality for greeting
+    personality = load_personality()
 
+    print("")
+    print("  ==================================================")
+    print("    ____   ___   ____      _")
+    print("   / ___| / _ \\ |  _ \\    / \\")
+    print("  | |    | | | || |_) |  / _ \\")
+    print("  | |___ | |_| ||  _ <  / ___ \\")
+    print("   \\____| \\___/ |_| \\_\\/_/   \\_\\")
+    print("")
+    print(f"  {personality.get('name', 'C.O.R.A')} v{VERSION}")
+    print("  Cognitive Operations & Reasoning Assistant")
+    print("  ==================================================")
+    print("  Unity AI Lab | unityailab.com")
+    print("  ==================================================")
+    greeting = generate_greeting(personality)
+    print(f"\n  {greeting}\n")
+    speak(greeting)
+    print("  Type 'help' for commands, 'exit' to quit\n")
 
-# Global for undo functionality
-_last_deleted_task = None
-ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))).parent
-DATA_DIR = ROOT_DIR / 'data'
-CONFIG_DIR = ROOT_DIR / 'config'
+    # Load existing tasks
+    tasks = load_tasks()
+
+    # Command dispatch table (shared with the GUI app)
+    commands = COMMANDS
+
+    # Main loop
+    while True:
+        try:
+            user_input = input("cora> ").strip()
+
+            if not user_input:
+                continue
+
+            cmd, args = parse_input(user_input)
+
+            # Check for exit commands
+            if cmd in ('exit', 'quit', 'q'):
+                respond('shutdown', {})
+                try:
+                    from ai.ollama import unload_models
+                    unload_models()          # her models leave the GPU on exit
+                except Exception:
+                    pass
+                # Stop system tray before exit
+                if _system_tray:
+                    _system_tray.stop()
+                break
+
+            # Execute command; anything that is not a command is a chat message
+            # for the assistant (tools + her voice via ai.dispatcher)
+            if cmd in commands:
+                tasks = commands[cmd](args, tasks)
+            else:
+                tasks = cmd_chat(user_input.split(), tasks)
+
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            # Stop system tray
+            if _system_tray:
+                _system_tray.stop()
+            break
+        except EOFError:
+            print("\nGoodbye!")
+            # Stop system tray
+            if _system_tray:
+                _system_tray.stop()
+            break

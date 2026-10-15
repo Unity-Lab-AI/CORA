@@ -411,6 +411,9 @@ def main():
                     keep.append(s)
             parts[p] = keep
     rebound &= header_names
+    # _base keeps the ORIGINAL source order (a moved constant must follow what it is built from)
+    _pos = {id(st): i for i, st in enumerate(tree.body)}
+    header.sort(key=lambda st: _pos.get(id(st), 10**9))
     part_names = {p: set(names_of(s)) for p, s in parts.items()}
 
     # ---- dependencies: module-level sibling needs import at the top (cycles there merge the
