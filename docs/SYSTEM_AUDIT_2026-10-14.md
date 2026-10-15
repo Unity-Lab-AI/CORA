@@ -49,7 +49,7 @@ C.O.R.A is a large library of mostly real building blocks (63 Python files, ~36k
 - **Replace with:** `faster-whisper` 1.2.1 on CUDA for command transcription (Backrooms already uses faster-whisper-base int8 for screening), **openWakeWord** with a trained "cora" model for the wake word (dedicated KWS is cheaper and far more accurate than continuous ASR). Moonshine or Parakeet TDT 0.6B are the streaming alternatives.
 
 ### Image generation
-- `cora_tools/image_gen.py:29` uses `gen.pollinations.ai/image` with `model=flux` and `key=`; the web page uses the legacy `image.pollinations.ai` host with no key. Per current Pollinations APIDOCS a key is required (401 without), the default image model is now `tongyi-mai/z-image-turbo`, model IDs are fully qualified (`black-forest-labs/flux.1-schnell`), `nologo`/`enhance` are no longer documented, and `pk_` raw keys are rate-limited per IP. Whether the `flux` alias still resolves is unverified — query `/image/models`.
+- `cora_tools/image_gen.py:29` used a hosted image API with `model=flux` and a `key=` query; the web page used that service's legacy host with no key. The service had changed its auth, model ids and flags under us. **Resolved 2026-10-14 (UPG-046): the hosted image API is gone from the project; images render on her own local engine (`services/image_sidecar.py`, the stream's Stable Diffusion rig).**
 
 ---
 
@@ -84,7 +84,7 @@ Plus `web/kokoro-worker.js` (kokoro-js 1.2.0) and a dead Kokoro-FastAPI probe at
 
 **Fixed since Dec 2025:** SEC-002 (AST calculator), SEC-003 (PowerShell escaping), SEC-005 (git list args + ref validation), MEM-001, MEM-002. `docs/TODO.md` still lists SEC-002/003 as pending.
 
-**Privacy:** `.env` is not tracked (good; contains only `POLLINATIONS_API_KEY` and `GITHUB_TOKEN`). But `data/*.json` (chat history, knowledge, working memory, calendar, tasks), `config/settings.json`, `config/personality.json` and `backups/*` are tracked in a repo that is now public on GitHub. Boot phase 4.1 (`boot_sequence.py:1161-1260`) uses `GITHUB_TOKEN` to enumerate the user's private repos and display a random file.
+**Privacy:** `.env` is not tracked (good; at audit time it held the hosted image API key and `GITHUB_TOKEN`; since 2026-10-14 only `GITHUB_TOKEN`). But `data/*.json` (chat history, knowledge, working memory, calendar, tasks), `config/settings.json`, `config/personality.json` and `backups/*` are tracked in a repo that is now public on GitHub. Boot phase 4.1 (`boot_sequence.py:1161-1260`) uses `GITHUB_TOKEN` to enumerate the user's private repos and display a random file.
 
 ---
 
@@ -106,7 +106,7 @@ Plus `web/kokoro-worker.js` (kokoro-js 1.2.0) and a dead Kokoro-FastAPI probe at
 | Presence detection before speaking at boot | Module exists; not wired into boot. |
 | Installer / auto-updater | Absent. |
 
-**Modern-assistant capabilities absent:** streaming, native tools, conversation memory, context management (`settings.ai.context_window` has no reader), RAG over `knowledge.json` (tag filter only; `/api/embed` unused), MCP client, plugin/skill system, scheduling, barge-in/VAD, multi-language (`lang_code='a'`, en-us everywhere), GPU provider selection, offline caching (boot hits ip-api, wttr.in, Google News, GitHub, YouTube, Pollinations uncached), auto-update.
+**Modern-assistant capabilities absent:** streaming, native tools, conversation memory, context management (`settings.ai.context_window` has no reader), RAG over `knowledge.json` (tag filter only; `/api/embed` unused), MCP client, plugin/skill system, scheduling, barge-in/VAD, multi-language (`lang_code='a'`, en-us everywhere), GPU provider selection, offline caching (boot hits ip-api, wttr.in, Google News, GitHub, YouTube and, at audit time, the hosted image API uncached), auto-update.
 
 ---
 
@@ -152,7 +152,7 @@ Effort: S = hours, M = a day or two, L = a week+. "Phase 0" items are independen
 8. Install Python 3.12 side by side; `CORA.bat` calls `py -3.12`, creates/uses a venv, re-runs pip when `requirements.txt` changes (hash), upgrades yt-dlp.
 9. One model config: `OLLAMA_URL` env + `models.{chat, vision, code}` in a single config; delete the hardcoded names in `ai/ollama.py`, `code.py`, `presence.py`, `voice/commands.py`, `stats_server.py`, `web/index.html`.
 10. Switch chat to `qwen3.5:9b` (or `gemma4:12b`), vision to `qwen3-vl:4b`, code to `qwen3-coder`; warm at boot; unify timeouts.
-11. Pollinations: send `Authorization: Bearer` / `sk_` key, fully qualified model IDs, drop `nologo`/`enhance`, move the web page off the legacy host.
+11. Hosted image API: send the bearer key, fully qualified model IDs, drop `nologo`/`enhance`, move the web page off the legacy host. (Superseded 2026-10-14: the hosted API was removed outright; her own local image engine replaced it, UPG-046.)
 
 ### Phase 2 — V2 voice (M)
 12. Implement §4 steps 1-6: `voice/unity_voice.py`, sidecar discovery/autostart, shared lock dir, config block, delete the three old stacks and `kokoro-worker.js`, presence off the TTS thread.

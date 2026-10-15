@@ -35,7 +35,9 @@ _(none — no work currently in motion)_
 
 **Delivered:** the full repair, `docs/TODO.md` UPG-001 through UPG-045, all closed. Version 3.0.0 is tagged; main + develop are pushed to origin (Forgejo) and github after every phase. The two-minute cron that drove the day is stopped. The user's last instructions were "do both, go" (the web split and the oversized-file split, both done) and "wehn u are done, write the now.md file and kill the cron" (this file, and the cron is cancelled).
 
-**What CORA is now, in one breath:** `unity-brain` (Unity's own LoRA) as brain and eyes, `unity-voice-v2` as her voice, faster-whisper as her ears, one conversation loop (`ai/dispatcher.py`) behind every entry point with 115 tools, a timeout-guarded camera layer, browser-backed web search and page fetch, config loader + daily log, models unloaded from the GPU on every exit, start/stop scripts for Windows and Linux, the web page served locally with her voice, docs that tell the truth, and no source file over 800 lines.
+**What CORA is now, in one breath:** `unity-brain` (Unity's own LoRA) as brain and eyes, `unity-voice-v2` as her voice, faster-whisper as her ears, her own local image engine (`services/image_sidecar.py`, the stream's Stable Diffusion rig: generate, edit, inpaint, camera recreations with the face kept, viewer with Save As, `save_image`), one conversation loop (`ai/dispatcher.py`) behind every entry point with 120 tools, a timeout-guarded camera layer, browser-backed web search and page fetch, config loader + daily log, models and the image engine unloaded from the GPU on every exit, start/stop scripts for Windows and Linux, the web page served locally with her voice and her images, docs that tell the truth, and no source file over 800 lines.
+
+**Evening addition (UPG-046/047):** the hosted image API is gone everywhere (code, config, `.env`, launchers, web page, docs; only the TODO/FINALIZED ledgers keep the word by LAW). The image engine runs on the torch interpreter (`C:\Program Files\Python310\python.exe` here, auto-detected, cached in `data/.image_python`), starts on the first picture, holds ~3 GB of VRAM while rendering with offload, and is stopped by `ai.ollama.unload_models()` and the stop scripts. Checks: `python cora_tools/image_gen.py` (health + start), `--render` for one picture.
 
 **Last verified runs (all on 2026-10-14):**
 - Full boot with voice: runs 4 and 5, 13/13 systems.
@@ -48,7 +50,8 @@ _(none — no work currently in motion)_
 **Rules that bind every later session (learned today):**
 - Checks never write to her real data: `CORA_HISTORY_FILE` scratch transcript, `handle(..., allowed_tools=...)` read-only set.
 - Checks never make sound: `--quick` for the boot, `speak=False` for the dispatcher; never launch the GUI or CLI for a check.
-- Unload the GPU after anything that touched her brain: `python scripts/gpu_release.py` (CORA does it herself on every normal exit).
+- Unload the GPU after anything that touched her brain or her image engine: `python scripts/gpu_release.py` (CORA does it herself on every normal exit).
+- Never open her viewer or the GUI for a check while the user is at the desk; the engine is checked through `cora_tools.image_gen` with `show=False`.
 - The user's words go into TODO / FINALIZED verbatim.
 
 **Open, for whoever picks this up next:** `web/js/06-boot-sequence-exact-match-to.js` is one 1102-line function and was left whole (documented, UPG-021 b); the phase module names in `src/boot_phases/` carry the banner text (`phase_10_phase_4_1_...`), ugly but exact; the sidecar for her voice is shared with the stream rig and only killed by the stop scripts when CORA started it.

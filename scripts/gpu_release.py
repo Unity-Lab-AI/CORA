@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Release the GPU: ask Ollama to drop every loaded model (keep_alive 0) and report
-VRAM before and after. CORA calls the same unload on every normal exit; the stop
+Release the GPU: ask Ollama to drop every loaded model (keep_alive 0), end her
+image engine sidecar when CORA started it, and report VRAM before and after. CORA calls the same unload on every normal exit; the stop
 scripts call it too. Run it by hand after anything that talked to her brain:
 
     python scripts/gpu_release.py

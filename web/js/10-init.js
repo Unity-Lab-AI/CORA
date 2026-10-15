@@ -14,7 +14,8 @@ async function init() {
     }
 
     renderPhases();
-    document.getElementById('pollinationsKey').value = pollinationsKey;
+    // keys of image services from before the local engine are dropped from old installs
+    try { Object.keys(localStorage).filter(k => /^cora_.*_key$/.test(k) && !['cora_github_key', 'cora_weather_key'].includes(k)).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     document.getElementById('githubToken').value = githubToken;
 
     // Check if first-time user - show warning FIRST before any gates

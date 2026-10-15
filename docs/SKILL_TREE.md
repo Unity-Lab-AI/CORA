@@ -67,7 +67,7 @@
 ### External AI
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Pollinations API | Intermediate | DONE | Image generation |
+| Local image engine | Advanced | DONE | Stable Diffusion sidecar: text to image, edits, inpainting, camera recreations with the face kept, viewer with Save As |
 | GitHub API | Intermediate | DONE | Repository access |
 
 ---
@@ -204,6 +204,7 @@
 |--------|---------------|
 | Voice | `voice/tts.py`, `voice/unity_voice.py`, `voice/stt.py`, `voice/wake_word.py` |
 | Vision | `services/camera.py`, `cora_tools/vision.py`, `services/presence.py`, `ui/camera_feed.py` |
+| Images | `services/image_sidecar.py`, `cora_tools/image_gen.py`, `ui/image_viewer.py` |
 | AI | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py`, `ai/ollama.py`, `ai/settings.py` |
 | Tasks | `cora_tools/tasks.py`, `cora_tools/calendar.py` |
 | System | `cora_tools/system.py`, `cora_tools/windows.py` |
@@ -227,7 +228,7 @@
 | `email_tool.py` | 366 | Email client | No recipient validation |
 | `files.py` | 517 | File operations | OK |
 | `git_ops.py` | 850+ | Git + GitHub API | SEC-006 hardcoded OAuth |
-| `image_gen.py` | 314 | Pollinations API | OK |
+| `image_gen.py` | 314 | image engine client (Dec 2025: a hosted API; since 2026-10-14 the local sidecar) | OK |
 | `media.py` | 800+ | Media control | Optional deps |
 | `memory.py` | 352 | Working memory | OK |
 | `modal_tools.py` | 358 | UI modal handlers | Terminal injection risk |

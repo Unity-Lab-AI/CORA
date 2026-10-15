@@ -91,22 +91,21 @@ if /i not "%REQ_HASH%"=="%OLD_HASH%" (
 )
 
 :: ---------------------------------------------------------------------------
-:: .env (API keys). Weather and news are keyless; only Pollinations + GitHub
-:: are read by the code.
+:: .env (API keys). Weather, news and images are keyless (images render on her
+:: own local engine); only GITHUB_TOKEN is read by the code.
 :: ---------------------------------------------------------------------------
 echo [CHECK] Environment Configuration...
 if not exist ".env" (
-    echo         [WARN] .env not found - copy env.example to .env for image generation + GitHub features
+    echo         [INFO] .env not found - copy env.example to .env for the GitHub features ^(optional^)
 ) else (
-    findstr /i "POLLINATIONS_API_KEY=" ".env" | findstr /v "your_" >nul 2>&1
-    if errorlevel 1 (echo         [WARN] Pollinations API key missing - image generation limited) else (echo         Pollinations API - OK)
     findstr /i "GITHUB_TOKEN=" ".env" | findstr /v "your_" >nul 2>&1
     if errorlevel 1 (echo         [WARN] GitHub token missing - git features limited) else (echo         GitHub Token - OK)
 )
 echo.
 
 :: ---------------------------------------------------------------------------
-:: Ollama + configured models + yt-dlp + Playwright + unity-voice-v2 sidecar.
+:: Ollama + configured models + yt-dlp + Playwright + unity-voice-v2 sidecar
+:: + the image engine checkpoint (config image.checkpoint).
 :: All model names come from config/config.json (ai.settings).
 :: ---------------------------------------------------------------------------
 echo [CHECK] Ollama, models, media tools, voice...

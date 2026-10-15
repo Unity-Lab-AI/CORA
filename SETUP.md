@@ -64,15 +64,9 @@ Stop everything she started with `windows\stop.bat` / `linux/stop.sh`.
 
 CORA works great with NO API keys - Ollama runs locally for free! But these optional keys enable extra features:
 
-### Pollinations.AI (FREE - Image Generation)
+### Images need no key
 
-1. Go to: https://enter.pollinations.ai/
-2. Click "Get API Key" or sign up
-3. Copy your API key (starts with `pk_`)
-4. Add to your `.env` file:
-   ```
-   POLLINATIONS_API_KEY=pk_your_key_here
-   ```
+Pictures render on CORA's own image engine (see **Image Engine Setup** below): local Stable Diffusion, nothing hosted, no account.
 
 ### GitHub Token (FREE - Git Operations)
 
@@ -219,6 +213,28 @@ Voice input is faster-whisper on the GPU (`stt.whisper_model` in `config/config.
 
 ---
 
+## Image Engine Setup
+
+CORA paints with her own engine: `services/image_sidecar.py`, local Stable Diffusion with the `realistic-vision-v51` checkpoint (the same rig Unity's stream renders with) through diffusers. Text to image, img2img edits, inpainting, and webcam recreations with the face kept (IP-Adapter Plus Face).
+
+What it needs (`config/config.json` `image` block):
+
+| Key | Meaning |
+|---|---|
+| `checkpoint` | path to `realistic-vision-v51.safetensors` (2.1 GB, SD 1.5 family) |
+| `python` | an interpreter with torch + diffusers + transformers + accelerate; `null` = auto-detect (the voice sidecar's interpreter is tried first, then `C:\Program Files\Python310\python.exe`); or set `CORA_IMAGE_PYTHON` |
+| `device` | `auto` (GPU when there is one), `cuda`, `cpu` |
+| `offload` | `true` keeps the model in RAM and streams layers to the GPU (about 3 GB of VRAM while rendering, so her brain and voice keep their room) |
+| `url` | `http://127.0.0.1:5124` |
+| `width` / `height` / `steps` | defaults for a picture (768x768; steps `null` = 25 on GPU, 12 on CPU) |
+| `save_dir` | where pictures land (`data/images`) |
+
+The engine starts on the first picture and the checkpoint loads then (about a second on an RTX 4070 Ti; a picture takes 3-5 s on the GPU, 1-2 minutes on a CPU). The face adapter weights (`h94/IP-Adapter`) download once into the Hugging Face cache. Health: `http://127.0.0.1:5124/health`; log: `data/image-sidecar.log`. The stop scripts end the engine when CORA started it, and every normal exit unloads it with her brain.
+
+Every picture opens in her viewer (`ui/image_viewer.py`: Save As, Open folder, Copy path); "save that to my desktop" calls her `save_image` tool.
+
+---
+
 ## GPU Setup (Optional)
 
 For faster AI responses with NVIDIA GPU:
@@ -354,6 +370,15 @@ nvidia-smi
 
 **Update drivers:** [nvidia.com/drivers](https://www.nvidia.com/drivers)
 
+### No images
+
+**Check her image engine:**
+```bash
+curl http://127.0.0.1:5124/health        # the sidecar; its log is data/image-sidecar.log
+python cora_tools/image_gen.py           # prints the checkpoint path, finds the torch interpreter, starts the engine
+```
+A missing checkpoint or an interpreter without torch + diffusers is the usual cause (`config/config.json` `image.checkpoint` / `image.python`).
+
 ### Webcam not working
 
 **Check OpenCV:**
@@ -380,6 +405,7 @@ C.O.R.A/
 ├── ui/
 │   ├── boot_display.py      # Visual boot display
 │   ├── app.py               # Main GUI
+│   ├── image_viewer.py      # Picture window (Save As, Open folder)
 │   └── panels.py            # GUI panels
 ├── voice/
 │   ├── tts.py               # unity-voice-v2 client
@@ -392,7 +418,7 @@ C.O.R.A/
 │   └── settings.py          # models, URLs, options
 ├── cora_tools/              # Python tool modules (20+)
 ├── tools/                   # Downloaded binaries (mpv, ffmpeg)
-├── services/                # Weather, location, etc.
+├── services/                # Camera, image engine sidecar, stats server, weather, location
 ├── config/
 │   └── config.json          # Configuration
 ├── data/

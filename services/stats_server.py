@@ -2,8 +2,9 @@
 """
 C.O.R.A Local Server
 Local HTTP server (127.0.0.1:11435) that gives the web version real system
-stats, setup commands, the V2 voice proxy and, when hosted locally, the web
-files themselves.
+stats, setup commands, the V2 voice proxy, her image engine (/image/health,
+/image/generate, the pictures under /images/) and, when hosted locally, the
+web files themselves.
 
 Security model (2026-10-14):
 - Binds to 127.0.0.1 only.
@@ -265,6 +266,45 @@ def get_setup_status():
     }
 
 
+def image_health():
+    """Health of her image engine (services/image_sidecar.py)."""
+    try:
+        import sys
+        if str(PROJECT_DIR) not in sys.path:
+            sys.path.insert(0, str(PROJECT_DIR))
+        from cora_tools import image_gen
+        h = image_gen.sidecar_health()
+        h['checkpoint_present'] = h.get('checkpoint_present', image_gen.checkpoint_path().exists())
+        h['engine'] = image_gen.ENGINE_NAME
+        # usable = the checkpoint is there and the sidecar is up or may be started on the first picture
+        h['available'] = bool(h['checkpoint_present']) and (bool(h.get('ok')) or bool(image_gen._cfg().get('autostart', True)))
+        return h
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120]}
+
+
+def image_generate(body: dict) -> dict:
+    """Text to image on her engine for the web page; the file is served back under /images/."""
+    import sys
+    if str(PROJECT_DIR) not in sys.path:
+        sys.path.insert(0, str(PROJECT_DIR))
+    from cora_tools import image_gen
+    prompt = str(body.get('prompt') or '').strip()
+    if not prompt:
+        return {'success': False, 'error': 'prompt is empty'}
+    kw = {}
+    for k in ('width', 'height', 'seed'):
+        if body.get(k) not in (None, ''):
+            try:
+                kw[k] = int(body[k])
+            except (TypeError, ValueError):
+                pass
+    r = image_gen.generate_image(prompt, **kw)
+    if r.get('success'):
+        r['url'] = '/images/' + Path(r['path']).name
+    return r
+
+
 def voice_health():
     """Health of the unity-voice-v2 sidecar."""
     try:
@@ -388,13 +428,30 @@ class StatsHandler(BaseHTTPRequestHandler):
             self.send_json({'models': get_ollama_models()})
         elif path == '/voice/health':
             self.send_json(voice_health())
+        elif path == '/image/health':
+            self.send_json(image_health())
+        elif path.startswith('/images/'):
+            # her generated pictures, for the web page (download link = the same URL)
+            try:
+                import sys
+                if str(PROJECT_DIR) not in sys.path:
+                    sys.path.insert(0, str(PROJECT_DIR))
+                from cora_tools import image_gen
+                base = image_gen.images_dir().resolve()
+                target = (base / path[len('/images/'):]).resolve()
+                target.relative_to(base)
+                if not target.is_file():
+                    raise FileNotFoundError(target)
+                self.send_bytes(target.read_bytes(), _MIME.get(target.suffix.lower(), 'application/octet-stream'))
+            except Exception:
+                self.send_json({'error': 'not found'}, 404)
         elif path == '/api/prompt':
             # the one system prompt, so the web page and the desktop share a personality
             try:
                 self.send_bytes((PROJECT_DIR / 'config' / 'system_prompt.txt').read_bytes(), 'text/plain; charset=utf-8')
             except Exception as e:
                 self.send_json({'error': str(e)}, 404)
-        elif path == '/' or path.startswith('/web/') or not path.startswith(('/setup', '/voice', '/api')):
+        elif path == '/' or path.startswith('/web/') or not path.startswith(('/setup', '/voice', '/api', '/image')):
             self._serve_static(path[4:] if path.startswith('/web/') else path)
         else:
             self.send_json({'error': 'unknown endpoint'}, 404)
@@ -419,6 +476,18 @@ class StatsHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 msg = getattr(e, 'read', lambda: b'')()
                 return self.send_json({'error': (msg.decode('utf-8', 'replace') if msg else str(e))[:300]}, 422)
+
+        if path == '/image/generate':
+            if not self._authorized():
+                return self.send_json({'error': 'unauthorized'}, 401)
+            try:
+                req = json.loads(body.decode('utf-8')) if body else {}
+            except Exception:
+                return self.send_json({'success': False, 'error': 'bad json'}, 400)
+            try:
+                return self.send_json(image_generate(req))
+            except Exception as e:
+                return self.send_json({'success': False, 'error': str(e)[:300]}, 500)
 
         if not path.startswith('/setup/'):
             return self.send_json({'error': 'unknown endpoint'}, 404)

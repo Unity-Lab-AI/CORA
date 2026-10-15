@@ -43,8 +43,8 @@
     "vision": "unity-brain",
     "code": null,
     "think": null,
-    "image": "flux",
-    "_note": "primary = unity-brain: Unity's own text LoRA (Qwen3.5-9B, Backrooms/models/unity-brain) trained to call say(text, emotion, act) with the exact emotions and speech acts unity-voice-v2 knows; it also reads images, so it is the vision model too. fallback = huihui_ai/qwen3-abliterated:8b (uncensored + native tools; plain text streams to the voice with inferred emotion). Always send unity-brain num_ctx 32768 (models.options).",
+    "image": "realistic-vision-v51",
+    "_note": "primary = unity-brain: Unity's own text LoRA (Qwen3.5-9B, Backrooms/models/unity-brain) trained to call say(text, emotion, act) with the exact emotions and speech acts unity-voice-v2 knows; it also reads images, so it is the vision model too. fallback = huihui_ai/qwen3-abliterated:8b (uncensored + native tools; plain text streams to the voice with inferred emotion). Always send unity-brain num_ctx 32768 (models.options). image = her own local image engine (the image block below): the realistic-vision-v51 checkpoint the stream renders with, through services/image_sidecar.py; no hosted image API, no key.",
     "fallback": "huihui_ai/qwen3-abliterated:8b",
     "options": {
       "unity-brain": {
@@ -132,6 +132,19 @@
     "voice_mode": "auto",
     "legacy_regex": false,
     "_note": "voice_mode: auto = say_tool for unity-brain (she speaks through the say tool with her own designators), stream for any other model (sentences streamed to the voice as they arrive). legacy_regex: route typed input through the old regex command chain instead of the dispatcher."
+  },
+  "image": {
+    "url": "http://127.0.0.1:5124",
+    "checkpoint": "C:\\Users\\gfour\\Desktop\\Unity 3D Equational Model\\Unity 18+\\models\\realistic-vision-v51.safetensors",
+    "python": null,
+    "device": "auto",
+    "offload": true,
+    "autostart": true,
+    "steps": null,
+    "width": 768,
+    "height": 768,
+    "save_dir": "data/images",
+    "_note": "Her own image engine: local Stable Diffusion (services/image_sidecar.py) on the interpreter that has torch + diffusers (python: null = auto-detect, the voice sidecar's interpreter first). device auto = GPU when there is one; offload keeps the model in RAM and streams layers to the GPU so her brain and voice keep their room. steps null = 25 on GPU / 12 on CPU. Pictures land in save_dir and open in the viewer (Save As / Open folder); save_image puts them where the user says."
   },
   "camera": {
     "enabled": true,

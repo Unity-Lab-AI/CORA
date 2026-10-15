@@ -56,7 +56,7 @@ When CORA starts with visual boot, you'll see:
 | 6 | External Services | Weather, Location, Notifications |
 | 7 | News Headlines | Top 3 headlines from Google News |
 | 8 | Vision Test | Screenshot & webcam capture |
-| 9 | Image Generation | AI art via Pollinations Flux |
+| 9 | Image Generation | her own local image engine (Stable Diffusion sidecar) |
 | 10 | Final Check | Summary & readiness status |
 
 3. **Live System Stats** - Real-time CPU, RAM, GPU, VRAM, Disk monitoring
@@ -233,7 +233,7 @@ Uses the configured vision model (unity-brain reads the frame itself).
 ### Image Generation
 
 ```
-imagine <description>  Generate AI image via Pollinations Flux
+imagine <description>  Generate an image on her own local engine
 ```
 
 Example:
@@ -241,7 +241,7 @@ Example:
 cora> imagine a cyberpunk city at night with neon lights
 ```
 
-Images saved to `data/images/` folder.
+The picture opens in her viewer window (Save As, Open folder, Copy path) and is saved to `data/images/`. The rest is conversation: "make that one a rainy night" (edit), "repaint the sky as a nebula" (a region), "take a picture of me and make it a painting" (a webcam shot recreated with your face kept), "save that to my desktop" (her `save_image` tool). The engine is local Stable Diffusion; nothing is uploaded.
 
 ### AI Model Management
 
@@ -446,7 +446,7 @@ backup                Save all data to backups/
 | Slow boot | Use `--quick` flag |
 | Voice not heard | Check microphone in settings |
 | No GPU stats | Install NVIDIA drivers, check nvidia-smi |
-| No images | Check internet connection (Pollinations needs internet) |
+| No images | Her engine is local: `http://127.0.0.1:5124/health`, log `data/image-sidecar.log`, checkpoint path `image.checkpoint` in config |
 
 ---
 

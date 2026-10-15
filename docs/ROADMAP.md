@@ -35,6 +35,7 @@
 - [x] Timeout-guarded camera layer; thinking off on every request; search through a headless browser
 - [x] Config loader, log tee, orderly shutdown, start/stop scripts for Windows and Linux
 - [x] Web page served locally with her voice and the configured models
+- [x] Her own local image engine (Stable Diffusion sidecar, the stream's rig): generate, edit, inpaint, camera recreations with the face kept; viewer with Save As; the hosted image API removed everywhere
 
 ---
 
@@ -277,7 +278,7 @@ These need fixing BEFORE any new feature work:
 - [x] Split view (Console + App panels)
 - [x] F-100 jet style boot console
 - [x] API key modal with validation
-- [x] Pollinations + GitHub API integration
+- [x] Hosted image API + GitHub API integration (the image API was replaced by her local engine on 2026-10-14)
 - [x] localStorage key persistence
 - [x] Fullscreen/split toggle
 - [x] Ollama chat integration
@@ -300,7 +301,7 @@ These need fixing BEFORE any new feature work:
 - [x] Personality-consistent responses
 
 ### Image Generation (NEW)
-- [x] Pollinations Flux integration
+- [x] Hosted image API integration (replaced by the local image engine, 2026-10-14)
 - [x] `imagine` command
 - [x] Boot-time image generation test
 - [x] Auto-save to data/images/
@@ -350,7 +351,7 @@ These need fixing BEFORE any new feature work:
 - [x] **email_tool.py** - Email sending
 - [x] **media.py** - Emby media control
 - [x] **self_modify.py** - Script creation
-- [x] **image_gen.py** - Pollinations AI
+- [x] **image_gen.py** - image generation (now her local engine)
 
 ### Testing
 - [x] TaskManager unit tests (45 tests)
@@ -466,12 +467,12 @@ C.O.R.A/
 ## Recent Achievements (v1.0.0)
 
 - **Web UI deployed to GitHub Pages** (2025-12-25)
-- **API key management with validation** (Pollinations + GitHub)
+- **API key management with validation** (image API + GitHub; the image key is gone since 2026-10-14)
 - Visual Boot Display with cyberpunk theme
 - Dynamic AI responses via `cora_respond()` function
 - Live system stats panel (CPU, RAM, GPU, VRAM, Disk)
 - Audio waveform visualization during TTS
-- Pollinations Flux image generation
+- Image generation (local since 2026-10-14)
 - Full location announcement (City, State, Country)
 - News headlines integration
 - 75+ Python files across modules

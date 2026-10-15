@@ -6,9 +6,7 @@
 // ============================================================
 
 function saveApiKeys() {
-    pollinationsKey = document.getElementById('pollinationsKey').value.trim();
     githubToken = document.getElementById('githubToken').value.trim();
-    if (pollinationsKey) localStorage.setItem('cora_pollinations_key', pollinationsKey);
     if (githubToken) localStorage.setItem('cora_github_key', githubToken);
     document.getElementById('apiModal').classList.remove('visible');
     runBootSequence();

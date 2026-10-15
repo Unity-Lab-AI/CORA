@@ -21,7 +21,7 @@
 
 **Version 3.0.0** | **73 Python files** | **Unity AI Lab 2026**
 
-CORA is a local, voice-first desktop companion. Her brain is `unity-brain`, Unity AI Lab's own text LoRA (Qwen3.5-9B) running in Ollama; her voice is `unity-voice-v2`, the lab's own trained voice; her ears are faster-whisper on the GPU. She has 115 tools for tasks, reminders, calendar, memory, knowledge, the screen and the webcam, the web, files, apps and windows, media, code, git and email. Nothing leaves the machine except the web requests you ask her to make.
+CORA is a local, voice-first desktop companion. Her brain is `unity-brain`, Unity AI Lab's own text LoRA (Qwen3.5-9B) running in Ollama; her voice is `unity-voice-v2`, the lab's own trained voice; her ears are faster-whisper on the GPU. She has 120 tools for tasks, reminders, calendar, memory, knowledge, the screen and the webcam, the web, files, apps and windows, media, code, git and email. She paints on her own local image engine (the same Stable Diffusion rig Unity's stream renders with): pictures from words, edits of any picture, webcam shots recreated with the face kept, every result in a viewer with Save As. Nothing leaves the machine except the web requests you ask her to make.
 
 ![CORA Boot Display](docs/images/boot_display.png)
 
@@ -57,7 +57,7 @@ Other doors into the same brain:
 - Anything destructive (deleting, sending, running scripts) she asks you to confirm first.
 - Ask "what can you do" and she reads her own tool catalog back.
 
-Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "remind me to stretch in 20 minutes" / "what's on my calendar" / "remember my plate is ..." / "what's on my screen" / "look at the camera, what am I holding" / "search for ..." / "open youtube" / "play lofi" / "what's the weather" / "git status" / "email karen saying hi" / "imagine a neon city at night".
+Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "remind me to stretch in 20 minutes" / "what's on my calendar" / "remember my plate is ..." / "what's on my screen" / "look at the camera, what am I holding" / "search for ..." / "open youtube" / "play lofi" / "what's the weather" / "git status" / "email karen saying hi" / "imagine a neon city at night" / "make that one a rainy night" / "make a picture of me as a vampire" / "save that to my desktop".
 
 ---
 
@@ -70,7 +70,9 @@ Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "rem
 | Voice | `unity-voice-v2` sidecar on 127.0.0.1:5123; `say(text, emotion, act)` from the brain goes straight to it | `voice/tts.py`, `voice/unity_voice.py` |
 | Ears | faster-whisper (CUDA) for commands and the transcript stream; fuzzy wake word; optional openWakeWord model | `voice/stt.py`, `voice/wake_word.py` |
 | Eyes | webcam through a timeout-guarded, host-agnostic camera layer; screenshots; the brain reads images itself | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py` |
+| Images | her own local image engine: Stable Diffusion (realistic-vision-v51) as a sidecar on the torch interpreter (127.0.0.1:5124); text to image, img2img edits, inpainting, camera recreations with the face kept (IP-Adapter); the viewer window has Save As / Open folder; `save_image` puts a picture where you say | `services/image_sidecar.py`, `cora_tools/image_gen.py`, `ui/image_viewer.py`, `config.json` `image` |
 | Web | search (DuckDuckGo, Brave, Bing through a headless browser when the plain endpoints block), readable page fetch | `cora_tools/web.py` |
+| Web page | served locally with her voice, the configured models and her image engine (`/image/generate`, pictures under `/images/` with a download link) | `services/stats_server.py`, `web/` |
 | Boot | 10 phases with spoken status, daily briefing (calendar, overdue tasks, reminders), reminder checker | `src/boot_sequence.py` |
 | Config | one file, one loader, atomic saves | `config/config.json`, `ai/config.py` |
 | Logs | everything printed also lands in `data/logs/cora-YYYYMMDD.log` | `ai/log.py` |
@@ -106,7 +108,8 @@ Served by `services/stats_server.py` on 127.0.0.1:11435. The page gets the launc
 - Python 3.13 (3.12 works), NVIDIA GPU recommended (16 GB fits the brain, the voice and whisper together)
 - Ollama; the launcher pulls `unity-brain` and the fallback. `unity-brain` and `unity-voice-v2` are built in the lab's Backrooms repo (`models/unity-brain`, `models/unity-voice-v2`); the voice sidecar needs a Python with torch and misaki (the launcher finds one or you set `UNITY_VOICE_PYTHON`)
 - mpv (optional, YouTube playback): extract into `tools/mpv/` or install with winget/choco/scoop
-- Optional keys in `.claude/.env`: `POLLINATIONS_API_KEY` (image generation)
+- Images: the `realistic-vision-v51.safetensors` checkpoint (`config.json` `image.checkpoint`) and a Python with torch + diffusers (the voice sidecar's interpreter works; auto-detected, or `CORA_IMAGE_PYTHON`). No key, nothing hosted.
+- Optional key in `.env`: `GITHUB_TOKEN` (git features)
 
 Install by hand:
 
@@ -126,9 +129,9 @@ C.O.R.A/
 ├── src/        boot_sequence.py (main), cora.py (CLI), gui_launcher.py (GUI)
 ├── ai/         dispatcher.py, tools_registry.py, history.py, ollama.py, settings.py, config.py, log.py
 ├── voice/      tts.py, unity_voice.py, stt.py, wake_word.py, converse.py, commands.py, ambient_awareness.py, emotion.py
-├── ui/         boot_display.py, app.py, panels.py, camera_feed.py, code_editor.py, query_panel.py, ...
+├── ui/         boot_display.py, app.py, panels.py, camera_feed.py, image_viewer.py, code_editor.py, query_panel.py, ...
 ├── cora_tools/ tasks, calendar, reminders, memory, knowledge, files, system, windows, web, browser, media, code, git_ops, email_tool, image_gen, screenshots, vision, self_modify ...
-├── services/   camera.py, presence.py, stats_server.py, weather.py, location.py, cli_popup.py
+├── services/   camera.py, image_sidecar.py, presence.py, stats_server.py, weather.py, location.py, cli_popup.py
 ├── scripts/    bootstrap.py
 ├── windows/    start.bat, stop.bat          linux/  start.sh, stop.sh
 ├── web/        index.html (served locally)

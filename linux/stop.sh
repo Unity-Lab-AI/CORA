@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 # C.O.R.A - stop (Linux / macOS)
 # Ends every process CORA started from THIS project folder (boot sequence, GUI,
-# CLI, stats server), her voice sidecar when CORA launched it (data/run/
-# voice-sidecar.pid; one started by something else is left alone), and unloads
-# her models from the GPU (Ollama keep_alive 0). Ollama itself stays up.
+# CLI, stats server), her voice and image sidecars when CORA launched them
+# (data/run/voice-sidecar.pid / image-sidecar.pid; one started by something
+# else is left alone), and unloads her models from the GPU (Ollama keep_alive
+# 0). Ollama itself stays up.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 echo "[CORA] stopping..."
 
 # 1. CORA's own Python processes: command line holds this folder AND an entry point
-for pid in $(pgrep -f "boot_sequence.py|gui_launcher.py|stats_server.py|src/cora.py|ui/app.py|voice/converse.py" 2>/dev/null); do
+for pid in $(pgrep -f "boot_sequence.py|gui_launcher.py|stats_server.py|src/cora.py|ui/app.py|voice/converse.py|ui/image_viewer.py" 2>/dev/null); do
   if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q -F "$ROOT"; then
     echo "  killing $pid $(tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-90)"
     kill "$pid" 2>/dev/null
   fi
 done
 sleep 2
-for pid in $(pgrep -f "boot_sequence.py|gui_launcher.py|stats_server.py|src/cora.py|ui/app.py|voice/converse.py" 2>/dev/null); do
+for pid in $(pgrep -f "boot_sequence.py|gui_launcher.py|stats_server.py|src/cora.py|ui/app.py|voice/converse.py|ui/image_viewer.py" 2>/dev/null); do
   if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q -F "$ROOT"; then
     kill -9 "$pid" 2>/dev/null && echo "  force-killed $pid"
   fi
@@ -30,6 +31,17 @@ if [ -f data/run/voice-sidecar.pid ]; then
     echo "  stopping voice sidecar pid $VPID"; kill "$VPID" 2>/dev/null
   fi
   rm -f data/run/voice-sidecar.pid
+fi
+
+# 2b. her image engine, only if CORA started it
+if [ -f data/run/image-sidecar.pid ]; then
+  IPID="$(cat data/run/image-sidecar.pid)"
+  if [ -n "$IPID" ] && kill -0 "$IPID" 2>/dev/null && tr '\0' ' ' < "/proc/$IPID/cmdline" 2>/dev/null | grep -q "image_sidecar.py"; then
+    curl -s --max-time 3 -X POST http://127.0.0.1:5124/shutdown -d '{}' >/dev/null 2>&1
+    sleep 1
+    kill "$IPID" 2>/dev/null && echo "  stopping image engine pid $IPID"
+  fi
+  rm -f data/run/image-sidecar.pid
 fi
 
 # 3. unload her models from the GPU (Ollama stays running)

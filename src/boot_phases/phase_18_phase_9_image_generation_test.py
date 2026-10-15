@@ -42,9 +42,16 @@ def run(_m, L):
     print("=" * 50)
 
     try:
-        from cora_tools.image_gen import generate_image, show_fullscreen_image
-        print("  [OK] Image generation module loaded (Pollinations)")
-        _m.display_log("Pollinations image module loaded", "ok")
+        from cora_tools.image_gen import generate_image, show_image, checkpoint_path, sidecar_health, ensure_sidecar
+        ckpt = checkpoint_path()
+        if not ckpt.exists():
+            raise RuntimeError(f"image checkpoint not found: {ckpt} (config image.checkpoint)")
+        ok, msg = ensure_sidecar()
+        if not ok:
+            raise RuntimeError(f"image engine: {msg}")
+        h = sidecar_health()
+        print(f"  [OK] Image engine online: {h.get('checkpoint')} on {h.get('device')} ({msg})")
+        _m.display_log(f"Image engine online: local Stable Diffusion, {h.get('checkpoint')}", "ok")
         _m.BOOT_STATUS['tools_tested'].append({'name': 'Image Generation', 'status': 'OK'})
         if not L._demo:
             raise _m._SkippedPhase("boot.demo_phases is false")
@@ -88,14 +95,14 @@ def run(_m, L):
 
         print(f"  Seed: {random_seed}")
 
-        print("  Generating via Pollinations Flux model...")
-        _m.display_tool("Pollinations API", f"Generating 1280x720 image")
+        print("  Generating on her own image engine (local Stable Diffusion)...")
+        _m.display_tool("Image engine", f"Generating 1024x576 image")
         _m.display_action(f"Prompt: {cora_prompt}")
 
         result = generate_image(
             prompt=cora_prompt,
-            width=1280,
-            height=720,
+            width=1024,
+            height=576,
             seed=random_seed
         )
 
@@ -109,42 +116,20 @@ def run(_m, L):
             _m.BOOT_STATUS['boot_image'] = img_path
 
             print("  Displaying image...")
-            _m.display_action("Opening image display window...")
+            _m.display_action("Opening the image viewer (Save As / Open folder)...")
 
-            # Show image in a window
+            # the viewer is its own process (Save As, Open folder, Copy path); closes itself after 20 s here
             img_window = None
             try:
-                import tkinter as tk
-                from PIL import Image, ImageTk
-
                 if not _m._popups_enabled():
                     raise _m._SkippedPhase("result popups are off (boot.popups)")
-                # Use window manager for proper z-layering
-                parent = _m._boot_display.root if _m._boot_display else None
-                img_window = create_image_window(
-                    title="CORA - Image Generation Test",
-                    width=1280, height=720,
-                    parent=parent
-                )
-
-                # Load and display image
-                img = Image.open(img_path)
-                img = img.resize((1280, 720), Image.Resampling.LANCZOS)
-                photo = ImageTk.PhotoImage(img, master=img_window)
-
-                label = tk.Label(img_window, image=photo, bg='black')
-                label.image = photo  # Keep reference
-                label.pack(fill='both', expand=True)
-
-                img_window.update()
-                _m.display_result("Image displayed successfully")
-
+                if show_image(img_path, caption=cora_prompt, close_after=20):
+                    _m.display_result("Image shown in the viewer")
             except _m._SkippedPhase as e:
                 img_window = None
             except Exception as e:
                 print(f"  [INFO] Image display skipped: {e}")
                 _m.display_log(f"Image display skipped: {e}", "info")
-                img_window = None
 
             # Use AI vision to describe what CORA actually generated
             image_description = None
@@ -177,12 +162,7 @@ def run(_m, L):
                 response = _m.cora_respond("Image Generation", f"Image generated in {gen_time:.1f}s. Vision failed.", "warn")
                 _m.speak(response)
 
-            # Close image window after speaking
-            if img_window:
-                try:
-                    img_window.destroy()
-                except:
-                    pass
+            # the viewer closes itself (close_after); nothing to tear down here
         else:
             L.error = result.get('error', 'Unknown error')
             print(f"  [WARN] Image generation failed: {L.error}")

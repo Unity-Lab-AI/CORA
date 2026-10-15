@@ -812,26 +812,27 @@ async function runBootSequence() {
     await speakAndWait(visionResponse);
 
     // ================================================================
-    // PHASE 9.0: IMAGE GENERATION - Pollinations test + generate image
+    // PHASE 9.0: IMAGE GENERATION - her own local engine, test + generate image
     // ================================================================
     setPhase('imagegen', 'running');
     log('PHASE 9.0: IMAGE GENERATION', 'phase');
     updateProgress(90, 'Testing image generation...');
 
-    // Test Pollinations API first
-    log('Testing Pollinations API...', 'info');
-    const pollinationsOk = await checkPollinations();
-    if (pollinationsOk) {
-        log('Pollinations API - Online', 'ok');
-        document.getElementById('statPollinations').textContent = 'Online';
-        document.getElementById('statPollinations').className = 'stat-value';
+    // Her image engine: local Stable Diffusion behind the local CORA server
+    log('Checking her image engine...', 'info');
+    const imageOk = await checkImageEngine();
+    const statImages = document.getElementById('statImages');
+    if (imageOk) {
+        log('Image engine - Online (local)', 'ok');
+        statImages.textContent = 'Local';
+        statImages.className = 'stat-value';
     } else {
-        log('Pollinations API - Unavailable', 'warn');
-        document.getElementById('statPollinations').textContent = 'N/A';
-        document.getElementById('statPollinations').className = 'stat-value na';
+        log(CORA_LOCAL ? 'Image engine - Unavailable (checkpoint or sidecar missing)' : 'Image engine - needs the local CORA server', 'warn');
+        statImages.textContent = 'N/A';
+        statImages.className = 'stat-value na';
     }
 
-    if (pollinationsOk) {
+    if (imageOk) {
         // Random dark/creative prompts like desktop
         const imagePrompts = [
             "cyberpunk city at night, neon lights, rain, dark atmosphere",
@@ -844,41 +845,25 @@ async function runBootSequence() {
         const seed = Math.floor(Math.random() * 999999999);
 
         log(`Prompt: ${prompt}`, 'info');
-        log('Generating via Pollinations Flux...', 'info');
+        log('Generating on her own image engine...', 'info');
         const genStart = Date.now();
 
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=768&seed=${seed}&nologo=true`;
-
-        // Show image in modal while it loads
-        const imgModal = showImageModal(imageUrl, 'CORA - Generated Image');
-
-        // Wait for image to load and get base64 for llava analysis
-        let imageLoaded = false;
+        let imgModal = null;
         let image_description = null;
         try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = imageUrl;
-            });
-            imageLoaded = true;
+            const gen = await generateImageLocal(prompt, { width: 1024, height: 576, seed });
             const genTime = ((Date.now() - genStart) / 1000).toFixed(1);
-            log(`Image generated in ${genTime}s`, 'ok');
+            log(`Image generated in ${genTime}s (seed ${gen.seed}) - saved at ${gen.path}`, 'ok');
 
-            // Convert to base64 and analyze with llava - EXACT like desktop line 2440-2461
-            log('Analyzing generated image with llava...', 'info');
-            const imgCanvas = document.createElement('canvas');
-            imgCanvas.width = img.width;
-            imgCanvas.height = img.height;
-            imgCanvas.getContext('2d').drawImage(img, 0, 0);
-            const imgBase64 = imgCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            // the picture with its Download link; the file is already on disk
+            imgModal = showGeneratedImage(gen, prompt);
 
+            // Analyze what she made with her own eyes
+            log('Analyzing generated image with vision...', 'info');
             try {
+                const imgBase64 = await imageUrlToBase64(gen.url);
                 image_description = await analyzImageWithLlava(imgBase64, 'Describe this image in detail. What do you see? Be specific about the scene, objects, colors, mood, and style.');
                 if (image_description) {
-                    // Clean markdown like desktop
                     image_description = image_description.replace(/\*\*([^*]+)\*\*/g, '$1');
                     image_description = image_description.replace(/\*([^*]+)\*/g, '$1');
                     image_description = image_description.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -890,7 +875,6 @@ async function runBootSequence() {
 
             setPhase('imagegen', 'ok');
 
-            // SPEAK the actual description like desktop line 2461
             if (image_description && image_description.length > 10) {
                 await speakAndWait(image_description);
             } else {
@@ -904,14 +888,14 @@ async function runBootSequence() {
             await speakAndWait(imgFail);
         }
 
-        // Wait then close modal before moving on
+        // Wait then close the modal before moving on (the file stays in data/images)
         await sleep(5000);
-        imgModal.close();
+        if (imgModal) imgModal.close();
         log('Image generation complete, modal closed', 'info');
     } else {
-        log('Image generation unavailable - API down', 'warn');
+        log('Image generation unavailable - engine offline', 'warn');
         setPhase('imagegen', 'warn');
-        const imgWarn = await coraRespond('Image', 'Image generation unavailable, Pollinations API down.', 'warn');
+        const imgWarn = await coraRespond('Image', 'Image generation unavailable, image engine offline.', 'warn');
         await speakAndWait(imgWarn);
     }
 

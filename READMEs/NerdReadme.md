@@ -28,6 +28,8 @@ Read this first; the sections below it are the December 2025 write-up kept for h
    ears: voice/stt.py (faster-whisper, one shared model) -> wake word -> dispatcher; ambient awareness watches the rest
    eyes: services/camera.py (probed, timeout-guarded) / cora_tools/screenshots.py -> the brain reads the image
    web:  cora_tools/web.py (DuckDuckGo HTML -> headless Chromium DDG/Brave/Bing -> Bing HTTP), readable fetch
+ images: cora_tools/image_gen.py -> services/image_sidecar.py (local Stable Diffusion, :5124, on the torch interpreter)
+         txt2img / img2img / inpaint / face lock; ui/image_viewer.py shows the result (Save As, Open folder)
  config: config/config.json through ai/config.py (atomic saves); logs: ai/log.py tee -> data/logs/
  launch: CORA.bat / windows/start.bat / linux/start.sh -> scripts/bootstrap.py -> src/boot_sequence.py; stop scripts end it all
 ```
@@ -39,6 +41,9 @@ Read this first; the sections below it are the December 2025 write-up kept for h
 | `ai/log.py` | daily log file + stdout/stderr tee |
 | `ai/tools_registry.py` | `Tool` dataclass, `_tool` decorator, `select_tools`, `execute` |
 | `services/camera.py` | the only place a webcam is opened |
+| `services/image_sidecar.py` | her image engine: realistic-vision-v51 through diffusers, HTTP on 127.0.0.1:5124 (`/txt2img`, `/img2img`, `/inpaint`, `/unload`, `/shutdown`, `/health`) |
+| `cora_tools/image_gen.py` | the engine's client: `generate_image`, `edit_image`, `recreate_camera`, `save_image`, `show_image`, sidecar start/stop, `release()` on exit |
+| `ui/image_viewer.py` | the picture window, its own process |
 | `cora_tools/vision.py` | screenshot / camera snapshot helpers for ambient awareness |
 | `voice/unity_voice.py` | sidecar client: `voice_text()` (four-mark vocabulary), `synth_delivery()`, autostart, turn lock |
 
@@ -150,12 +155,12 @@ response = cora_respond("Hardware", "CPU 15%, RAM 45%, GPU RTX 4070 Ti", "ok", "
 
 ### Image Generation (cora_tools/image_gen.py)
 
-**API:** Pollinations Flux model
+**Engine:** local Stable Diffusion sidecar (`services/image_sidecar.py`) since 2026-10-14; December 2025 used a hosted API
 
 ```python
 def generate_image(prompt: str, save_path: str = None) -> str:
     """
-    Generate AI image via Pollinations API.
+    Generate an image on her own local engine.
 
     Args:
         prompt: Image description
@@ -301,22 +306,21 @@ GET /api/tags       # List models
 
 ### cora_tools/image_gen.py (Image Generation)
 
-**API:** Pollinations Flux
+**Engine:** `services/image_sidecar.py`, local Stable Diffusion (realistic-vision-v51, diffusers, DPM++), the same rig Unity's stream renders with
 
 ```python
-# URL format
-https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&model=flux
-
-# Example usage
-from cora_tools.image_gen import generate_image
-path = generate_image("a cyberpunk city at night")
+from cora_tools.image_gen import generate_image, edit_image, recreate_camera, save_image, show_image
+r = generate_image("a cyberpunk city at night", width=1024, height=576)      # {'success', 'path', 'seed', 'inference_time', ...}
+e = edit_image('last', 'the same city at dawn', strength=0.55)                # img2img; box=[x0,y0,x1,y1] -> inpaint
+c = recreate_camera('a renaissance oil painting', strength=0.6, keep_face=True)
+save_image('~/Desktop', 'last'); show_image(r['path'], caption='...')
 ```
 
 **Features:**
-- Automatic prompt encoding
-- Configurable dimensions
-- Auto-save to data/images/
-- Timestamp-based filenames
+- txt2img, img2img, inpainting by region, IP-Adapter face lock (the person in a camera shot stays themselves)
+- GPU with CPU offload (about 3 GB VRAM while rendering), CPU when there is no GPU
+- The sidecar runs on the interpreter that has torch (auto-detected, `CORA_IMAGE_PYTHON`), starts on the first picture, stops with CORA
+- Auto-save to data/images/, timestamp-based filenames, `last_image()` for "that one"
 
 ---
 
@@ -473,7 +477,7 @@ COMMANDS = {
 | Chat | Network | Ollama API latency |
 | TTS (unity-voice-v2) | GPU | ~0.5 s per sentence, synthesised one ahead of playback |
 | cora_respond() | Network | Ollama generate (~2-5s) |
-| Image generation | Network | Pollinations API (~5-15s) |
+| Image generation | GPU | local Stable Diffusion (3-5 s on an RTX 4070 Ti at 768px; 1-2 min on CPU) |
 | Presence | CPU/Camera | Frame capture + detection |
 | Boot sequence | Network | Weather/location API calls |
 | System stats | CPU | nvidia-smi subprocess (~100ms) |
@@ -547,7 +551,7 @@ C.O.R.A/
 │   ├── context.py           # Context management
 │   └── router.py            # Model routing
 ├── cora_tools/
-│   ├── image_gen.py         # Pollinations AI image gen
+│   ├── image_gen.py         # image engine client (local Stable Diffusion sidecar)
 │   ├── screenshots.py       # Screen/window capture
 │   ├── tasks.py             # Task management
 │   ├── memory.py            # Working memory
@@ -559,6 +563,7 @@ C.O.R.A/
 │   ├── weather.py           # Weather API
 │   ├── location.py          # IP geolocation
 │   ├── presence.py          # Webcam detection
+│   ├── image_sidecar.py     # Her image engine (local Stable Diffusion)
 │   └── notifications.py     # System notifications
 ├── config/
 │   ├── settings.json        # GUI settings

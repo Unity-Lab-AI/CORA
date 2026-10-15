@@ -384,16 +384,61 @@ async function getOllamaModels() {
     } catch { return []; }
 }
 
-async function checkPollinations() {
+// ------------------------------------------------------------
+// Her image engine: local Stable Diffusion behind the local CORA server
+// (/image/health, /image/generate, the pictures under /images/). Opened
+// without the local server there is no image engine.
+// ------------------------------------------------------------
+async function checkImageEngine() {
+    if (!CORA_LOCAL) return false;
     try {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-            setTimeout(() => resolve(false), 5000);
-            img.src = 'https://image.pollinations.ai/prompt/test?width=64&height=64&nologo=true';
-        });
+        const r = await fetch(STATS_BASE + '/image/health', { signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return false;
+        const h = await r.json();
+        return !!h.available;
     } catch { return false; }
+}
+
+async function generateImageLocal(prompt, opts = {}) {
+    if (!CORA_LOCAL) throw new Error('needs the local CORA server');
+    const r = await fetch(STATS_BASE + '/image/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CORA-Token': CORA_LOCAL.token },
+        body: JSON.stringify(Object.assign({ prompt }, opts)),
+        signal: AbortSignal.timeout(900000)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+    d.url = STATS_BASE + d.url;
+    return d;
+}
+
+function showGeneratedImage(gen, prompt) {
+    // the picture, a Download link (the same file she saved) and where it lives on disk
+    const { content, close } = createDynamicModal('CORA - Generated Image', 1000, 760);
+    const name = String(gen.path || gen.url).split(/[\\/]/).pop();
+    const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    content.style.padding = '0';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.innerHTML = `
+        <img src="${gen.url}" style="flex: 1; min-height: 0; width: 100%; object-fit: contain; background: black;">
+        <div style="padding: 8px 12px; background: #0a0a0f; color: #ccc; font-size: 12px; display: flex; gap: 14px; align-items: center;">
+            <a href="${gen.url}" download="${esc(name)}" style="color: #000; background: #ff00ff; padding: 6px 12px; border-radius: 4px; font-weight: bold; text-decoration: none;">Download</a>
+            <span style="color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(gen.path)}">saved at ${esc(gen.path || name)}</span>
+        </div>
+        <div style="padding: 0 12px 8px; background: #0a0a0f; color: #888; font-size: 11px;">${esc(prompt)}</div>`;
+    return { close };
+}
+
+async function imageUrlToBase64(url) {
+    const blob = await (await fetch(url)).blob();
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1]);
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+    });
 }
 
 // Store location coords for reuse

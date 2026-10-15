@@ -19,9 +19,14 @@ The full repair. Everything below came out of the system audit (`docs/SYSTEM_AUD
 
 ### Runtime
 - Python 3.13 virtual environment, `CORA.bat` bootstrap (Ollama, configured models, yt-dlp, Playwright, voice sidecar), `requirements.txt` rewritten for numpy 2.
-- Pollinations image generation on the current API. Location over HTTPS.
+- Location over HTTPS.
 - Stats server: launch token, origin allowlist, model-name validation, serves the web version locally with a voice proxy.
 - Shell injection in the YouTube pipeline fixed; file tools confined to allowed roots; self-modification gated.
+
+### Images (later the same day)
+- The hosted image API is gone from the code, the config, the launchers, the web page and every doc. Her own image engine replaces it: `services/image_sidecar.py`, local Stable Diffusion with the stream's `realistic-vision-v51` checkpoint through diffusers, running as a sidecar on the interpreter that has torch (the voice sidecar's). Text to image, img2img edits, inpainting by region, webcam recreations with the face kept (IP-Adapter Plus Face). GPU with CPU offload by default; released with her brain on every exit and by the stop scripts.
+- Tools: `generate_image`, `edit_image` (a path, "last" or "camera"), `recreate_camera`, `save_image`, `show_image`, `recent_images`. Every picture opens in `ui/image_viewer.py` (Save As, Open folder, Copy path).
+- Web page: `/image/health`, `/image/generate` and the pictures under `/images/` on the local server; the boot phase shows the picture with a Download link; the key field is gone.
 
 ### Housekeeping
 - `pyproject.toml`, compile-only CI, this changelog, `docs/NOW.md` single-focus snapshot.

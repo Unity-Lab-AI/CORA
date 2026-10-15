@@ -102,11 +102,7 @@
     <div class="modal-overlay" id="apiModal">
         <div class="modal">
             <h2>API Configuration</h2>
-            <div class="modal-field">
-                <label>Pollinations API Key (optional)</label>
-                <input type="password" id="pollinationsKey" placeholder="pk_...">
-                <a href="https://pollinations.ai" target="_blank">Get key at pollinations.ai</a>
-            </div>
+            <p style="color: #888; font-size: 11px; margin-bottom: 12px;">Images render on CORA's own local engine (no key). Only the GitHub token is optional here.</p>
             <div class="modal-field">
                 <label>GitHub Token (optional)</label>
                 <input type="password" id="githubToken" placeholder="ghp_...">
@@ -240,7 +236,7 @@
                     <div class="stats-header">── SERVICE STATUS ──</div>
                     <div class="stats-grid">
                         <div class="stat-item"><span class="stat-label">Ollama:</span><span class="stat-value" id="statOllama">--</span></div>
-                        <div class="stat-item"><span class="stat-label">Pollinations:</span><span class="stat-value" id="statPollinations">--</span></div>
+                        <div class="stat-item"><span class="stat-label">Images:</span><span class="stat-value" id="statImages">--</span></div>
                         <div class="stat-item"><span class="stat-label">Weather:</span><span class="stat-value" id="statWeather">--</span></div>
                         <div class="stat-item"><span class="stat-label">Boot:</span><span class="stat-value" id="statBootTime">--</span></div>
                     </div>

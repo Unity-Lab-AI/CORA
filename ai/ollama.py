@@ -246,6 +246,15 @@ def unload_models(names: Optional[List[str]] = None, timeout: int = 15) -> List[
             done.append(name)
         except Exception:
             pass
+    if names is None:
+        # her image engine leaves the GPU with her brain (the sidecar she started is stopped)
+        try:
+            from cora_tools.image_gen import release as _release_image
+            state = _release_image()
+            if state in ('stopped', 'unloaded'):
+                done.append(f'image engine ({state})')
+        except Exception:
+            pass
     return done
 
 

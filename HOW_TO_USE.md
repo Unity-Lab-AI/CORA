@@ -23,7 +23,7 @@ CORA is your computer friend who can:
 - **Remember things** for you (tasks, notes, facts)
 - **See you** through your webcam
 - **Help you** with questions (she's smart like ChatGPT)
-- **Generate images** (describe what you want and she creates it!)
+- **Make and edit pictures** (on her own local engine: describe it, change it, turn a webcam shot into art, save it where you say)
 - **Monitor your system** (CPU, RAM, GPU stats in real-time)
 
 ---
@@ -147,7 +147,10 @@ python src/boot_sequence.py --quick
 |--------------|--------------|
 | `see` | CORA looks through webcam and describes what she sees |
 | `see what color is my shirt?` | Ask specific questions about the camera view |
-| `imagine a sunset over mountains` | CORA generates an AI image |
+| `imagine a sunset over mountains` | CORA paints it on her own engine and opens it in a window |
+| `make that one a rainy night` | she edits the last picture (talk to her: edit, restyle, change colors or clothes) |
+| `make a picture of me as a vampire` | a webcam shot recreated with your face kept |
+| `save that to my desktop` | she copies the picture where you said |
 
 ### YouTube & Media
 
@@ -209,7 +212,9 @@ imagine a cute robot eating pizza
 imagine a dragon flying over a castle
 ```
 
-Images are saved to `data/images/` folder.
+Every picture opens in her viewer window: **Save As...**, **Open folder**, **Copy path**, Esc closes. Images are saved to `data/images/` (and wherever you tell her: "save that to D:\art").
+
+Editing and the camera (just talk to her): "make it night", "give her a red jacket", "repaint the left half as a forest", "take a picture of me and make it a painting", "edit the camera shot, make my room a spaceship". The engine is local Stable Diffusion, the same rig Unity's stream renders with; nothing is uploaded anywhere.
 
 ---
 
@@ -229,7 +234,8 @@ Images are saved to `data/images/` folder.
 2. Her voice runs as a sidecar: check `http://127.0.0.1:5123/health` and `data/voice-sidecar.log`
 
 ### No images generating?
-1. Check internet connection (uses Pollinations AI)
+1. Her engine is local: check `http://127.0.0.1:5123/health` is her voice and `http://127.0.0.1:5124/health` is her image engine
+2. The checkpoint path is `image.checkpoint` in `config/config.json`; the engine log is `data/image-sidecar.log`
 
 ### YouTube not working?
 1. Download mpv from link above
@@ -266,7 +272,8 @@ VOICE:
 
 VISION:
   see             = Describe webcam view
-  imagine <desc>  = Generate an image
+  imagine <desc>  = Generate an image (opens in the viewer: Save As / Open folder)
+  (talk to her)   = "edit that: ...", "picture of me as ...", "save that to ..."
 
 MEDIA:
   play <search>   = Play YouTube video

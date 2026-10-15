@@ -191,7 +191,8 @@ def cmd_imagine(args, tasks):
     from src.cora_parts.chat import respond
     """Generate an image from a text prompt. Usage: imagine <description>
 
-    Uses Pollinations.AI via PolliLibPy for image generation.
+    Renders on her own local image engine (services/image_sidecar.py) and opens
+    the viewer window (Save As, Open folder).
     """
     if not args:
         respond('error', {'message': "What should I create? Usage: imagine <description>"})
@@ -212,7 +213,7 @@ def cmd_imagine(args, tasks):
             print(f"[CORA]: Generated in {result['inference_time']:.1f}s")
             speak("Done. Opening image.")
 
-            # Show the image
+            # the viewer: its own process, Save As / Open folder / Copy path
             show_fullscreen_image(result['path'])
         else:
             respond('error', {'message': f"Generation failed: {result.get('error', 'Unknown')}"})

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-> **Unity AI Lab** | Last Updated: 2025-12-25
+> **Unity AI Lab** | Last Updated: 2026-10-14
 
 ---
 
@@ -23,7 +23,7 @@ All of this stays on YOUR computer:
 | Knowledge base | `data/knowledge.json` | Stuff you teach CORA |
 | Camera snapshots | `data/camera/` | Vision features |
 | Screenshots | `data/snapshots/` | When you ask for them |
-| Generated images | `data/images/` | AI art you create |
+| Generated images | `data/images/` | Pictures she makes on her own local engine (prompts never leave the machine) |
 
 **None of this leaves your machine.** Ever.
 
@@ -42,7 +42,6 @@ CORA can connect to these if YOU enable them:
 When using the web version, these external services may be contacted:
 - **wttr.in** - Weather data (no API key, anonymous)
 - **Google News RSS** - Headlines (public RSS, no tracking)
-- **Pollinations.ai** - Image generation (prompts sent, no account needed)
 - **Invidious** - YouTube search (privacy-focused YouTube frontend)
 
 ### What We DON'T Do

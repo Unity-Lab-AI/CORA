@@ -38,6 +38,7 @@ disagree, this section wins.
 | Voice | `unity-voice-v2` (the lab's own trained voice) as a sidecar on 127.0.0.1:5123; her designators go straight to it; text normalised to her four marks. No other voice, no fallback voice. | `voice/tts.py`, `voice/unity_voice.py`, `voice/tts_mutex.py` |
 | Ears | faster-whisper on CUDA (one shared model), fuzzy wake word on the transcript stream, optional openWakeWord model. Vosk only as a fallback engine. | `voice/stt.py`, `voice/wake_word.py`, `voice/converse.py` |
 | Eyes | Timeout-guarded, probed camera layer (index x backend, config `camera.*`); screenshots; the brain describes images itself. | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py`, `services/presence.py` |
+| Images | Her own image engine, the same Stable Diffusion rig Unity's stream renders with: `realistic-vision-v51` through diffusers as a sidecar on the torch interpreter (127.0.0.1:5124, config `image.*`). Text to image, img2img edits, inpainting by region, webcam recreations with the face kept (IP-Adapter Plus Face). GPU with CPU offload; unloaded with her brain on every exit. Every picture opens in the viewer (Save As, Open folder); `save_image` copies it where the user says. No hosted image API, no key. | `services/image_sidecar.py`, `cora_tools/image_gen.py`, `ui/image_viewer.py`, `ai/tools/vision.py` |
 | Web | Search through DuckDuckGo HTML, then DuckDuckGo/Brave/Bing in a headless Chromium (Playwright), then Bing HTTP with a relevance guard; readable page fetch with browser rendering for blocked or script-built pages. | `cora_tools/web.py`, `cora_tools/browser.py` |
 | Boot | `src/boot_sequence.py`: 10 phases with spoken status (About names all four creators), daily briefing, reminder checker, ambient awareness; demo phases and result popups off by default (`boot.demo_phases`, `boot.popups`). | `src/boot_sequence.py`, `ui/boot_display.py` |
 | Other doors | GUI (`src/gui_launcher.py` -> `ui/app.py`, `ui/panels.py`), CLI (`src/cora.py`), web page served by `services/stats_server.py` with `/voice/say`, `/api/prompt` and the configured models injected. | |
@@ -954,7 +955,6 @@ Auto-deploys on push to main branch.
 ### API Key Management
 | Key | Storage | Validation | Get Key Link |
 |-----|---------|------------|--------------|
-| Pollinations | `cora_pollinations_key` | Ping API on boot | pollinations.ai/dashboard |
 | GitHub | `cora_github_key` | Ping /user endpoint | github.com/settings/tokens |
 
 ---
@@ -967,7 +967,7 @@ Auto-deploys on push to main branch.
 | Location | ip-api.com | Geolocation from IP |
 | Calendar | Google Calendar API (optional) | Events sync |
 | Search | DuckDuckGo (if online) | Web search |
-| Pollinations | pollinations.ai | Image generation |
+| Image engine | local (`services/image_sidecar.py`, 127.0.0.1:5124) | Image generation, editing, camera recreations (replaced the hosted image API on 2026-10-14) |
 | GitHub | api.github.com | Repository access, code ops |
 | Ollama | localhost:11434 | Local AI inference |
 

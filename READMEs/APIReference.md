@@ -78,6 +78,19 @@ summarize_url(url) ; instant_answer(query)
 
 # cora_tools/vision.py
 capture_screenshot() -> Path|None ; capture_camera_snapshot(save_path=None) -> Path|None ; describe_screen(prompt) ; describe_camera(prompt)
+
+# cora_tools/image_gen.py  (her image engine: services/image_sidecar.py, local Stable Diffusion on 127.0.0.1:5124)
+generate_image(prompt, width=None, height=None, seed=None, output_path=None, negative=None, steps=None, face=None) -> {'success', 'path', 'seed', 'width', 'height', 'inference_time', 'engine', ...}
+edit_image(source, prompt, strength=0.55, box=None, keep_face=False, ...)     # source: path | 'last' | 'camera'; box -> inpaint
+recreate_camera(prompt='', strength=0.6, keep_face=True, ...) ; generate_boot_image(prompt=None)
+save_image(destination, source='last') ; show_image(path, caption=None, close_after=None) ; show_fullscreen_image(path, duration=None)
+last_image() ; get_recent_images(limit) ; ensure_sidecar() ; sidecar_health() ; release() ; release_gpu() ; stop_sidecar()
+
+# services/image_sidecar.py  (HTTP, JSON in, image/png out with X-Seed / X-Seconds / X-Size)
+GET /health ; POST /txt2img {prompt, negative?, width?, height?, steps?, guidance?, seed?, face?, face_scale?}
+POST /img2img {prompt, image(b64), strength?, ...} ; POST /inpaint {prompt, image, mask(b64)? | box?, ...} ; POST /unload ; POST /shutdown
+
+# ai/tools (images): generate_image, edit_image, recreate_camera, save_image, show_image, recent_images
 ```
 
 ### config/config.json (3.0.0 blocks)
@@ -91,6 +104,7 @@ capture_screenshot() -> Path|None ; capture_camera_snapshot(save_path=None) -> P
 | `tts` | `enabled`, `volume`, `presence_gate`, `unity_voice` {`url`, `model_dir`, `python`, `autostart`, `default_intensity`} |
 | `stt` | `engine`, `whisper_model`, `device`, `wake_word`, `sensitivity` |
 | `camera` | `enabled`, `index`, `backend`, `open_timeout` |
+| `image` | `url`, `checkpoint`, `python`, `device`, `offload`, `autostart`, `steps`, `width`, `height`, `save_dir` |
 | `boot` | `demo_phases`, `popups`, `github_import` |
 | `web` | `allowed_origins` |
 
@@ -102,7 +116,8 @@ capture_screenshot() -> Path|None ; capture_camera_snapshot(save_path=None) -> P
 | `CORA_CHAT_MODEL`, `CORA_VISION_MODEL`, `CORA_CODE_MODEL`, `CORA_THINK_MODEL`, `CORA_NUM_CTX` | model overrides |
 | `CORA_HISTORY_FILE` | scratch transcript for checks |
 | `UNITY_VOICE_TTS_URL`, `UNITY_VOICE_MODEL_DIR`, `UNITY_VOICE_PYTHON` | her voice sidecar |
-| `POLLINATIONS_API_KEY`, `GITHUB_TOKEN` | optional keys (`.claude/.env`) |
+| `CORA_IMAGE_URL`, `CORA_IMAGE_CHECKPOINT`, `CORA_IMAGE_PYTHON`, `CORA_IMAGE_DEVICE` | her image engine sidecar |
+| `GITHUB_TOKEN` | optional key (`.env`) |
 
 ---
 
@@ -771,8 +786,10 @@ def execute_tool(name: str, args: str) -> str:
 
 ### tools/image_gen.py - Image Generation
 
+December 2025 design (a hosted image API). Since 2026-10-14 the module is the client of her local engine; the shipped signatures are in the Current API section.
+
 ```python
-POLLINATIONS_API = "https://image.pollinations.ai/prompt/"
+# (the hosted endpoint constant is gone; the engine is services/image_sidecar.py on 127.0.0.1:5124)
 
 def generate_image(prompt: str, width: int = 512,
                    height: int = 512) -> bytes:
