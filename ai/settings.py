@@ -47,7 +47,9 @@ _DEFAULTS: Dict[str, Any] = {
 # Modelfile and MUST always get the same num_ctx (32768): a request with a
 # different context makes Ollama reload it with a huge default (~14 GB).
 _MODEL_OPTIONS: Dict[str, Dict[str, Any]] = {
-    'unity-brain': {'num_ctx': 32768, 'temperature': 1.0, 'top_k': 20, 'top_p': 0.95, 'presence_penalty': 1.5},
+    # temperature/presence are calmer than her stream Modelfile (1.0 / 1.5): at those
+    # values she skips tool calls and riffs on stale answers; 0.7 / 1.0 keep the voice
+    'unity-brain': {'num_ctx': 32768, 'temperature': 0.7, 'top_k': 20, 'top_p': 0.95, 'presence_penalty': 1.0},
 }
 
 _cache: Optional[Dict[str, Any]] = None
@@ -55,10 +57,14 @@ _cache: Optional[Dict[str, Any]] = None
 
 def _read_config() -> Dict[str, Any]:
     try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        from ai import config as _config
+        return _config.load()
     except Exception:
-        return {}
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
 
 
 def _normalize_url(url: str) -> str:

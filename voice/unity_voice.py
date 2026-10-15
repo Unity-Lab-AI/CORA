@@ -31,6 +31,7 @@ import io
 import json
 import os
 import re
+import unicodedata
 import shutil
 import subprocess
 import sys
@@ -81,6 +82,10 @@ def voice_text(text: str) -> str:
     keep their brackets.
     """
     t = str(text)
+    # accented letters -> their base letter (cafe, naive, resume); symbols she can say -> words
+    t = ''.join(c for c in unicodedata.normalize('NFKD', t) if not unicodedata.combining(c))
+    t = t.replace('&', ' and ').replace('%', ' percent ').replace('+', ' plus ').replace('=', ' equals ')
+    t = t.replace('@', ' at ').replace('$', ' dollars ').replace('#', ' number ')
     keep = {}
     for i, m in enumerate(re.findall(r"\[(?:laughter|breath)\]", t, flags=re.I)):
         key = "\x00%d\x00" % i
@@ -92,7 +97,13 @@ def voice_text(text: str) -> str:
     t = re.sub(r"[\"\u201c\u201d\u201e\u00ab\u00bb]", "", t)                       # double quotes: silent
     t = re.sub(r"(?<![A-Za-z0-9])['\u2018\u2019`]+|['\u2018\u2019`]+(?![A-Za-z0-9])", "", t)   # quotes, not don't
     t = t.replace("\u2019", "'").replace("\u2018", "'")
-    t = re.sub(r"\s*(?:[;:]|--+|[\u2014\u2013]|[()\[\]{}<>]|\*+|_+|\|+|\^+|~+|\\+|/(?!\d))\s*", ", ", t)
+    # every dash-like code point (em/en/figure/horizontal bar/minus/fullwidth, soft hyphen), bullets,
+    # a spaced hyphen and a leading "- " list marker all become the pause she has
+    t = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\u2043\ufe58\ufe63\uff0d\u00ad]", " - ", t)
+    t = re.sub(r"[\u2022\u25cf\u25e6\u2023\u2219\u00b7]", ", ", t)
+    t = re.sub(r"(^|\n)\s*-\s+", r"\1", t)
+    t = re.sub(r"\s+-\s+", ", ", t)
+    t = re.sub(r"\s*(?:[;:]|--+|[()\[\]{}<>]|\*+|_+|\|+|\^+|~+|\\+|/(?!\d))\s*", ", ", t)
     t = re.sub(r"\s*([,.?])", r"\1", t)                                              # no space before a mark
     t = re.sub(r"([,.?])(?=[^\s,.?])", r"\1 ", t)                                    # one space after a mark
     for _ in range(3):
@@ -102,9 +113,16 @@ def voice_text(text: str) -> str:
         t = re.sub(r"\.(?:\s*\.)+", ".", t)
         t = re.sub(r"\?(?:\s*[?.])+", "?", t)
     t = re.sub(r"\s+", " ", t).strip().lstrip(",.? ").strip()
+    # last guard: her vocabulary is letters, digits, apostrophes inside words and the four marks.
+    # Anything else that slipped through (a stray symbol, an accent she has no phoneme for) becomes
+    # a space so the WHOLE line is not refused; words are never dropped.
+    t = re.sub(r"[^A-Za-z0-9 ,.?'\x00]", " ", t)
+    t = re.sub(r"(?<![A-Za-z0-9])'|'(?![A-Za-z0-9])", "", t)
+    t = re.sub(r"\s*([,.?])", r"\1", t)
+    t = re.sub(r",(?:\s*,)+", ",", t)
     for key, m in keep.items():
         t = t.replace(key, " " + m + " ")
-    t = re.sub(r"\s+", " ", t).strip()
+    t = re.sub(r"\s+", " ", t).strip().lstrip(",.? ").strip()
     return t
 
 
@@ -335,8 +353,15 @@ def ensure_sidecar(timeout: float = 45.0) -> Tuple[bool, str]:
             flags = 0
             if os.name == 'nt':
                 flags = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, 'DETACHED_PROCESS', 0)
-            subprocess.Popen([py, '-u', str(serve), '--port', str(port)], cwd=str(MODEL_DIR),
-                             stdout=log, stderr=log, stdin=subprocess.DEVNULL, creationflags=flags)
+            proc = subprocess.Popen([py, '-u', str(serve), '--port', str(port)], cwd=str(MODEL_DIR),
+                                    stdout=log, stderr=log, stdin=subprocess.DEVNULL, creationflags=flags)
+            # stop.bat / stop.sh end only sidecars CORA started herself (the stream has its own)
+            try:
+                run_dir = PROJECT_DIR / 'data' / 'run'
+                run_dir.mkdir(parents=True, exist_ok=True)
+                (run_dir / 'voice-sidecar.pid').write_text(str(proc.pid), encoding='utf-8')
+            except Exception:
+                pass
         except Exception as e:
             return False, f"could not start sidecar: {e}"
         deadline = time.time() + timeout

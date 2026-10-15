@@ -352,8 +352,16 @@ class StatsHandler(BaseHTTPRequestHandler):
         body = target.read_bytes()
         if target.name == 'index.html':
             # Hand the page its token + Ollama URL without exposing them to other origins.
-            inject = ('<script>window.CORA_LOCAL={token:%s,ollama:%s,stats:"http://127.0.0.1:%d"};</script>'
-                      % (json.dumps(get_token()), json.dumps(_ollama_url()), self.server.server_port))
+            local = {'token': get_token(), 'ollama': _ollama_url(),
+                     'stats': 'http://127.0.0.1:%d' % self.server.server_port}
+            try:
+                from ai import settings as _s
+                local['models'] = {'chat': _s.chat_model(), 'vision': _s.vision_model(), 'code': _s.code_model()}
+                local['num_ctx'] = _s.num_ctx()
+                local['version'] = str((_s._read_config() or {}).get('version') or '3.0.0')
+            except Exception:
+                pass
+            inject = '<script>window.CORA_LOCAL=%s;</script>' % json.dumps(local)
             body = body.replace(b'<head>', b'<head>' + inject.encode('utf-8'), 1)
         self.send_bytes(body, _MIME.get(target.suffix.lower(), 'application/octet-stream'))
 
@@ -380,6 +388,12 @@ class StatsHandler(BaseHTTPRequestHandler):
             self.send_json({'models': get_ollama_models()})
         elif path == '/voice/health':
             self.send_json(voice_health())
+        elif path == '/api/prompt':
+            # the one system prompt, so the web page and the desktop share a personality
+            try:
+                self.send_bytes((PROJECT_DIR / 'config' / 'system_prompt.txt').read_bytes(), 'text/plain; charset=utf-8')
+            except Exception as e:
+                self.send_json({'error': str(e)}, 404)
         elif path == '/' or path.startswith('/web/') or not path.startswith(('/setup', '/voice', '/api')):
             self._serve_static(path[4:] if path.startswith('/web/') else path)
         else:

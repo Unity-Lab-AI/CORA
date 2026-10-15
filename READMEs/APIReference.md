@@ -2,11 +2,111 @@
 
 ## Module & Function Reference
 
-Version 1.0.0
+Version 3.0.0 (2026-10-14)
 
 ---
 
-## Table of Contents
+## Current API (3.0.0)
+
+The signatures below are the ones in the code today. The reference that follows them is the December 2025 design listing (kept; several names in it never shipped as written).
+
+```python
+# ai/dispatcher.py
+get_dispatcher() -> Dispatcher
+Dispatcher.handle(text, speak=True, on_event=None, stream=True, tools_enabled=True,
+                  allowed_tools=None) -> DispatchResult(text, tool_calls, spoke, error, pending_confirmation, elapsed)
+    # on_event(kind, payload): thinking, token, sentence, tool_call, tool_result, confirm_needed, final, error
+Dispatcher.voice_mode() -> 'say_tool' | 'stream'
+Dispatcher.confirm_callback = fn(question) -> True/False/None
+ask(text, speak=False) -> str
+
+# ai/tools_registry.py
+@_tool(name, description, category, params={name: _p(desc, type, enum)}, required=[...], confirm=False, speak_result=False)
+all_tools() / get_tool(name) / tool_schemas() / tool_catalog_text()
+select_tools(text, max_tools=40) -> [Tool]        # core set + best keyword matches
+execute(name, arguments) -> {'ok': bool, 'message'|'error': str, ...}
+CORE_TOOLS, SAY_EMOTIONS, SAY_ACTS
+
+# ai/history.py
+get_history() -> ConversationHistory
+.add_exchange(user_text, assistant_text, turn_messages=None)   # tool calls + results kept
+.messages_for_model(system_prompt) / .needs_summary(system_prompt) / .fold_into_summary(summarizer) / .clear()
+# env CORA_HISTORY_FILE -> scratch transcript for checks
+
+# ai/ollama.py  (think=False by default on every call)
+chat(messages, model=None, system=None, temperature=None, max_tokens=None, timeout=None, tools=None, think=False) -> OllamaResponse
+chat_stream_events(...) -> yields {'type': 'token'|'tool_calls'|'done'|'error', ...}
+generate(prompt, model=None, system=None, ...) -> OllamaResponse
+generate_with_image(prompt, image_path, model=None, ...) -> OllamaResponse ; analyze_image(image_path, prompt) -> str
+warm_up(model=None) / model_capabilities(model) / has_model(model) / list_models() / pull_model(name) / summarize(text)
+
+# ai/settings.py
+ollama_url() chat_model() vision_model() code_model() think_model() num_ctx(model=None) keep_alive()
+model_options(model=None) base_options(temperature_override=None, max_tokens_override=None, model=None)
+creators() -> {'lab', 'names', 'roles', 'spoken'} ; reload()
+
+# ai/config.py
+load(force=False) get(dotted, default=None) section(name) save(cfg) update(mutator) version()
+
+# ai/log.py
+setup(name='cora', keep_days=14, tee=True) -> Path ; get_logger(name) ; log_path()
+
+# voice/tts.py
+UnityVoiceTTS().speak(text, emotion='neutral', speech_act=None) -> bool
+TTSQueue.speak(text, emotion, priority=5, skip_presence=False, speech_act=None)
+queue_speak(text, emotion='neutral', priority=5, speech_act=None) ; speak() ; speak_async() ; speak_interrupt()
+stop_speaking() ; is_speaking() ; voice_status() -> {'engine', 'url', 'up', 'model_dir', 'model_present'}
+
+# voice/unity_voice.py
+EMOTIONS, SPEECH_ACTS ; voice_text(text) ; prepare_text(text) ; split_sentences(text)
+plan_delivery(sentence, emotion, had_bang) ; synth(body) ; synth_with_fallback(sentence, emotion, had_bang)
+synth_delivery(sentence, emotion, speech_act, intensity=None) ; ensure_sidecar() ; is_up() ; take_turn() / give_turn()
+
+# voice/stt.py
+SpeechRecognizer(engine=None).initialize() / .listen_once(timeout, phrase_limit) / .start_listening(callback) / .transcribe_audio(bytes)
+WakeWordDetector(wake_word=None).start(on_wake) / .stop() ; WakeWordDetector.add_transcript_callback(fn) ; .last_wake_time
+stt_status() -> dict ; transcribe_file(path) ; list_microphones()
+
+# services/camera.py
+capture_frame(timeout=None) -> ndarray|None ; capture_to_file(path=None) -> Path|None
+open_capture() -> cv2.VideoCapture|None ; working_device() -> (index, backend) ; camera_status(probe=True) ; last_error()
+
+# cora_tools/web.py
+web_search(query, num_results=5, show_window=False) -> {'success', 'results': [{title, url, snippet, answer_box?}], 'engine', 'count'}
+fetch_url(url, timeout=15, show_window=False) -> {'success', 'text', 'content', 'via', 'status_code'}
+summarize_url(url) ; instant_answer(query)
+
+# cora_tools/vision.py
+capture_screenshot() -> Path|None ; capture_camera_snapshot(save_path=None) -> Path|None ; describe_screen(prompt) ; describe_camera(prompt)
+```
+
+### config/config.json (3.0.0 blocks)
+
+| Block | Keys |
+|---|---|
+| `models` | `primary`, `vision`, `code`, `fallback`, `options` ({model: {num_ctx, temperature, top_k, top_p, presence_penalty}}) |
+| `ollama` | `api_url`, `num_ctx`, `keep_alive`, `timeout`, `think_timeout`, `vision_timeout` |
+| `ai` | `temperature`, `max_tokens`, `history_turns` |
+| `assistant` | `voice_mode` (auto / say_tool / stream), `legacy_regex`, `max_tools` |
+| `tts` | `enabled`, `volume`, `presence_gate`, `unity_voice` {`url`, `model_dir`, `python`, `autostart`, `default_intensity`} |
+| `stt` | `engine`, `whisper_model`, `device`, `wake_word`, `sensitivity` |
+| `camera` | `enabled`, `index`, `backend`, `open_timeout` |
+| `boot` | `demo_phases`, `popups`, `github_import` |
+| `web` | `allowed_origins` |
+
+### Environment variables (3.0.0)
+
+| Variable | Purpose |
+|---|---|
+| `OLLAMA_URL` / `OLLAMA_HOST` | Ollama endpoint |
+| `CORA_CHAT_MODEL`, `CORA_VISION_MODEL`, `CORA_CODE_MODEL`, `CORA_THINK_MODEL`, `CORA_NUM_CTX` | model overrides |
+| `CORA_HISTORY_FILE` | scratch transcript for checks |
+| `UNITY_VOICE_TTS_URL`, `UNITY_VOICE_MODEL_DIR`, `UNITY_VOICE_PYTHON` | her voice sidecar |
+| `POLLINATIONS_API_KEY`, `GITHUB_TOKEN` | optional keys (`.claude/.env`) |
+
+---
+
+## Table of Contents (December 2025 reference)
 
 1. [Core Modules](#core-modules)
 2. [Voice Layer](#voice-layer)
@@ -160,7 +260,7 @@ class TTSEngine:
             WAV audio bytes
         """
 
-class KokoroTTS(TTSEngine):
+class KokoroTTS(TTSEngine):   # December 2025; in 3.0.0 this name is an alias of UnityVoiceTTS
     """High-quality neural TTS using Kokoro model."""
 
     def __init__(self, model_path: str = None):
@@ -169,7 +269,7 @@ class KokoroTTS(TTSEngine):
             model_path: Path to Kokoro model (optional)
         """
 
-class Pyttsx3TTS(TTSEngine):
+class Pyttsx3TTS(TTSEngine):   # December 2025; in 3.0.0 this name is an alias of UnityVoiceTTS
     """Offline TTS using pyttsx3."""
 
     def __init__(self, rate: int = 150, volume: float = 1.0):
@@ -294,7 +394,7 @@ def get_emotional_state() -> EmotionalState:
 ### voice/stt.py - Speech-to-Text
 
 ```python
-class VoskSTT:
+class VoskSTT:   # December 2025 design; the shipped class is SpeechRecognizer (faster-whisper, Vosk fallback)
     """Vosk-based speech recognition."""
 
     def __init__(self, model_path: str = None):
@@ -416,6 +516,7 @@ def get_mutex(name: str = "CORA") -> TTSMutex:
 
 ```python
 # Configuration
+# December 2025 design; in 3.0.0 all of this comes from ai.settings (unity-brain for chat and vision)
 OLLAMA_BASE = "http://localhost:11434"
 DEFAULT_MODEL = "llama3.2"
 VISION_MODEL = "llava"
@@ -1024,6 +1125,7 @@ class KnowledgePanel(BasePanel):
   }
 }
 ```
+(December 2025 shape; 3.0.0 uses `config/config.json`, see the Current API section.)
 
 ### config/voice_commands.json
 
@@ -1071,7 +1173,7 @@ class KnowledgePanel(BasePanel):
 |--------|-------|-------------|
 | TTS | `TTS_NOT_AVAILABLE` | No TTS engine initialized |
 | TTS | `TTS_MUTEX_TIMEOUT` | Failed to acquire speech lock |
-| STT | `STT_NO_MODEL` | Vosk model not found |
+| STT | `STT_NO_MODEL` | whisper/Vosk model not found |
 | STT | `STT_NO_AUDIO` | No audio input detected |
 | AI | `OLLAMA_OFFLINE` | Ollama service not running |
 | AI | `MODEL_NOT_FOUND` | Requested model not available |
@@ -1085,11 +1187,11 @@ class KnowledgePanel(BasePanel):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_HOST` | `localhost:11434` | Ollama API endpoint |
-| `CORA_TTS_ENGINE` | `pyttsx3` | Default TTS engine |
+| `CORA_TTS_ENGINE` | (removed) | 3.0.0 has one voice; see `UNITY_VOICE_*` above |
 | `CORA_LOG_LEVEL` | `INFO` | Logging level |
 | `CORA_DATA_DIR` | `.` | Data directory path |
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0 API Reference*
-*Last Updated: 2025-12-23*
+*Unity AI Lab - C.O.R.A v3.0.0 API Reference*
+*Last Updated: 2026-10-14*

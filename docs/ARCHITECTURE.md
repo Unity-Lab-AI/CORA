@@ -21,9 +21,35 @@
 ## Cognitive Operations & Reasoning Assistant - Windows 11 AI Application
 
 **CRITICAL: READ THIS ENTIRE FILE BEFORE DOING ANY WORK**
-**VERSION: 1.0.0 - FULL AUTONOMOUS AI ASSISTANT + VOICE/VISION + WEB UI + ADVANCED TOOLS**
+**VERSION: 3.0.0 (2026-10-14). The CURRENT STATE section is live; the rest is the December 2025 design spec.**
 
 ---
+
+## CURRENT STATE (2026-10-14, version 3.0.0)
+
+This section is the truth as of the 3.0.0 repair. Everything below it is the
+original design specification (December 2025) kept for history; where the two
+disagree, this section wins.
+
+| Part | What runs today | Files |
+|---|---|---|
+| Brain | `unity-brain` (Unity AI Lab's LoRA on Qwen3.5-9B, Ollama, native tool calling, reads images). Fallback `huihui_ai/qwen3-abliterated:8b`. Pinned 32K context + Modelfile sampling on every request. | `ai/settings.py`, `ai/ollama.py`, `config/config.json` `models` |
+| Conversation loop | One dispatcher for every entry point: 116 tools as JSON-schema tools, relevance-ranked per message, JSON fallback for models without a tools template, confirmation before destructive tools, tool calls + results kept in the shared transcript with summary folding. The brain speaks through `say(text, emotion, act)`. | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py` |
+| Voice | `unity-voice-v2` (the lab's own trained voice) as a sidecar on 127.0.0.1:5123; her designators go straight to it; text normalised to her four marks. No other voice, no fallback voice. | `voice/tts.py`, `voice/unity_voice.py`, `voice/tts_mutex.py` |
+| Ears | faster-whisper on CUDA (one shared model), fuzzy wake word on the transcript stream, optional openWakeWord model. Vosk only as a fallback engine. | `voice/stt.py`, `voice/wake_word.py`, `voice/converse.py` |
+| Eyes | Timeout-guarded, probed camera layer (index x backend, config `camera.*`); screenshots; the brain describes images itself. | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py`, `services/presence.py` |
+| Web | Search through DuckDuckGo HTML, then DuckDuckGo/Brave/Bing in a headless Chromium (Playwright), then Bing HTTP with a relevance guard; readable page fetch with browser rendering for blocked or script-built pages. | `cora_tools/web.py`, `cora_tools/browser.py` |
+| Boot | `src/boot_sequence.py`: 10 phases with spoken status (About names all four creators), daily briefing, reminder checker, ambient awareness; demo phases and result popups off by default (`boot.demo_phases`, `boot.popups`). | `src/boot_sequence.py`, `ui/boot_display.py` |
+| Other doors | GUI (`src/gui_launcher.py` -> `ui/app.py`, `ui/panels.py`), CLI (`src/cora.py`), web page served by `services/stats_server.py` with `/voice/say`, `/api/prompt` and the configured models injected. | |
+| Config / logs | One file (`config/config.json`), one loader with atomic saves (`ai/config.py`), console tee to `data/logs/cora-YYYYMMDD.log` (`ai/log.py`). | |
+| Launch / stop | `CORA.bat`, `windows/start.bat` + `stop.bat`, `linux/start.sh` + `stop.sh`, `scripts/bootstrap.py` (Python 3.13/3.12 venv, requirements, Ollama + configured models, yt-dlp, Playwright browser, voice sidecar). | |
+
+Counts (2026-10-14): 73 Python files; files over 800 lines: `src/boot_sequence.py`, `src/cora.py`, `ui/boot_display.py`, `voice/commands.py`, `ui/code_editor.py`, `ai/tools_registry.py`, `cora_tools/git_ops.py`, `cora_tools/media.py`, `ui/boot_console.py`, `cora_tools/code.py` (split tracked as UPG-018 in `docs/TODO.md`).
+
+The Known Issues section below is the December 2025 scan; its SEC/MEM/ARCH items are closed or re-tracked in `docs/TODO.md` and `docs/SYSTEM_AUDIT_2026-10-14.md`.
+
+---
+
 
 ## CORE IDENTITY
 
@@ -90,13 +116,13 @@ CORA speaks a SUMMARIZED version of each check via TTS (not verbatim logs).
 │      - Take medication at 9:30 AM                          │
 │      TTS: "Reminder: take your meds in 15 minutes."        │
 │                                                             │
-│  [✓] Ollama: Connected (llama3.2 loaded)                   │
+│  [✓] Ollama: Connected (unity-brain loaded)                │
 │      TTS: "Brain's online and ready."                      │
 │                                                             │
-│  [✓] Kokoro TTS: Initialized (af_bella)                    │
+│  [✓] unity-voice-v2: her own voice up (sidecar :5123)      │
 │      TTS: "Voice systems active."                          │
 │                                                             │
-│  [✓] Vosk STT: Listening (wake word: "Cora")               │
+│  [✓] faster-whisper: Listening (wake word: "Cora")         │
 │      TTS: "I'm listening. Just say my name."               │
 │                                                             │
 │  [✓] System: GPU 12% | RAM 4.2GB | CPU 8%                  │
@@ -120,8 +146,8 @@ CORA speaks a SUMMARIZED version of each check via TTS (not verbatim logs).
 | **Tasks** | tasks.json | Pending, overdue, due today |
 | **Reminders** | reminders.json | Time-based alerts |
 | **Ollama** | localhost:11434/api/tags | Model status |
-| **Kokoro TTS** | kokoro-onnx import | Voice readiness |
-| **Vosk STT** | vosk import | Listening status |
+| **unity-voice-v2** | sidecar /health | Voice readiness |
+| **faster-whisper** | model load on CUDA | Listening status |
 | **System** | psutil | GPU/RAM/CPU usage |
 
 ### TTS Summarization Rules
@@ -330,7 +356,7 @@ You can view and modify these settings:
 
 TTS:
 - settings.tts.enabled (true/false)
-- settings.tts.voice (af_bella, af_sarah, etc.)
+- settings.tts.unity_voice.* (her own voice; no voice list)
 - settings.tts.speed (0.5-2.0)
 - settings.tts.emotion_intensity (0.0-1.0)
 
@@ -358,12 +384,12 @@ MODELS:
 
 ### Wake Word Detection
 - Always listening for "Cora" or "Hey Cora"
-- Uses Vosk (local speech recognition)
+- Uses faster-whisper on the GPU (Vosk only as a fallback engine)
 - Responds to voice OR typed input
 - Adjustable sensitivity
 
-### TTS Output (Kokoro)
-- **Voice**: af_bella or af_sarah (sexy female)
+### TTS Output (unity-voice-v2)
+- **Voice**: her own trained voice (A2 low warm alto), 9 emotions x 7 speech acts
 - **Emotion-aware**: Analyze text before speaking
 - **Dynamic**: Build TTS instruction based on detected emotion
 - **Summarization**: System messages summarized by persona
@@ -373,7 +399,7 @@ MODELS:
 1. Response text generated
 2. Analyze emotional tone (excited/annoyed/caring/sarcastic/concerned/playful)
 3. Build TTS instruction with emotion parameter
-4. Kokoro TTS renders with appropriate inflection
+4. unity-voice-v2 renders with the emotion + speech act the brain chose
 5. Audio plays through speakers
 ```
 
@@ -409,7 +435,7 @@ Detect if user is at their desk before speaking/alerting.
 ```python
 def check_human_present(camera_index=0):
     """
-    Two-pass detection using webcam + Ollama llava:
+    Two-pass detection using webcam + the configured vision model (unity-brain):
     1. Quick check: Is anyone at the desk?
     2. If present: Full state analysis
 
@@ -430,7 +456,7 @@ def full_human_check(camera_index=0):
 ```
 
 **Implementation Required:**
-- `services/presence.py` - Webcam capture + llava analysis
+- `services/presence.py` - Webcam capture (services/camera.py) + vision-model analysis
 - Boot sequence checks presence before speaking
 - Smart notifications (wait if user away)
 
@@ -527,7 +553,7 @@ Fast local AI for simple tasks (no API calls).
 ```python
 OLLAMA_API = "http://localhost:11434/api/generate"
 
-def think(prompt, model="dolphin-mistral:7b"):
+def think(prompt, model=None):   # None -> ai.settings.think_model() (unity-brain)
     """
     Quick local AI for simple questions.
     - FREE (no API costs)
@@ -563,7 +589,7 @@ def listen_continuous():
     recognizer.pause_threshold = 0.8
     recognizer.non_speaking_duration = 0.5
     audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
-    return recognizer.recognize_google(audio)
+    return recognizer.listen_once()    # faster-whisper, local (Google STT is gone)
 
 def capture_camera(camera_index=0):
     """Capture webcam frame for visual context."""
@@ -602,7 +628,7 @@ def capture_camera(camera_index=0):
 **Implementation Required:**
 - Copy claude-v1.1/.claude to CORA root
 - Modify instance_name to "Cora"
-- Integrate with existing TTS (Kokoro) or use edge-tts
+- Integrate with her voice (unity-voice-v2); edge-tts and Kokoro are not used
 - Start listener on boot: `python .claude/scripts/voice_listener.py`
 
 ### ALIGNED CAPABILITIES SUMMARY
@@ -724,8 +750,8 @@ C.O.R.A/
 │
 ├── voice/
 │   ├── __init__.py
-│   ├── tts.py               # Kokoro TTS wrapper
-│   ├── stt.py               # Vosk speech recognition
+│   ├── tts.py               # unity-voice-v2 client + queue
+│   ├── stt.py               # faster-whisper speech recognition
 │   ├── wake_word.py         # Wake word detection
 │   └── emotion.py           # Emotion detection
 │
@@ -773,22 +799,22 @@ C.O.R.A/
   "version": "1.0.0",
   "tts": {
     "enabled": true,
-    "engine": "kokoro",
-    "voice": "af_bella",
+    "engine": "unity-voice-v2",
+    "unity_voice": {"url": "http://127.0.0.1:5123"},
     "speed": 1.0,
     "emotion_intensity": 0.8
   },
   "stt": {
     "enabled": true,
-    "engine": "vosk",
+    "engine": "faster-whisper",
     "wake_word": "cora",
     "sensitivity": 0.7
   },
   "ollama": {
     "enabled": true,
     "api_url": "http://localhost:11434",
-    "primary_model": "llama3.2",
-    "code_model": "codellama",
+    "primary_model": "unity-brain",
+    "code_model": "unity-brain",
     "timeout": 60
   },
   "ui": {
@@ -841,15 +867,15 @@ C.O.R.A/
 
 ### Phase 3: Voice + Vision Integration - 90% COMPLETE
 Voice and vision systems integrated:
-- [x] voice/stt.py - Speech recognition (Vosk)
-- [x] voice/tts.py - Text-to-speech (pyttsx3/Kokoro)
+- [x] voice/stt.py - Speech recognition (faster-whisper; Vosk fallback)
+- [x] voice/tts.py - Text-to-speech (unity-voice-v2)
 - [x] voice/wake_word.py - Wake word detection
 - [x] voice/commands.py - Voice command processing
 - [x] voice/converse.py - Conversation mode
 - [x] voice/echo_filter.py - Echo filtering
 - [x] services/presence.py - Webcam presence detection
 - [~] Start listener on boot (wiring in progress)
-- [~] Connect webcam to llava vision (wiring in progress)
+- [x] Connect webcam to vision (unity-brain reads the frame; done 2026-10-14)
 
 ### Phase 4: Advanced Body Capabilities - 85% COMPLETE
 From BODY_TOOLS_FOR_GEE (16 files, 210KB):
@@ -896,7 +922,7 @@ From BODY_TOOLS_FOR_GEE (16 files, 210KB):
 
 ---
 
-## WEB UI & GITHUB PAGES (NEW - v1.0.0)
+## WEB UI & GITHUB PAGES (December 2025; today the page is served locally by services/stats_server.py)
 
 ### Web Interface
 Browser-based interface that mirrors the Python boot sequence.
@@ -959,13 +985,12 @@ customtkinter>=5.2.0
 pystray>=0.19.0
 Pillow>=10.0.0
 
-# TTS
-kokoro-onnx>=0.4.0
+# TTS (her voice runs as a sidecar; the client needs only audio I/O)
 sounddevice>=0.4.6
 numpy>=1.24.0
 
 # STT
-vosk>=0.3.45
+faster-whisper
 soundfile>=0.12.0
 pyaudio>=0.2.13
 
@@ -1070,7 +1095,7 @@ colorama>=0.4.6
 
 ### Remaining Work
 - Wire voice_listener.py to GUI boot
-- Connect webcam to llava vision
+- Connect webcam to vision (done 2026-10-14)
 - Create temp_scripts.json for tool persistence
 - Safety sandboxing for self-modification
 - Installer/packaging script
@@ -1080,6 +1105,6 @@ colorama>=0.4.6
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0 Architecture Specification*
-*UPDATED: 2025-12-29 (10-Agent Deep Scan)*
+*Unity AI Lab - C.O.R.A v3.0.0 Architecture*
+*UPDATED: 2026-10-14 (current state section); design spec from 2025-12-29*
 *72+ Python files | 32,795+ lines | 81 issues identified*

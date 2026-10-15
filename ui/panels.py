@@ -23,19 +23,15 @@ KNOWLEDGE_FILE = PROJECT_DIR / 'data' / 'knowledge.json'
 
 def _load_config() -> dict:
     try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        from ai import config as _config
+        return json.loads(json.dumps(_config.load(force=True)))   # an editable copy
     except Exception:
         return {}
 
 
 def _save_config(cfg: dict):
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = CONFIG_FILE.with_suffix('.json.tmp')
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
-        f.write('\n')
-    os.replace(tmp, CONFIG_FILE)
+    from ai import config as _config
+    _config.save(cfg)      # atomic, cache + ai.settings refreshed
 
 
 class BasePanel(ctk.CTkFrame):

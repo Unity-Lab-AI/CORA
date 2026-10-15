@@ -193,11 +193,16 @@ class AudioWaveform(tk.Canvas):
             self._animate()
 
     def stop(self):
-        """Stop is now a no-op - waveform runs continuously.
-
-        The waveform naturally shows flat when there's no audio.
-        """
-        pass  # Don't stop - keep running forever
+        """Stop the animation timer (called on window close). While the window
+        lives the waveform runs continuously and shows flat with no audio."""
+        self.is_playing = False
+        aid = getattr(self, 'animation_id', None)
+        if aid is not None:
+            try:
+                self.after_cancel(aid)
+            except Exception:
+                pass
+            self.animation_id = None
 
     def _fade_out(self):
         """Legacy fade out - no longer used."""
@@ -320,7 +325,8 @@ class AudioWaveform(tk.Canvas):
         self._draw_wave()
 
         # Schedule next frame (~40 FPS for smooth scrolling)
-        self.animation_id = self.after(25, self._animate)
+        if self.is_playing:
+            self.animation_id = self.after(25, self._animate)
 
     def _draw_wave(self):
         """Draw the waveform on canvas."""
@@ -439,11 +445,19 @@ class BootDisplay:
 
         # Handle window close - exit entire application
         def on_close():
-            """When GUI window is closed, exit the entire application."""
+            """When GUI window is closed, exit the entire application: close the
+            window (mainloop returns, the boot thread is a daemon), with a hard
+            exit only as a 3 s safety net for anything stuck in a C call."""
             print("[CORA] Window closed - shutting down...")
+            try:
+                from voice.tts import stop_speaking
+                stop_speaking()
+            except Exception:
+                pass
             self.close()
             import os
-            os._exit(0)  # Force exit everything including console
+            import threading as _th
+            _th.Timer(3.0, lambda: os._exit(0)).start()
 
         self.root.protocol("WM_DELETE_WINDOW", on_close)
 
@@ -905,7 +919,7 @@ class BootDisplay:
                         else:
                             self.log_fail(f"{payload['tool']}: {str(msg)[:200]}")
                     elif kind == 'sentence':
-                        self.log_speech(payload)
+                        pass   # logged by the voice when it actually plays (start_speaking)
                     elif kind == 'confirm_needed':
                         self.log_warn(f"Needs your OK: {payload['tool']} {payload.get('arguments')} - say yes or no")
                     elif kind == 'error':
@@ -914,8 +928,15 @@ class BootDisplay:
                 result = d.handle(prompt, speak=True, on_event=on_event)
                 if result.error:
                     self.log_fail(f"AI error: {result.error}")
-                elif result.text and not result.spoke:
-                    self.log_result(result.text)
+                elif result.text:
+                    voice_up = True
+                    try:
+                        from voice.tts import voice_status
+                        voice_up = bool(voice_status().get('up'))
+                    except Exception:
+                        pass
+                    if not result.spoke or not voice_up:
+                        self.log_result(result.text)
                 try:
                     self.update_operational_status(activity="Ready - Awaiting commands",
                                                    last_action=(result.tool_calls[-1]['name'] if result.tool_calls else 'chat'))
@@ -1894,8 +1915,17 @@ class BootDisplay:
 
     def close(self):
         """Close the display window."""
+        self._closing = True
         # Stop stats collector thread
         self._stats_running = False
+        # Stop the speech-text poller
+        tid = getattr(self, '_speech_timer_id', None)
+        if tid is not None:
+            try:
+                self.root.after_cancel(tid)
+            except Exception:
+                pass
+            self._speech_timer_id = None
         # Stop stats UI updates
         if self.stats_update_id:
             try:
@@ -1981,9 +2011,9 @@ class BootDisplay:
         except Exception:
             pass
         # Schedule next check in 50ms
-        if self.root:
+        if self.root and not getattr(self, '_closing', False):
             try:
-                self.root.after(50, self._process_speech_queue)
+                self._speech_timer_id = self.root.after(50, self._process_speech_queue)
             except:
                 pass
 

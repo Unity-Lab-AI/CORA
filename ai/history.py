@@ -4,8 +4,13 @@ C.O.R.A conversation history — one shared, persisted transcript used by every
 entry point (boot display, CLI, GUI app, voice loop).
 
 Storage: data/chat_history.json as a list of
-    {"role": "user"|"assistant"|"tool", "content": "...", "timestamp": iso}
+    {"role": "user"|"assistant"|"tool", "content": "...", "timestamp": iso,
+     "tool_calls": [...]?, "tool_name": "..."?}
 which is the same shape src/cora.py has always written, so old files load.
+Tool calls and their results are KEPT in the transcript: the model was trained
+on multi-turn conversations where every action is a tool call, and when the
+history shows only plain-text answers she stops calling tools and riffs on
+stale answers instead (seen live 2026-10-14).
 
 The context sent to the model is bounded two ways:
   * by turn count (settings.history_turns), and
@@ -28,8 +33,10 @@ from ai import settings as _settings
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / 'data'
-HISTORY_FILE = DATA_DIR / 'chat_history.json'
-SUMMARY_FILE = DATA_DIR / 'chat_summary.json'
+# CORA_HISTORY_FILE points a scratch session (a check, a demo) at its own file so
+# nothing but real use ever lands in her transcript.
+HISTORY_FILE = Path(os.environ.get('CORA_HISTORY_FILE') or (DATA_DIR / 'chat_history.json'))
+SUMMARY_FILE = HISTORY_FILE.with_name(HISTORY_FILE.stem + '_summary.json') if os.environ.get('CORA_HISTORY_FILE') else (DATA_DIR / 'chat_summary.json')
 
 # ~4 characters per token is a safe average for English chat.
 _CHARS_PER_TOKEN = 4
@@ -90,9 +97,17 @@ class ConversationHistory:
             self._messages.append(msg)
             self._save()
 
-    def add_exchange(self, user_text: str, assistant_text: str):
+    def add_exchange(self, user_text: str, assistant_text: str, turn_messages: Optional[List[Dict]] = None):
+        """One turn: the user line, the tool calls/results she made on the way
+        (assistant messages with tool_calls + role=tool results), her final line."""
         with self._lock:
             self.add('user', user_text)
+            for m in turn_messages or []:
+                role = m.get('role')
+                if role == 'assistant' and m.get('tool_calls'):
+                    self.add('assistant', m.get('content', ''), tool_calls=m['tool_calls'])
+                elif role == 'tool':
+                    self.add('tool', m.get('content', ''), tool_name=m.get('tool_name', ''))
             self.add('assistant', assistant_text)
 
     def clear(self):
@@ -140,9 +155,15 @@ class ConversationHistory:
         used = 0
         for m in reversed(msgs):
             c = m.get('content', '') or ''
+            entry: Dict = {'role': m['role'], 'content': c}
+            if m.get('tool_calls'):
+                entry['tool_calls'] = m['tool_calls']
+                c += json.dumps(m['tool_calls'])
+            if m.get('tool_name'):
+                entry['tool_name'] = m['tool_name']
             if used + len(c) > budget and out:
                 break
-            out.append({'role': m['role'], 'content': c})
+            out.append(entry)
             used += len(c)
         out.reverse()
         # never start the context with an assistant turn (confuses some templates)

@@ -390,18 +390,22 @@ def t_delete_reminder(reminder_id: str):
 
 
 # =========================================================================== vision + images
-@_tool('take_screenshot', 'Capture the desktop; optionally describe it with vision.', 'vision',
-       {'question': _p('What to look for / describe (optional). If given, the screenshot is analysed.')})
-def t_take_screenshot(question: str = None):
+@_tool('take_screenshot', 'Capture the desktop and LOOK at it: returns what is on screen (app, site, what the user is doing). '
+       'Ask a specific question to look for something in particular.', 'vision',
+       {'question': _p('What to look for on the screen (optional)'),
+        'describe': _p('false = just save the file without looking', 'boolean')})
+def t_take_screenshot(question: str = None, describe: bool = True):
     from cora_tools.screenshots import desktop
     r = desktop()
     if not r.success:
         return _err(r.error or 'screenshot failed')
     out = {'path': str(r.path), 'size': f"{r.width}x{r.height}"}
-    if question:
+    if describe or question:
         from ai.ollama import generate_with_image
-        v = generate_with_image(question, str(r.path))
-        out['description'] = v.content if not v.error else f"vision error: {v.error}"
+        q = question or ('Describe what is on this screen in two sentences: which application or site is open and '
+                         'what the user is doing. Be concrete, read visible titles and text.')
+        v = generate_with_image(q, str(r.path), max_tokens=220)
+        out['description'] = v.content.strip() if not v.error else f"vision error: {v.error}"
         return _ok(out['description'], **out)
     return _ok(f"Screenshot saved to {r.path}", **out)
 
@@ -468,21 +472,40 @@ def t_recent_images(limit: int = 5):
 
 
 # =========================================================================== web
-@_tool('web_search', 'Search the web (DuckDuckGo) and return top results.', 'web',
+@_tool('web_search', 'Search the web and return the top results (title, url, snippet). Read the snippets and '
+       'answer from them; use fetch_url on a result for the full page.', 'web',
        {'query': _p('Search query'), 'num_results': _p('How many', 'integer')}, ['query'])
 def t_web_search(query: str, num_results: int = 5):
     from cora_tools.web import web_search
-    r = web_search(query, int(num_results or 5))
-    return r if isinstance(r, dict) else _ok(str(r))
+    r = web_search(query, int(num_results or 5), show_window=False)
+    if not isinstance(r, dict):
+        return _ok(str(r))
+    if not r.get('success'):
+        return _err(r.get('error') or 'search failed')
+    res = r.get('results') or []
+    lines = [f"{i}. {x.get('title', '')} - {x.get('snippet', '')[:200]} ({x.get('url', '')})" for i, x in enumerate(res, 1)]
+    box = (res[0].get('answer_box') if res else '') or ''
+    if box:
+        lines.insert(0, f"Answer box from the search page: {box[:700]}")
+    return _ok('\n'.join(lines) or 'no results', results=res, count=r.get('count'), answer_box=box or None)
 
 
-@_tool('fetch_url', 'Fetch a web page as readable text.', 'web', {'url': _p('http(s) URL')}, ['url'])
-def t_fetch_url(url: str):
+@_tool('fetch_url', 'Fetch a web page and return its readable text (renders script-built pages in a browser when needed).',
+       'web', {'url': _p('http(s) URL'), 'find': _p('Optional words to look for; the text around them is returned first')}, ['url'])
+def t_fetch_url(url: str, find: str = None):
     from cora_tools.web import fetch_url
-    r = fetch_url(url)
-    if isinstance(r, dict) and r.get('text'):
-        r['text'] = r['text'][:6000]
-    return r if isinstance(r, dict) else _ok(str(r)[:6000])
+    r = fetch_url(url, show_window=False)
+    if not isinstance(r, dict):
+        return _ok(str(r)[:6000])
+    if not r.get('success'):
+        return _err(r.get('error') or 'fetch failed')
+    text = r.get('text') or ''
+    if find:
+        import re as _re
+        hits = [m.start() for m in _re.finditer(_re.escape(find.split()[0]), text, _re.I)][:4]
+        if hits:
+            text = ' ... '.join(text[max(0, h - 300):h + 500] for h in hits) + '\n\n' + text
+    return _ok(text[:6000] or 'no readable text', url=r.get('url'), via=r.get('via'), length=r.get('length'))
 
 
 @_tool('summarize_url', 'Fetch a page and summarize it.', 'web', {'url': _p('http(s) URL')}, ['url'])
@@ -1071,7 +1094,8 @@ def select_tools(text: str, max_tools: int = 40) -> List[Tool]:
     """The tools worth showing the model for this message: the core set plus
     the best keyword matches on name/description/category. A 9B model picks
     the right tool far more reliably from ~40 schemas than from 115."""
-    tools = all_tools()
+    # `speak` is the pre-brain voice tool; `say` (emotion + act) replaces it in what the model sees
+    tools = [t for t in all_tools() if t.name != 'speak']
     if max_tools <= 0 or len(tools) <= max_tools:
         ordered = sorted(tools, key=lambda t: (t.name != 'say', t.name))
         return ordered

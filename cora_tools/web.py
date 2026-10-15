@@ -144,13 +144,134 @@ def instant_answer(query: str) -> Dict[str, Any]:
         return {'success': False, 'error': f'Error: {e}'}
 
 
-def web_search(query: str, num_results: int = 5) -> Dict[str, Any]:
+_BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+}
+
+
+def _strip_tags(html: str) -> str:
+    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', html or '')).strip()
+
+
+def _search_bing(query: str, num_results: int) -> List[Dict[str, str]]:
+    """Bing's HTML results page (no key). Used when DuckDuckGo answers with a
+    challenge page (HTTP 202, no results) as it did on 2026-10-14."""
+    url = f"https://www.bing.com/search?q={quote_plus(query)}&setlang=en&count={max(5, num_results)}"
+    r = requests.get(url, headers=_BROWSER_HEADERS, timeout=10)
+    r.raise_for_status()
+    out: List[Dict[str, str]] = []
+    for block in re.split(r'<li class="b_algo"', r.text)[1:]:
+        m = re.search(r'<a[^>]+href="(https?://[^"]+)"[^>]*>(.*?)</a>', block, re.S)
+        if not m:
+            continue
+        snippet = re.search(r'<p[^>]*>(.*?)</p>', block, re.S)
+        out.append({'title': _strip_tags(m.group(2)), 'url': m.group(1),
+                    'snippet': _strip_tags(snippet.group(1)) if snippet else ''})
+        if len(out) >= num_results:
+            break
+    return out
+
+
+def _relevant(results: List[Dict[str, str]], query: str) -> List[Dict[str, str]]:
+    """Drop a result set that ignores the query (Bing answers non-browser
+    clients with results for the first word only: 'Kansas' for a Chiefs
+    question). Keep it when any result mentions a query word of 4+ letters
+    other than the first word."""
+    words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) >= 4]
+    if len(words) < 2:
+        return results
+    rest = words[1:]
+    for r in results:
+        hay = f"{r.get('title', '')} {r.get('snippet', '')}".lower()
+        if any(w in hay for w in rest):
+            return results
+    return []
+
+
+_BROWSER_ENGINES = (
+    # name, url template, result container, title, snippet
+    ('duckduckgo', 'https://duckduckgo.com/?q={q}&ia=web&kl=us-en',
+     'li[data-layout="organic"], [data-testid="result"], article', 'h2', '[data-result="snippet"], .result__snippet'),
+    ('brave', 'https://search.brave.com/search?q={q}&source=web',
+     '#results [data-type="web"], #results .snippet', '.title, .snippet-title', '.snippet-description, .snippet-content, .desc'),
+    ('bing', 'https://www.bing.com/search?q={q}&setlang=en', 'li.b_algo', 'h2 a', '.b_caption p, p'),
+)
+
+
+def _search_playwright(query: str, num_results: int, timeout_ms: int = 20000) -> List[Dict[str, str]]:
+    """Real results pages in the full Chromium build, headless (Playwright
+    channel='chromium'). The plain HTML endpoints answer bots with a challenge
+    page, Bing degrades to a first-word result over HTTP and the headless-shell
+    build is detected; the full build is not. One launch, engines in turn:
+    DuckDuckGo, Brave, Bing. ~3-6 s."""
+    from playwright.sync_api import sync_playwright
+    out: List[Dict[str, str]] = []
+    with sync_playwright() as pw:
+        try:
+            browser = pw.chromium.launch(headless=True, channel='chromium')
+        except Exception:
+            browser = pw.chromium.launch(headless=True)      # headless shell: last resort
+        try:
+            ctx = browser.new_context(user_agent=_BROWSER_HEADERS['User-Agent'], locale='en-US',
+                                      viewport={'width': 1280, 'height': 900})
+            for name, tmpl, container, title_sel, snip_sel in _BROWSER_ENGINES:
+                page = ctx.new_page()
+                try:
+                    page.goto(tmpl.format(q=quote_plus(query)), timeout=timeout_ms, wait_until='domcontentloaded')
+                    try:
+                        page.wait_for_selector(container, timeout=8000)
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(1200)
+                    answer = ''
+                    try:
+                        answer = page.evaluate("""() => {
+                            const sels = ['#results .infobox', '[data-type="infobox"]', '.answer', '[data-testid="module"]',
+                                          '#b_context', '.b_ans', '[data-area="mainline"] .module'];
+                            for (const sel of sels) { const n = document.querySelector(sel); if (n && n.innerText.trim().length > 40) return n.innerText.trim().slice(0, 900); }
+                            return '';
+                        }""") or ''
+                    except Exception:
+                        answer = ''
+                    rows = page.evaluate("""([container, titleSel, snipSel]) => {
+                        const text = (el, sel) => { const n = el.querySelector(sel); return n ? n.innerText.trim() : ''; };
+                        const link = (el, sel) => { const t = el.querySelector(sel); const a = (t && t.tagName === 'A') ? t : (t ? t.closest('a') || t.querySelector('a') : el.querySelector('a[href^="http"]')); return a ? a.href : ''; };
+                        return Array.from(document.querySelectorAll(container)).map(el => ({
+                            title: text(el, titleSel), url: link(el, titleSel), snippet: text(el, snipSel)
+                        })).filter(r => r.title && r.url && !r.url.includes('duckduckgo.com/y.js'));
+                    }""", [container, title_sel, snip_sel])
+                    seen = set()   # real engines in a real browser: no relevance guard (it only guards Bing-over-HTTP)
+                    for r in rows:
+                        if r.get('url') in seen:
+                            continue
+                        seen.add(r.get('url'))
+                        out.append({'title': r.get('title', ''), 'url': r.get('url', ''),
+                                    'snippet': r.get('snippet', ''), 'engine': name})
+                        if len(out) >= num_results:
+                            break
+                    if out:
+                        if answer:
+                            out[0]['answer_box'] = re.sub(r'\s+', ' ', answer)
+                        break
+                except Exception as e:
+                    print(f"[web] {name} in browser: {str(e)[:100]}")
+                finally:
+                    page.close()
+        finally:
+            browser.close()
+    return out
+
+
+def web_search(query: str, num_results: int = 5, show_window: bool = False) -> Dict[str, Any]:
     """
     Search the web using DuckDuckGo HTML API.
 
     Args:
         query: Search query string
         num_results: Maximum number of results to return
+        show_window: also open the results in a modal window (off: she reads
+            the results back; a window that just sat there was confusing)
 
     Returns:
         Dict with 'success', 'results' list, and optional 'error'
@@ -201,18 +322,37 @@ def web_search(query: str, num_results: int = 5) -> Dict[str, Any]:
             'success': True,
             'query': query,
             'results': results,
-            'count': len(results)
+            'count': len(results),
+            'engine': 'duckduckgo'
         }
 
-        # Show results in modal window
-        try:
-            from ui.modals import show_web_modal, show_modal_threadsafe
-            content = f"Search: {query}\n\n"
-            for i, r in enumerate(results, 1):
-                content += f"{i}. {r['title']}\n   {r['url']}\n   {r.get('snippet', '')}\n\n"
-            show_modal_threadsafe(show_web_modal, content, "", f"Search: {query}")
-        except Exception:
-            pass
+        if not results:
+            # DuckDuckGo answered with a challenge page (or changed its markup): a real browser, then Bing
+            for name, fn in (('browser', _search_playwright), ('bing', _search_bing)):
+                try:
+                    results = fn(query, num_results)
+                    if name == 'bing':
+                        results = _relevant(results, query)
+                except Exception as e:
+                    result[f'{name}_error'] = str(e)[:160]
+                    results = []
+                if results:
+                    result.update(results=results, count=len(results), engine=name)
+                    break
+        if not results:
+            result['success'] = False
+            result['error'] = 'no results from any search path (blocked or markup changed)'
+
+        # Show results in modal window only when asked
+        if show_window and results:
+            try:
+                from ui.modals import show_web_modal, show_modal_threadsafe
+                content = f"Search: {query}\n\n"
+                for i, r in enumerate(results, 1):
+                    content += f"{i}. {r['title']}\n   {r['url']}\n   {r.get('snippet', '')}\n\n"
+                show_modal_threadsafe(show_web_modal, content, "", f"Search: {query}")
+            except Exception:
+                pass
 
         return result
 
@@ -236,9 +376,29 @@ def web_search(query: str, num_results: int = 5) -> Dict[str, Any]:
         }
 
 
-def fetch_url(url: str, timeout: int = 15) -> Dict[str, Any]:
+def _fetch_in_browser(url: str, timeout_ms: int = 20000) -> str:
+    """The page's visible text rendered in the full Chromium build: for sites
+    that block plain requests (403/429) or build the page with scripts."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        try:
+            browser = pw.chromium.launch(headless=True, channel='chromium')
+        except Exception:
+            browser = pw.chromium.launch(headless=True)
+        try:
+            page = browser.new_context(user_agent=_BROWSER_HEADERS['User-Agent'], locale='en-US').new_page()
+            page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
+            page.wait_for_timeout(1500)
+            return page.evaluate("() => { for (const n of document.querySelectorAll('script,style,noscript,nav,footer,header')) n.remove(); return document.body ? document.body.innerText : ''; }") or ''
+        finally:
+            browser.close()
+
+
+def fetch_url(url: str, timeout: int = 15, show_window: bool = False) -> Dict[str, Any]:
     """
-    Fetch content from a URL.
+    Fetch content from a URL. Returns the raw `content` and the readable `text`
+    (what the model reads); falls back to a headless browser when the plain
+    request is blocked or the page is script-built. The modal window is opt-in.
 
     Args:
         url: The URL to fetch
@@ -280,29 +440,54 @@ def fetch_url(url: str, timeout: int = 15) -> Dict[str, Any]:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
 
-        response = requests.get(url, headers=headers, timeout=timeout)
-        response.raise_for_status()
+        response = None
+        blocked = False
+        try:
+            response = requests.get(url, headers={**_BROWSER_HEADERS, **headers}, timeout=timeout)
+            if response.status_code in (401, 403, 406, 429, 503):
+                blocked = True
+            else:
+                response.raise_for_status()
+        except requests.HTTPError:
+            blocked = True
+        content_type = response.headers.get('Content-Type', 'text/html') if response is not None else 'text/html'
+        raw = response.text if (response is not None and not blocked) else ''
+        text = extract_text_from_html(raw) if raw and 'html' in content_type.lower() else raw
+        via = 'requests'
 
-        content_type = response.headers.get('Content-Type', 'text/html')
+        # blocked, or a script-built page with almost no readable text: render it
+        if blocked or ('html' in content_type.lower() and len(re.sub(r'\s+', ' ', text)) < 400 and len(raw) > 20000):
+            try:
+                rendered = _fetch_in_browser(url)
+                if len(re.sub(r'\s+', ' ', rendered)) > len(re.sub(r'\s+', ' ', text)):
+                    text, via = rendered, 'browser'
+                    if not raw:
+                        raw = rendered
+            except Exception as e:
+                if blocked and not text:
+                    code = response.status_code if response is not None else '?'
+                    return {'success': False, 'error': f'blocked (HTTP {code}) and browser fetch failed: {str(e)[:120]}', 'content': None}
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
         result = {
             'success': True,
             'url': url,
-            'content': response.text,
+            'content': raw,
+            'text': text,
             'content_type': content_type,
-            'status_code': response.status_code,
-            'length': len(response.text)
+            'status_code': response.status_code if response is not None else None,
+            'length': len(raw),
+            'via': via,
         }
 
-        # Show content in modal window
-        try:
-            from ui.modals import show_web_modal, show_modal_threadsafe
-            text_content = extract_text_from_html(response.text)
-            if len(text_content) > 5000:
-                text_content = text_content[:5000] + "\n\n[Content truncated...]"
-            show_modal_threadsafe(show_web_modal, text_content, url, f"Fetched: {urlparse(url).netloc}")
-        except Exception:
-            pass
+        # Show content in modal window only when asked
+        if show_window:
+            try:
+                from ui.modals import show_web_modal, show_modal_threadsafe
+                text_content = text if len(text) <= 5000 else text[:5000] + "\n\n[Content truncated...]"
+                show_modal_threadsafe(show_web_modal, text_content, url, f"Fetched: {urlparse(url).netloc}")
+            except Exception:
+                pass
 
         return result
 

@@ -10,24 +10,31 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 1.0.0
+  Version: 3.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
 
 ---
 
-## Current State (2025-12-29)
+## Current State (2026-10-14)
 
 | Metric | Value |
 |--------|-------|
-| **Version** | 1.0.0 |
-| **Total Files** | 72+ Python modules |
-| **Total Lines** | ~32,795+ |
-| **Skills Implemented** | 58/60 (97%) |
-| **Critical Issues** | 18 |
-| **High Issues** | 21 |
-| **Total Issues** | 81 |
+| **Version** | 3.0.0 |
+| **Total Files** | 73 Python modules |
+| **Skills Implemented** | 60/60 |
+| **Brain / Voice / Ears** | unity-brain / unity-voice-v2 / faster-whisper |
+| **Open work** | `docs/TODO.md` UPG-018 (oversized files), UPG-020 (tag), UPG-021 (web module split), UPG-026 |
+| **Dec 2025 scan** | SEC/MEM/ARCH items below are closed or re-tracked in `docs/SYSTEM_AUDIT_2026-10-14.md` |
+
+### Completed (3.0.0, 2026-10-14)
+- [x] One conversation loop for every entry point (dispatcher + 116 tools)
+- [x] unity-brain as chat + vision model, say(text, emotion, act) to her voice
+- [x] unity-voice-v2 replaces Kokoro/pyttsx3; faster-whisper replaces Vosk/Google
+- [x] Timeout-guarded camera layer; thinking off on every request; search through a headless browser
+- [x] Config loader, log tee, orderly shutdown, start/stop scripts for Windows and Linux
+- [x] Web page served locally with her voice and the configured models
 
 ---
 
@@ -156,8 +163,8 @@ These need fixing BEFORE any new feature work:
 **Target:** 100% skill completion
 
 ### Milestone 5.1: WIP Skills
-- [ ] Complete llava Vision integration
-- [ ] Complete Playwright browser automation
+- [x] Complete vision integration (unity-brain reads images; 2026-10-14)
+- [x] Complete Playwright browser automation (browser-backed search and fetch; 2026-10-14)
 
 ### Milestone 5.2: Enhancements
 - [ ] Add model download progress
@@ -187,7 +194,7 @@ These need fixing BEFORE any new feature work:
 
 ### Earlier
 - [x] 58/60 skills implemented (97%)
-- [x] Voice pipeline (Kokoro TTS, Vosk STT)
+- [x] Voice pipeline (Kokoro TTS, Vosk STT; replaced in 3.0.0 by unity-voice-v2 and faster-whisper)
 - [x] Vision system (camera, screenshots)
 - [x] 20 tool modules in cora_tools/
 - [x] Cyberpunk boot display
@@ -233,8 +240,8 @@ These need fixing BEFORE any new feature work:
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0*
-*Deep Scan: 2025-12-29 06:06:03*
+*Unity AI Lab - C.O.R.A v3.0.0*
+*Current state: 2026-10-14; deep scan: 2025-12-29*
 
 
 ---

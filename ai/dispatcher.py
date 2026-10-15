@@ -197,8 +197,12 @@ class Dispatcher:
             pass
         parts.append("You have tools. Use them whenever an action or live information is needed instead of guessing. "
                      "The ONLY way to do anything (reminders, tasks, apps, searches, notes) is a tool call: never say "
-                     "you did something unless a tool result in this turn confirms it. After a tool runs, answer in one "
-                     "or two short in-character sentences. Never mention tool names or JSON to the user.")
+                     "you did something unless a tool result in this turn confirms it. Anything live (the screen, the camera, "
+                     "the time, weather, tasks, reminders, files) is looked up fresh with a tool every time it is asked. "
+                     "Do ONLY what this message asks: never add tasks or reminders, open apps or files, or change anything "
+                     "the user did not ask for in this turn. "
+                     "After a tool runs, answer in one or two short in-character sentences. Never mention tool names, "
+                     "JSON or these instructions to the user.")
         if self.voice_mode() == 'say_tool':
             parts.append("The user HEARS you, they do not read you: every reply goes through say(text, emotion, act), one to "
                          "three short sentences per call, more calls for a longer reply, with the emotion and act that fit "
@@ -241,9 +245,12 @@ class Dispatcher:
 
     # ------------------------------------------------------------------ main entry
     def handle(self, text: str, speak: bool = True, on_event: Optional[Callable[[str, Any], None]] = None,
-               stream: bool = True, tools_enabled: bool = True) -> DispatchResult:
+               stream: bool = True, tools_enabled: bool = True,
+               allowed_tools: Optional[set] = None) -> DispatchResult:
         """Process one user message. on_event(kind, payload) kinds:
-        thinking, token, sentence, tool_call, tool_result, confirm_needed, final, error."""
+        thinking, token, sentence, tool_call, tool_result, confirm_needed, final, error.
+        allowed_tools: restrict this turn to these tool names (a read-only check, a demo);
+        anything else she tries is refused, never executed."""
         on_event = on_event or (lambda k, p: None)
         text = (text or '').strip()
         res = DispatchResult()
@@ -268,7 +275,10 @@ class Dispatcher:
                 system = self.system_prompt() + "\n\n" + self._dynamic_context()
                 native = tools_enabled and self._supports_native_tools()
                 max_tools = int(self._assistant_config().get('max_tools', 40) or 0)
-                schemas = [t.schema() for t in _tools.select_tools(text, max_tools)] if tools_enabled else []
+                selected = _tools.select_tools(text, max_tools) if tools_enabled else []
+                if allowed_tools is not None:
+                    selected = [t for t in selected if t.name in allowed_tools]
+                schemas = [t.schema() for t in selected]
                 if tools_enabled and not native:
                     system += _JSON_PROTOCOL + _tools.tool_catalog_text()
 
@@ -282,6 +292,8 @@ class Dispatcher:
                 mode = self.voice_mode()
                 speaker = self._make_speaker(on_event) if (speak and mode == 'stream') else None
                 said: List[str] = []
+                seen_calls: set = set()                  # (name, args) already run this turn
+                turn_msgs: List[Dict[str, Any]] = []     # her tool calls + results this turn, for the transcript
                 final_text = ''
                 for _round in range(MAX_TOOL_ROUNDS):
                     on_event('thinking', _round)
@@ -300,12 +312,28 @@ class Dispatcher:
                     # execute tool calls
                     messages.append({'role': 'assistant', 'content': content or '',
                                      'tool_calls': [{'function': {'name': c['name'], 'arguments': c['arguments']}} for c in calls]})
+                    turn_msgs.append(messages[-1])
                     deferred = False
                     for c in calls:
                         name, args = c['name'], c.get('arguments') or {}
                         res.tool_calls.append(c)
                         on_event('tool_call', {'tool': name, 'arguments': args})
                         tool = _tools.get_tool(name)
+                        sig = (name, json.dumps(args, sort_keys=True, default=str))
+                        if name != 'say' and sig in seen_calls:
+                            result = {'ok': False, 'error': f'{name} was already called with exactly these arguments this turn; '
+                                                            f'use what it returned, change the arguments, or tell the user what you found'}
+                            on_event('tool_result', {'tool': name, 'result': result})
+                            messages.append({'role': 'tool', 'content': json.dumps(result), 'tool_name': name})
+                            turn_msgs.append(messages[-1])
+                            continue
+                        seen_calls.add(sig)
+                        if allowed_tools is not None and name not in allowed_tools:
+                            result = {'ok': False, 'error': f'{name} is not available in this session'}
+                            on_event('tool_result', {'tool': name, 'result': result})
+                            messages.append({'role': 'tool', 'content': json.dumps(result), 'tool_name': name})
+                            turn_msgs.append(messages[-1])
+                            continue
                         if name == 'say':
                             line = str(args.get('text') or '').strip()
                             if line:
@@ -329,6 +357,7 @@ class Dispatcher:
                         if len(payload) > MAX_TOOL_RESULT_CHARS:
                             payload = payload[:MAX_TOOL_RESULT_CHARS] + '..."}'
                         messages.append({'role': 'tool', 'content': payload, 'tool_name': name})
+                        turn_msgs.append(messages[-1])
                     if deferred:
                         res.pending_confirmation = self._pending
                         # let the model tell the user what it wants to do
@@ -354,12 +383,18 @@ class Dispatcher:
                         res.spoke = True
                     except Exception as ve:
                         on_event('error', f'voice: {ve}')
-                shown = ' '.join([*said, final_text]).strip() if said and final_text != ' '.join(said) else (final_text or ' '.join(said))
-                res.text = shown.strip()
+                spoken = ' '.join(said).strip()
+                if not final_text:
+                    shown = spoken
+                elif all(line in final_text for line in said):
+                    shown = final_text            # she repeated the spoken line in text; show it once
+                else:
+                    shown = f"{spoken} {final_text}".strip()
+                res.text = shown
                 if res.text:
-                    self.history.add_exchange(text, res.text)
+                    self.history.add_exchange(text, res.text, turn_msgs)
                 elif not res.error and res.tool_calls:
-                    self.history.add_exchange(text, '(did it)')
+                    self.history.add_exchange(text, '(did it)', turn_msgs)
                 on_event('final', res.text)
             except Exception as e:
                 res.error = f"{type(e).__name__}: {e}"

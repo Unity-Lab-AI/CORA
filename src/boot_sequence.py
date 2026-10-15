@@ -20,6 +20,7 @@ import os
 import time
 import signal
 import atexit
+import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
@@ -32,20 +33,41 @@ sys.path.insert(0, str(PROJECT_DIR / 'src'))
 sys.path.insert(0, str(PROJECT_DIR / 'ui'))
 
 
-def shutdown_handler(*args):
-    """Handle shutdown signals - close everything cleanly."""
+_shutting_down = False
+
+
+def _orderly_shutdown():
+    """Stop what we own (voice, ears, ambient awareness, window). Each step is
+    bounded and best-effort; nothing here can hang the exit."""
+    global _shutting_down, _boot_display
+    if _shutting_down:
+        return
+    _shutting_down = True
     print("\n[CORA] Shutting down...")
-    global _boot_display
-    if _boot_display:
+    for step in (
+        lambda: __import__('voice.tts', fromlist=['stop_speaking']).stop_speaking(),
+        lambda: __import__('voice.tts', fromlist=['get_tts_queue']).get_tts_queue().stop(),
+        lambda: __import__('voice.ambient_awareness', fromlist=['stop_ambient_monitoring']).stop_ambient_monitoring(),
+        lambda: _boot_display.close() if _boot_display else None,
+    ):
         try:
-            _boot_display.close()
-        except:
+            step()
+        except Exception:
             pass
-    os._exit(0)
 
 
-# Register shutdown handlers
-atexit.register(shutdown_handler)
+def shutdown_handler(signum=None, frame=None):
+    """Signals (Ctrl+C, SIGTERM, Ctrl+Break): clean up, then leave. The hard
+    exit is a 3 s safety net for a thread stuck in a C call, not the exit path."""
+    _orderly_shutdown()
+    if signum is not None:
+        threading.Timer(3.0, lambda: os._exit(0)).start()
+        raise SystemExit(0)
+
+
+# Normal interpreter exit: just the cleanup (no os._exit at atexit; that killed
+# the process before Tk, the voice queue and the log file could finish)
+atexit.register(_orderly_shutdown)
 signal.signal(signal.SIGINT, shutdown_handler)  # Ctrl+C
 signal.signal(signal.SIGTERM, shutdown_handler)  # Termination
 if sys.platform == 'win32':
@@ -146,18 +168,23 @@ def get_full_prompt() -> str:
 def _boot_config() -> Dict[str, Any]:
     """config.json `boot` block (demo_phases, github_import, ...)."""
     try:
-        import json
-        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
-            return json.load(f).get('boot') or {}
+        from ai import config as _config
+        return _config.section('boot')
     except Exception:
         return {}
 
 
+def _popups_enabled() -> bool:
+    """Result windows (screenshot / camera / generated image) during boot are
+    opt-in: a 1280x720 capture of the desktop centred over the app read as
+    "CORA reopened smaller". Results are always logged and spoken."""
+    return bool(_boot_config().get('popups', False))
+
+
 def _app_version() -> str:
     try:
-        import json
-        with open(PROJECT_DIR / 'config' / 'config.json', 'r', encoding='utf-8') as f:
-            return str(json.load(f).get('version') or '3.0.0')
+        from ai import config as _config
+        return _config.version()
     except Exception:
         return '3.0.0'
 
@@ -2342,6 +2369,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 import tkinter as tk
                 from PIL import Image, ImageTk
 
+                if not _popups_enabled():
+                    raise _SkippedPhase("result popups are off (boot.popups)")
                 # Use window manager for proper z-layering
                 parent = _boot_display.root if _boot_display else None
                 ss_window = create_image_window(
@@ -2360,6 +2389,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 label.pack(fill='both', expand=True)
                 ss_window.update()
                 display_action("Showing screenshot for 5 seconds...")
+            except _SkippedPhase as e:
+                ss_window = None
             except Exception as e:
                 print(f"  [INFO] Screenshot popup failed: {e}")
                 ss_window = None
@@ -2452,6 +2483,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 import tkinter as tk
                 from PIL import Image, ImageTk
 
+                if not _popups_enabled():
+                    raise _SkippedPhase("result popups are off (boot.popups)")
                 # Use window manager for proper z-layering
                 parent = _boot_display.root if _boot_display else None
                 cam_window = create_image_window(
@@ -2470,6 +2503,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 label.pack(fill='both', expand=True)
                 cam_window.update()
                 display_action("Showing camera view for 5 seconds...")
+            except _SkippedPhase as e:
+                cam_window = None
             except Exception as e:
                 print(f"  [INFO] Camera popup failed: {e}")
                 cam_window = None
@@ -2631,6 +2666,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 import tkinter as tk
                 from PIL import Image, ImageTk
 
+                if not _popups_enabled():
+                    raise _SkippedPhase("result popups are off (boot.popups)")
                 # Use window manager for proper z-layering
                 parent = _boot_display.root if _boot_display else None
                 img_window = create_image_window(
@@ -2651,6 +2688,8 @@ def run_boot_sequence(skip_tts: bool = False, show_display: bool = True) -> Dict
                 img_window.update()
                 display_result("Image displayed successfully")
 
+            except _SkippedPhase as e:
+                img_window = None
             except Exception as e:
                 print(f"  [INFO] Image display skipped: {e}")
                 display_log(f"Image display skipped: {e}", "info")
@@ -2939,6 +2978,15 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', help='Extra verbose output')
     parser.add_argument('--mpv-missing', default='', help='Flag if mpv is missing (set by CORA.bat)')
     args = parser.parse_args()
+
+    # Everything printed from here on is also in data/logs/cora-YYYYMMDD.log
+    try:
+        from ai.log import setup as _log_setup
+        _lp = _log_setup('cora')
+        if _lp:
+            print(f"[LOG] {_lp}")
+    except Exception as _e:
+        print(f"[LOG] file logging unavailable: {_e}")
 
     # Check for missing dependencies and show modal
     mpv_missing = args.mpv_missing == '1'
@@ -3306,11 +3354,13 @@ Don't repeat the context - just respond to it naturally. No quotes around your r
                         else:
                             prompt = f"Respond naturally to: {context_info}"
 
-                        response = generate(prompt=prompt, system=system, max_tokens=60)
+                        # her own persona + the one-line brief (generate returns an OllamaResponse)
+                        response = generate(prompt=prompt, system=get_system_prompt() + "\n\n" + system, max_tokens=60)
+                        line = (response.content or '').strip().strip('"') if response and not response.error else ''
 
                         # Speak the interjection
-                        if response:
-                            speak(response)
+                        if line:
+                            speak(line)
                     except Exception as ai_err:
                         print(f"[AMBIENT] AI generation error: {ai_err}")
 
@@ -3321,7 +3371,19 @@ Don't repeat the context - just respond to it naturally. No quotes around your r
             ambient = get_ambient_awareness(friend_threshold=0.5)
 
             def ambient_transcript_handler(text):
-                """Feed transcripts to ambient awareness."""
+                """Feed transcripts to ambient awareness - except the wake word and
+                the command that follows it (those are hers to answer properly),
+                and anything heard while she is already working on a request."""
+                import time as _t
+                low = (text or '').lower()
+                try:
+                    if 'cora' in low or _t.time() - float(getattr(WakeWordDetector, 'last_wake_time', 0.0)) < 20.0:
+                        return
+                    from ai.dispatcher import get_dispatcher
+                    if get_dispatcher()._lock.locked():
+                        return
+                except Exception:
+                    pass
                 # Update ambient awareness with what we're hearing
                 ambient.update_audio_context(text)
 

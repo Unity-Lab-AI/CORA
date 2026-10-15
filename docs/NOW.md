@@ -15,7 +15,9 @@ LAW #0 applies: every snapshot of the active task preserves the user's verbatim 
 
 ## Active
 
-**Phase 3 of the full repair: the conversation loop (UPG-014 / UPG-023 / UPG-027) — every entry point through ONE dispatcher, unity-brain as her brain, say(text, emotion, act) straight to her voice.**
+**Phase 5 of the full repair (Phase 3 committed as 9409100): this round, uncommitted until boot run 5 passes — UPG-034 shared Whisper weights; UPG-035 vision/think-off + ambient fixes; UPG-036 tool calls kept in the transcript; UPG-037 planted check data removed + scratch transcript + read-only allowlist; UPG-038 web on the local server; UPG-039 boot popups off; UPG-040 voice text dash/symbol guard; UPG-019 fundamentals (config loader, log tee, orderly shutdown, timer cancels, mutex heartbeat); UPG-041 search (no modal, browser engines DuckDuckGo/Brave/Bing, answer box, readable page fetch with browser fallback); UPG-042 windows/ + linux/ start/stop scripts. NEXT: commit, UPG-018 oversized files, UPG-022 docs truth pass, UPG-021 module split, UPG-020 tag, UPG-026, push cascade.**
+
+**Rules learned today (binding for every later check):** checks never write to her real data (`CORA_HISTORY_FILE` scratch transcript + `allowed_tools` read-only set); GPU is unloaded (`keep_alive: 0` on every loaded model) before a boot run; the user's words go in TODO/FINALIZED verbatim.
 
 **Verbatim user request:**
 - "get to fixing it all we need it 100% operationsal and complete with all code wired up and working with edits and fixes where needed"

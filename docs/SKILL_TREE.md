@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 1.0.0
+  Version: 3.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -26,15 +26,15 @@
 ### Text-to-Speech (TTS)
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Kokoro TTS | Core | DONE | Neural voice synthesis (af_bella) |
+| unity-voice-v2 | Core | DONE | Her own trained voice (sidecar), 9 emotions x 7 speech acts |
 | Emotion-aware Speech | Advanced | DONE | Context-based tone adjustment |
 | TTS Mutex | Core | DONE | Prevents overlapping speech |
-| pyttsx3 Fallback | Basic | DONE | Backup TTS engine |
+| Voice designators from the brain | Advanced | DONE | say(text, emotion, act) straight to the voice |
 
 ### Speech-to-Text (STT)
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Vosk STT | Core | DONE | Offline speech recognition |
+| faster-whisper STT | Core | DONE | Local GPU speech recognition (Vosk fallback) |
 | Wake Word Detection | Core | DONE | "Cora" activation |
 | Echo Filtering | Advanced | DONE | Ignore own speech |
 | Conversation Mode | Advanced | DONE | Continuous listening |
@@ -48,7 +48,7 @@
 |-------|-------|--------|-------------|
 | Webcam Capture | Basic | DONE | Multi-index camera detection |
 | Presence Detection | Intermediate | DONE | User at desk detection |
-| llava Vision | Advanced | WIP | AI image analysis |
+| Vision (unity-brain) | Advanced | DONE | The brain reads camera and screen images |
 | Screenshot Capture | Basic | DONE | Desktop/window screenshots |
 
 ---
@@ -58,9 +58,9 @@
 ### Local AI (Ollama)
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Chat Generation | Core | DONE | dolphin-mistral responses |
-| Code Generation | Intermediate | DONE | qwen2.5-coder integration |
-| Vision Analysis | Advanced | DONE | llava model |
+| Chat Generation | Core | DONE | unity-brain responses |
+| Code Generation | Intermediate | DONE | configured code model (unity-brain by default) |
+| Vision Analysis | Advanced | DONE | unity-brain (vision) |
 | Dynamic Responses | Advanced | DONE | cora_respond() boot phases |
 | Context Tracking | Intermediate | DONE | Conversation memory |
 
@@ -118,7 +118,7 @@
 ### Web Operations
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Web Search | Intermediate | DONE | DuckDuckGo search |
+| Web Search | Intermediate | DONE | DuckDuckGo / Brave / Bing, browser-backed |
 | URL Fetch | Intermediate | DONE | Get webpage content |
 | Weather API | Intermediate | DONE | wttr.in integration |
 | Location API | Intermediate | DONE | IP geolocation |
@@ -127,7 +127,7 @@
 ### Browser Automation
 | Skill | Level | Status | Description |
 |-------|-------|--------|-------------|
-| Playwright | Advanced | WIP | Web automation |
+| Playwright | Advanced | DONE | Browser-backed search and page rendering |
 | Media Control | Intermediate | DONE | mpv YouTube playback |
 
 ---
@@ -185,16 +185,16 @@
 | Domain | Done | WIP | TODO | Total |
 |--------|------|-----|------|-------|
 | Voice & Speech | 8 | 0 | 0 | 8 |
-| Vision & Camera | 3 | 1 | 0 | 4 |
+| Vision & Camera | 4 | 0 | 0 | 4 |
 | AI & Reasoning | 7 | 0 | 0 | 7 |
 | Task Management | 8 | 0 | 0 | 8 |
 | System Control | 8 | 0 | 0 | 8 |
-| Web & External | 6 | 1 | 0 | 7 |
+| Web & External | 7 | 0 | 0 | 7 |
 | Code & Development | 6 | 0 | 0 | 6 |
 | User Interface | 12 | 0 | 0 | 12 |
-| **TOTAL** | **58** | **2** | **0** | **60** |
+| **TOTAL** | **60** | **0** | **0** | **60** |
 
-**Completion: 97%** (58/60 skills implemented)
+**Completion: 100%** (60/60 skills implemented, 2026-10-14)
 
 ---
 
@@ -202,9 +202,9 @@
 
 | Domain | Primary Files |
 |--------|---------------|
-| Voice | `voice/tts.py`, `voice/stt.py`, `voice/wake_word.py` |
-| Vision | `services/presence.py`, `ui/camera_feed.py` |
-| AI | `ai/ollama.py`, `ai/context.py` |
+| Voice | `voice/tts.py`, `voice/unity_voice.py`, `voice/stt.py`, `voice/wake_word.py` |
+| Vision | `services/camera.py`, `cora_tools/vision.py`, `services/presence.py`, `ui/camera_feed.py` |
+| AI | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py`, `ai/ollama.py`, `ai/settings.py` |
 | Tasks | `cora_tools/tasks.py`, `cora_tools/calendar.py` |
 | System | `cora_tools/system.py`, `cora_tools/windows.py` |
 | Web | `cora_tools/web.py`, `services/weather.py` |
@@ -245,9 +245,9 @@
 | Module | Lines | Purpose | Issues |
 |--------|-------|---------|--------|
 | `commands.py` | 1,725 | Voice command router | SEC-004/005 injection |
-| `tts.py` | 707 | Kokoro TTS | MEM-001 race condition |
+| `tts.py` | 707 | Kokoro TTS (Dec 2025; now unity-voice-v2) | MEM-001 race condition (fixed) |
 | `ambient_awareness.py` | 509 | Proactive interjections | Resource drain |
-| `stt.py` | 425 | Vosk STT | MEM-002 memory leak |
+| `stt.py` | 425 | Vosk STT (Dec 2025; now faster-whisper) | MEM-002 memory leak (fixed) |
 | `emotion.py` | 404 | Mood tracking | Thread safety |
 | `wake_word.py` | 368 | Wake detection | MEM-003 unbounded queue |
 | `tts_mutex.py` | 365 | Speech coordination | MEM-004 starvation |
@@ -282,5 +282,5 @@
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0 Skill Tree*
-*UPDATED: 2025-12-29 (10-Agent Deep Scan)*
+*Unity AI Lab - C.O.R.A v3.0.0 Skill Tree*
+*UPDATED: 2026-10-14 (skills); module inventory from the 2025-12-29 scan*

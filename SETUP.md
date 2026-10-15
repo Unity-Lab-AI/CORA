@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 1.0.0
+  Version: 3.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -18,15 +18,17 @@
 ## Quick Install (5 Minutes)
 
 ### Step 1: Python
-Make sure you have Python 3.10 or newer:
+Make sure you have Python 3.13 (3.12 works):
 ```bash
 python --version
 ```
 If not installed: [Download Python](https://www.python.org/downloads/)
 
 ### Step 2: Install Dependencies
+The launcher does this for you (`windows\start.bat` / `linux/start.sh` / `CORA.bat`). By hand:
 ```bash
-pip install -r requirements.txt
+py -3.13 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
 ```
 
 ### Step 3: Install Ollama (AI Brain)
@@ -37,9 +39,10 @@ Or download from: [ollama.com](https://ollama.com)
 
 ### Step 4: Download AI Models
 ```bash
-ollama pull dolphin-mistral:7b    # Main chat model (CORA's brain)
-ollama pull llava                  # Vision/image analysis
-ollama pull qwen2.5-coder:7b       # Coding assistance
+# The launcher pulls the configured models (config/config.json `models`):
+#   unity-brain                     - her brain: chat, tools, vision (built in the lab's Backrooms repo, models/unity-brain)
+#   huihui_ai/qwen3-abliterated:8b  - fallback brain
+ollama pull huihui_ai/qwen3-abliterated:8b
 ```
 
 ### Step 5: Install mpv (Optional - for YouTube)
@@ -48,9 +51,10 @@ Download from: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
 Extract to `./tools/` folder - CORA auto-detects mpv.exe (any subfolder works).
 
 ### Step 6: Run CORA
-```bash
-python src/boot_sequence.py
 ```
+windows\start.bat      (or linux/start.sh, or CORA.bat)
+```
+Stop everything she started with `windows\stop.bat` / `linux/stop.sh`.
 
 ---
 
@@ -126,10 +130,10 @@ See `env.example` for detailed instructions on each API key.
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
 | OS | Windows 10 | Windows 11 |
-| Python | 3.10+ | 3.11+ |
+| Python | 3.12 | 3.13 |
 | RAM | 8 GB | 16 GB |
 | GPU | None | NVIDIA (CUDA) |
-| VRAM | N/A | 8 GB+ |
+| VRAM | 8 GB | 16 GB (brain + voice + whisper together) |
 | Storage | 5 GB | 10 GB |
 | mpv | Optional | For YouTube playback |
 
@@ -141,15 +145,15 @@ Core packages installed via `requirements.txt`:
 |---------|---------|
 | customtkinter | Modern GUI framework |
 | ollama | AI model integration |
-| kokoro | Neural TTS synthesis |
+| (sidecar) | unity-voice-v2, her own voice, runs as a separate process |
 | soundfile | Audio processing |
 | sounddevice | Audio playback |
 | psutil | System monitoring |
 | opencv-python | Webcam/vision |
 | pillow | Image processing |
 | requests | API calls |
-| SpeechRecognition | Voice input |
-| vosk | Offline speech recognition |
+| faster-whisper | Local GPU speech recognition |
+| openwakeword | Optional wake-word model |
 
 Install all:
 ```bash
@@ -186,17 +190,11 @@ Or it starts automatically when you pull/run a model.
 
 **Required models:**
 ```bash
-ollama pull dolphin-mistral:7b   # Main chat - CORA's brain (~4.1 GB)
-ollama pull llava                # Vision/image analysis (~4.7 GB)
-ollama pull qwen2.5-coder:7b     # Coding assistance (~4.4 GB)
+ollama create unity-brain -f <Backrooms>/models/unity-brain/Modelfile   # her brain (5.3 GB + 0.9 GB vision)
+ollama pull huihui_ai/qwen3-abliterated:8b                              # fallback brain
 ```
 
-**Optional models:**
-```bash
-ollama pull llama3.2      # Alternative chat (smaller)
-ollama pull codellama     # Alternative code generation
-ollama pull phi           # Small & fast for testing
-```
+**Optional models:** any Ollama model works as `models.primary` in `config/config.json`; models with a tools template get native tool calling, others get the JSON fallback protocol.
 
 ### Verifying Ollama
 
@@ -213,24 +211,11 @@ Should show your downloaded models.
 
 ### TTS (Text-to-Speech)
 
-CORA uses Kokoro TTS by default (neural voice):
-
-```bash
-pip install kokoro soundfile sounddevice
-```
-
-The `af_bella` voice is used automatically.
+CORA speaks with `unity-voice-v2`, Unity AI Lab's own trained voice, served as a sidecar on 127.0.0.1:5123 (`tts.unity_voice` in `config/config.json`: model dir, Python with torch + misaki, autostart). The launcher starts it. There is no other voice and no fallback voice.
 
 ### STT (Speech-to-Text)
 
-For voice input:
-```bash
-pip install SpeechRecognition vosk
-```
-
-Download a Vosk model (optional, for offline):
-- [vosk-model-small-en-us](https://alphacephei.com/vosk/models)
-- Extract to `models/vosk/`
+Voice input is faster-whisper on the GPU (`stt.whisper_model` in `config/config.json`, default `base.en`; the model downloads on first use). Vosk is only a fallback engine if faster-whisper cannot load.
 
 ---
 
@@ -241,8 +226,7 @@ For faster AI responses with NVIDIA GPU:
 ### CUDA Installation
 
 1. Install NVIDIA drivers (latest)
-2. Install CUDA Toolkit 11.8+
-3. Install cuDNN
+2. The venv brings the CUDA 12 runtime libraries whisper needs (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`)
 
 ### Verify GPU
 
@@ -258,9 +242,10 @@ You should see your GPU listed with VRAM stats.
 ## Running CORA
 
 ### Visual Boot (Recommended)
-```bash
-python src/boot_sequence.py
 ```
+windows\start.bat        (Linux: linux/start.sh)
+```
+or, inside the venv, `python src/boot_sequence.py`.
 - Full cyberpunk visual display
 - 10-phase diagnostic with TTS
 - Live system stats
@@ -282,14 +267,11 @@ python src/boot_sequence.py --quick
 ```
 
 ### Web Version
-Visit [unityailab.com/CORA](https://unityailab.com/CORA) in your browser:
-1. Make sure Ollama is running (`ollama serve`)
-2. Click `[ BACKEND TERMINAL ]` to check model status
-3. Download any missing models shown in the terminal
-4. (Optional) Run stats server for live GPU/CPU stats:
-   ```bash
-   python services/stats_server.py
-   ```
+Served locally with her voice and the configured models:
+```bash
+python services/stats_server.py      # then open http://127.0.0.1:11435/
+```
+Opened from anywhere else the page is text only against a local Ollama.
 
 ---
 
@@ -299,28 +281,21 @@ Visit [unityailab.com/CORA](https://unityailab.com/CORA) in your browser:
 
 | File | Purpose |
 |------|---------|
-| `config/settings.json` | GUI settings (TTS, Ollama, STT) |
-| `config/voice_commands.json` | Wake words, voice config |
-| `personality.json` | AI personality traits |
+| `config/config.json` | The one config: models, ollama, tts.unity_voice, stt, camera, boot, assistant, web |
+| `config/system_prompt.txt` | Her persona (also served to the web page) |
+| `config/voice_commands.json` | Wake words, voice command aliases |
 
 ### Default Settings
 
-`config/settings.json`:
+`config/config.json` (excerpt):
 ```json
 {
-  "tts": {
-    "enabled": true,
-    "rate": 150,
-    "volume": 1.0
-  },
-  "ollama": {
-    "enabled": true,
-    "model": "llama3.2"
-  },
-  "stt": {
-    "enabled": true,
-    "sensitivity": 0.7
-  }
+  "models": {"primary": "unity-brain", "vision": "unity-brain", "fallback": "huihui_ai/qwen3-abliterated:8b"},
+  "ollama": {"api_url": "http://127.0.0.1:11434", "num_ctx": 16384, "keep_alive": "30m"},
+  "tts": {"enabled": true, "engine": "unity-voice-v2", "unity_voice": {"url": "http://127.0.0.1:5123", "autostart": true}},
+  "stt": {"engine": "faster-whisper", "whisper_model": "base.en"},
+  "camera": {"index": "auto", "backend": "auto", "open_timeout": 4.0},
+  "boot": {"demo_phases": false, "popups": false}
 }
 ```
 
@@ -334,7 +309,7 @@ Visit [unityailab.com/CORA](https://unityailab.com/CORA) in your browser:
 ```bash
 python --version
 ```
-Must be 3.10+
+Must be 3.12 or 3.13
 
 **Check dependencies:**
 ```bash
@@ -355,14 +330,14 @@ ollama serve
 
 **Pull models:**
 ```bash
-ollama pull llama3.2
+python scripts/bootstrap.py      # pulls whatever config/config.json names
 ```
 
 ### No voice output
 
-**Check Kokoro:**
+**Check her voice:**
 ```bash
-pip install kokoro soundfile sounddevice
+curl http://127.0.0.1:5123/health          # the sidecar; its log is data/voice-sidecar.log
 ```
 
 **Test TTS:**
@@ -388,7 +363,7 @@ pip install opencv-python
 
 **Test webcam:**
 ```bash
-python -c "import cv2; print(cv2.VideoCapture(0).isOpened())"
+python services/camera.py                 # probes every index/backend with a timeout
 ```
 
 ---
@@ -407,17 +382,19 @@ C.O.R.A/
 │   ├── app.py               # Main GUI
 │   └── panels.py            # GUI panels
 ├── voice/
-│   ├── tts.py               # Kokoro TTS
-│   ├── stt.py               # Speech recognition
+│   ├── tts.py               # unity-voice-v2 client
+│   ├── stt.py               # faster-whisper
 │   └── wake_word.py         # Wake word detection
 ├── ai/
+│   ├── dispatcher.py        # the conversation loop
+│   ├── tools_registry.py    # 116 tools
 │   ├── ollama.py            # Ollama client
-│   └── context.py           # Context management
+│   └── settings.py          # models, URLs, options
 ├── cora_tools/              # Python tool modules (20+)
 ├── tools/                   # Downloaded binaries (mpv, ffmpeg)
 ├── services/                # Weather, location, etc.
 ├── config/
-│   └── settings.json        # Configuration
+│   └── config.json          # Configuration
 ├── data/
 │   ├── images/              # Generated images
 │   └── camera/              # Camera captures
@@ -442,8 +419,7 @@ pip install -r requirements.txt --upgrade
 
 ### Update AI Models
 ```bash
-ollama pull llama3.2
-ollama pull llava
+python scripts/bootstrap.py
 ```
 
 ---
@@ -456,5 +432,5 @@ ollama pull llava
 
 ---
 
-*C.O.R.A v1.0.0 - Setup Guide*
-*Unity AI Lab - Hackall360, Sponge, GFourteen*
+*C.O.R.A v3.0.0 - Setup Guide*
+*Unity AI Lab - Hackall360, Sponge, GFourteen, Alfreddo*

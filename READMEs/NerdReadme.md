@@ -2,11 +2,51 @@
 
 ## Developer/Nerd Guide
 
-Version 1.0.0
+Version 3.0.0 (2026-10-14)
 
 ---
 
-## Architecture Overview
+## Current architecture (3.0.0)
+
+Read this first; the sections below it are the December 2025 write-up kept for history.
+
+```
+ input (boot display box / "Cora" + speech / GUI / CLI / web page)
+          |
+          v
+ ai/dispatcher.py  --- one conversation loop for every entry point
+   | system prompt (config/system_prompt.txt) + live context (time, mood, task counts, creators)
+   | 116 tools from ai/tools_registry.py, relevance-ranked per message (assistant.max_tools)
+   | native Ollama tool calling (JSON fallback for models without a tools template)
+   | confirmation gate for destructive tools, repeat-call guard, allowed_tools for checks
+   | transcript in ai/history.py (tool calls + results kept, summary folding)
+          |
+          v
+ ai/ollama.py -> Ollama (unity-brain; think:false; per-model pinned options from ai/settings.py)
+          |
+   say(text, emotion, act)  ->  voice/tts.py queue  ->  voice/unity_voice.py  ->  unity-voice-v2 sidecar :5123
+   ears: voice/stt.py (faster-whisper, one shared model) -> wake word -> dispatcher; ambient awareness watches the rest
+   eyes: services/camera.py (probed, timeout-guarded) / cora_tools/screenshots.py -> the brain reads the image
+   web:  cora_tools/web.py (DuckDuckGo HTML -> headless Chromium DDG/Brave/Bing -> Bing HTTP), readable fetch
+ config: config/config.json through ai/config.py (atomic saves); logs: ai/log.py tee -> data/logs/
+ launch: CORA.bat / windows/start.bat / linux/start.sh -> scripts/bootstrap.py -> src/boot_sequence.py; stop scripts end it all
+```
+
+| Module | Role |
+|---|---|
+| `ai/settings.py` | model names, Ollama URL, context, per-model options (`_MODEL_OPTIONS`), creators |
+| `ai/config.py` | config loader: mtime cache, dotted `get`, atomic `save`, `update` |
+| `ai/log.py` | daily log file + stdout/stderr tee |
+| `ai/tools_registry.py` | `Tool` dataclass, `_tool` decorator, `select_tools`, `execute` |
+| `services/camera.py` | the only place a webcam is opened |
+| `cora_tools/vision.py` | screenshot / camera snapshot helpers for ambient awareness |
+| `voice/unity_voice.py` | sidecar client: `voice_text()` (four-mark vocabulary), `synth_delivery()`, autostart, turn lock |
+
+Checks never write to her real data: `CORA_HISTORY_FILE` points at a scratch transcript and `handle(..., allowed_tools=...)` restricts tools.
+
+---
+
+## Architecture Overview (December 2025)
 
 ### Design Patterns
 
@@ -14,7 +54,7 @@ Version 1.0.0
 |---------|---------------|
 | Singleton | CONFIG global, TTSQueue, EmotionalState |
 | Command | Command dispatch table (COMMANDS dict) |
-| Strategy | TTS engine selection (Kokoro/pyttsx3) |
+| Strategy | TTS engine: unity-voice-v2 only (Kokoro/pyttsx3 removed in 3.0.0) |
 | Observer | Chat history, emotional event tracking |
 | State Machine | EmotionalState with mood decay |
 | Factory | Panel creation in GUI, cora_respond() |
@@ -58,7 +98,7 @@ Version 1.0.0
 
 ---
 
-## New in v1.0.0
+## New in v1.0.0 (December 2025)
 
 ### Visual Boot Display (ui/boot_display.py)
 
@@ -164,7 +204,7 @@ python src/boot_sequence.py --quick   # Skip TTS announcements
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  C.O.R.A v1.0.0 - Visual Boot Display                [X]   │
+│  C.O.R.A v3.0.0 - Visual Boot Display                [X]   │
 ├──────────────────────────┬──────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                        │
 │  ────────────────────    │  ────────────────────────────    │
@@ -216,8 +256,7 @@ python src/boot_sequence.py --quick   # Skip TTS announcements
 | Class | Engine | Features |
 |-------|--------|----------|
 | `TTSEngine` | Base | Abstract interface |
-| `KokoroTTS` | Kokoro | af_bella voice, emotion instructions |
-| `Pyttsx3TTS` | pyttsx3 | Rate modifiers, offline |
+| `UnityVoiceTTS` | unity-voice-v2 sidecar | her own voice; emotion + speech act per line; `KokoroTTS`/`Pyttsx3TTS` are aliases of it |
 | `TTSQueue` | Any | Non-blocking, priority queue, mutex |
 
 **TTSQueue Features:**
@@ -231,11 +270,11 @@ python src/boot_sequence.py --quick   # Skip TTS announcements
 **Global Functions:**
 
 ```python
-get_tts_engine(config)              # Factory for engine selection
-speak(text, emotion)                # Quick synchronous speak
-queue_speak(text, emotion, priority) # Async queued speak
-speak_interrupt(text)               # Clear queue and speak immediately
-speak_with_callback(text, on_audio) # Speak with audio data callback
+get_tts_engine(config)                          # the one engine (None when the sidecar is down)
+speak(text, emotion, speech_act=None)           # blocking
+queue_speak(text, emotion, priority, speech_act) # async queued
+speak_interrupt(text, emotion, speech_act)      # clear queue, speak now
+stop_speaking() / is_speaking() / voice_status()
 ```
 
 ### ai/ollama.py (AI Integration)
@@ -324,7 +363,7 @@ path = generate_image("a cyberpunk city at night")
 ```json
 {
   "tts": {"enabled": true, "rate": 150, "volume": 1.0},
-  "ollama": {"enabled": true, "model": "llama3.2"},
+  "ollama": {"enabled": true, "model": "unity-brain"},
   "stt": {"enabled": true, "sensitivity": 0.7}
 }
 ```
@@ -364,7 +403,7 @@ COMMANDS = {
     'time': cmd_time,
     'weather': cmd_weather,
     'screenshot': cmd_screenshot,
-    'see': cmd_see,           # Vision via llava
+    'see': cmd_see,           # Vision via the configured vision model
     'imagine': cmd_imagine,   # Image generation (NEW)
 
     # Runtime tools
@@ -432,7 +471,7 @@ COMMANDS = {
 | Task load | O(n) | File I/O |
 | Task search | O(n) | String matching |
 | Chat | Network | Ollama API latency |
-| TTS (Kokoro) | GPU | Neural inference (~1-2s) |
+| TTS (unity-voice-v2) | GPU | ~0.5 s per sentence, synthesised one ahead of playback |
 | cora_respond() | Network | Ollama generate (~2-5s) |
 | Image generation | Network | Pollinations API (~5-15s) |
 | Presence | CPU/Camera | Frame capture + detection |
@@ -497,7 +536,7 @@ C.O.R.A/
 │   ├── boot_console.py      # Boot diagnostics
 │   └── panels.py            # Task/Settings/Knowledge panels
 ├── voice/
-│   ├── tts.py               # Kokoro TTS engine
+│   ├── tts.py               # unity-voice-v2 client + queue
 │   ├── stt.py               # Speech recognition
 │   ├── wake_word.py         # Wake word detection
 │   ├── emotion.py           # Emotional state machine
@@ -538,5 +577,5 @@ C.O.R.A/
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0 Technical Documentation*
-*Last Updated: 2025-12-25*
+*Unity AI Lab - C.O.R.A v3.0.0 Technical Documentation*
+*Last Updated: 2026-10-14*

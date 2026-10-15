@@ -128,15 +128,21 @@ def ensure_playwright(quiet: bool):
         import playwright  # noqa: F401
     except ImportError:
         return
+    # the marker carries the playwright version: a pip upgrade needs a matching browser build
+    try:
+        from importlib.metadata import version as _v
+        pw_version = _v('playwright')
+    except Exception:
+        pw_version = 'unknown'
     marker = PROJECT_DIR / 'data' / '.playwright_ok'
-    if marker.exists():
+    if marker.exists() and marker.read_text(encoding='utf-8', errors='replace').strip() == pw_version:
         return
     try:
         r = subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'],
                            capture_output=True, text=True, timeout=900)
         if r.returncode == 0:
             marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text('ok')
+            marker.write_text(pw_version)
             say("[OK] Playwright chromium installed", quiet)
         else:
             say(f"[WARN] playwright install: {r.stderr[-200:]}", quiet)

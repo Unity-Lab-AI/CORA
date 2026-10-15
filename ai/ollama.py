@@ -252,7 +252,7 @@ def chat(
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
-    think: Optional[bool] = None,
+    think: Optional[bool] = False,
 ) -> OllamaResponse:
     """Send a chat completion request (non-streaming).
 
@@ -294,7 +294,7 @@ def chat_stream(
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
-    think: Optional[bool] = None,
+    think: Optional[bool] = False,
 ) -> Generator[str, None, None]:
     """Streaming chat completion. Yields content tokens as they arrive.
 
@@ -320,7 +320,7 @@ def chat_stream_events(
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
-    think: Optional[bool] = None,
+    think: Optional[bool] = False,
 ) -> Generator[Dict[str, Any], None, None]:
     """Streaming chat that yields structured events:
         {'type': 'token', 'content': str}
@@ -387,6 +387,7 @@ def generate(
             'prompt': prompt,
             'stream': False,
             'raw': raw,
+            'think': False,
             'keep_alive': _settings.keep_alive(),
             'options': _settings.base_options(temperature, max_tokens, model),
         }
@@ -539,7 +540,7 @@ async def async_chat(
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
-    think: Optional[bool] = None,
+    think: Optional[bool] = False,
 ) -> OllamaResponse:
     """Async non-blocking chat completion using aiohttp."""
     model = model or _settings.chat_model()
@@ -568,7 +569,7 @@ async def async_chat_stream(
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
-    think: Optional[bool] = None,
+    think: Optional[bool] = False,
 ) -> AsyncGenerator[str, None]:
     """Async streaming chat completion. Yields content tokens."""
     model = model or _settings.chat_model()
@@ -615,7 +616,7 @@ async def async_generate(
     timeout = timeout or _settings.timeout()
     try:
         payload = {
-            'model': model, 'prompt': prompt, 'stream': False,
+            'model': model, 'prompt': prompt, 'stream': False, 'think': False,
             'keep_alive': _settings.keep_alive(),
             'options': _settings.base_options(temperature, max_tokens, model),
         }

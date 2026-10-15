@@ -169,8 +169,14 @@ class _BoundedQueue(queue.Queue):
 
 
 # --------------------------------------------------------------------------- recognizer
+# One loaded WhisperModel per (name, device, compute) for the whole process.
+_WHISPER_CACHE: Dict[tuple, object] = {}
+_WHISPER_LOCK = threading.Lock()
+
+
 class SpeechRecognizer:
-    """Speech recognition: faster-whisper (default) or Vosk."""
+    """Speech recognition: faster-whisper (default) or Vosk. Instances are cheap:
+    the Whisper weights are loaded once per process and shared."""
 
     SILENCE_RMS = 0.012          # below this is silence (quiet room ~0.003-0.008)
     SPEECH_RMS = 0.02            # above this counts as speech
@@ -221,19 +227,28 @@ class SpeechRecognizer:
         if want in ('auto', 'cuda') and _cuda_available():
             attempts.append(('cuda', 'int8_float16'))
         attempts.append(('cpu', 'int8'))
-        for device, compute in attempts:
-            try:
-                model = WhisperModel(name, device=device, compute_type=compute)
-                # a tiny real inference proves the runtime libraries load (cuBLAS/cuDNN)
-                list(model.transcribe(np.zeros(16000, dtype=np.float32), language='en', beam_size=1)[0])
-                self.model = model
-                self.device = device
-                self.engine_name = 'faster-whisper'
-                print(f"[STT] faster-whisper {name} on {device}")
-                return True
-            except Exception as e:
-                print(f"[STT] faster-whisper on {device} failed: {str(e)[:120]}")
-                self.model = None
+        with _WHISPER_LOCK:
+            for device, compute in attempts:
+                key = (name, device, compute)
+                cached = _WHISPER_CACHE.get(key)
+                if cached is not None:
+                    # the wake-word detector, the command recognizer, converse mode
+                    # and the GUI all share ONE set of weights on the GPU
+                    self.model, self.device, self.engine_name = cached, device, 'faster-whisper'
+                    return True
+                try:
+                    model = WhisperModel(name, device=device, compute_type=compute)
+                    # a tiny real inference proves the runtime libraries load (cuBLAS/cuDNN)
+                    list(model.transcribe(np.zeros(16000, dtype=np.float32), language='en', beam_size=1)[0])
+                    _WHISPER_CACHE[key] = model
+                    self.model = model
+                    self.device = device
+                    self.engine_name = 'faster-whisper'
+                    print(f"[STT] faster-whisper {name} on {device}")
+                    return True
+                except Exception as e:
+                    print(f"[STT] faster-whisper on {device} failed: {str(e)[:120]}")
+                    self.model = None
         return False
 
     def _init_vosk(self) -> bool:
@@ -492,6 +507,7 @@ class WakeWordDetector:
                         WakeWordDetector._recent_transcripts.pop(0)
                 WakeWordDetector._notify_transcript_callbacks(text)
             if _fuzzy_wake_match(text_lower, self.wake_word):
+                WakeWordDetector.last_wake_time = time.time()
                 on_wake()
 
         self.recognizer.start_listening(check_wake)
@@ -509,6 +525,7 @@ class WakeWordDetector:
                     scores = self._oww.predict(frame)
                     if scores and max(scores.values()) >= threshold and time.time() - last > 2.0:
                         last = time.time()
+                        WakeWordDetector.last_wake_time = time.time()
                         on_wake()
         except Exception as e:
             print(f"[WAKE] openWakeWord loop error: {e}")

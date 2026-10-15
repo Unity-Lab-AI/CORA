@@ -2,7 +2,7 @@
 
 ## Cognitive Operations & Reasoning Assistant
 
-Version 1.0.0
+Version 3.0.0 (2026-10-14)
 
 ---
 
@@ -11,9 +11,10 @@ Version 1.0.0
 ### Starting CORA
 
 **Visual Boot (Recommended):**
-```bash
-python src/boot_sequence.py
 ```
+windows\start.bat        (Linux: linux/start.sh; CORA.bat at the root does the same)
+```
+Stop everything she started: `windows\stop.bat` / `linux/stop.sh`. By hand, inside the venv: `python src/boot_sequence.py`.
 Full cyberpunk visual boot display with dynamic AI responses.
 
 **GUI Mode:**
@@ -47,10 +48,10 @@ When CORA starts with visual boot, you'll see:
 
 | Phase | Check | What Happens |
 |-------|-------|--------------|
-| 1 | Voice Synthesis | Kokoro TTS initialization |
+| 1 | Voice Synthesis | unity-voice-v2 sidecar (her own voice) |
 | 2 | AI Engine | Ollama connection check |
-| 3 | Hardware Check | CPU, RAM, GPU, VRAM stats |
-| 4 | Core Tools | Memory, Tasks, Files, Browser |
+| 3 / 3.1 | Hardware Check, Camera | CPU, RAM, GPU, VRAM stats; camera open, snapshot, vision, close |
+| 4 / 4.5 | Core Tools, Daily Briefing | Tools check; today's events, overdue tasks and reminders spoken |
 | 5 | Voice Systems | STT, Echo Filter, Wake Word |
 | 6 | External Services | Weather, Location, Notifications |
 | 7 | News Headlines | Top 3 headlines from Google News |
@@ -69,7 +70,7 @@ When CORA starts with visual boot, you'll see:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  C.O.R.A v1.0.0 - Visual Boot Display                          │
+│  C.O.R.A v3.0.0 - Visual Boot Display                          │
 ├──────────────────────────┬─────────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                           │
 │                          │                                     │
@@ -114,9 +115,9 @@ Features:
 
 ### Input Methods
 
-1. **Text** - Type in the input field, press Enter or click Send
+1. **Text** - Type in the input field, press Enter or click Send. CLI verbs (`add`, `list`, `done` ...) run directly; anything else goes to her brain, which picks the tools itself.
 2. **Voice** - Click Mic button, speak your command
-3. **Wake Word** - Say "hey cora" to activate voice input
+3. **Wake Word** - Say "cora" (or "hey cora") to activate voice input; say "stop" or "quiet" to cut her off
 
 ---
 
@@ -217,7 +218,7 @@ cora> chat What should I focus on today?
 ### Voice Output
 
 ```
-speak <text>          Speak text aloud (Kokoro TTS)
+speak <text>          Speak text aloud (unity-voice-v2, her own voice)
 ```
 
 ### Vision / Camera
@@ -227,7 +228,7 @@ see                   Capture webcam and describe what CORA sees
 see <prompt>          Analyze camera image with specific question
 ```
 
-Uses Ollama's llava model for vision analysis.
+Uses the configured vision model (unity-brain reads the frame itself).
 
 ### Image Generation
 
@@ -306,15 +307,19 @@ Access via **Settings** button in sidebar:
 
 | Setting | Range | Description |
 |---------|-------|-------------|
-| TTS Enabled | On/Off | Enable voice output |
-| Speech Rate | 50-300 | Words per minute |
-| Volume | 0-100% | Voice volume |
-| Ollama Enabled | On/Off | Enable AI chat |
-| Model | text | Ollama model name |
-| Voice Input | On/Off | Enable STT |
-| Sensitivity | 0-100% | Voice detection threshold |
+| Enable voice | On/Off | Her voice on or off |
+| Volume | 0-1 | Voice volume |
+| Emotion intensity | 0-1 | How strongly she delivers emotion |
+| Presence gate | On/Off | Only speak when someone is at the desk (webcam) |
+| Enable AI | On/Off | Enable the brain |
+| Chat model / Vision model | installed list | Which Ollama models she uses |
+| Context (tokens) | 8192-32768 | Context window |
+| Wake word / voice input | On/Off | Enable the ears |
+| Sensitivity | 0-1 | Voice detection threshold |
+| Whisper model | tiny.en-medium.en | Recognition model |
+| Demo phases at boot | On/Off | YouTube, GitHub import, image popups during boot |
 
-Click **Save Settings** to persist changes.
+Click **Save Settings** to persist changes; they go to `config/config.json` (the one config everything reads).
 
 ### CLI Settings
 
@@ -379,9 +384,10 @@ backup                Save all data to backups/
 | tasks.json | Task storage |
 | knowledge.json | Knowledge base |
 | chat_history.json | Conversation memory |
-| config/settings.json | GUI settings |
-| config/voice_commands.json | Voice config |
-| personality.json | AI personality |
+| config/config.json | The one config (models, voice, ears, camera, boot) |
+| config/system_prompt.txt | Her persona |
+| config/voice_commands.json | Voice command aliases |
+| data/logs/ | Daily log files (everything printed) |
 | data/images/ | Generated images |
 | data/camera/ | Camera captures |
 | backups/ | Backup directory |
@@ -434,9 +440,9 @@ backup                Save all data to backups/
 
 | Issue | Solution |
 |-------|----------|
-| No voice | Check TTS settings, ensure Kokoro installed |
+| No voice | Her sidecar must be up: `http://127.0.0.1:5123/health`; log in `data/voice-sidecar.log` |
 | No AI | Start Ollama service (`ollama serve`), check model |
-| No camera | Install opencv-python, check webcam connection |
+| No camera | `python services/camera.py` probes every index/backend with a timeout; set `camera.index` in config if needed |
 | Slow boot | Use `--quick` flag |
 | Voice not heard | Check microphone in settings |
 | No GPU stats | Install NVIDIA drivers, check nvidia-smi |
@@ -444,5 +450,5 @@ backup                Save all data to backups/
 
 ---
 
-*Unity AI Lab - C.O.R.A v1.0.0*
-*Last Updated: 2025-12-25*
+*Unity AI Lab - C.O.R.A v3.0.0*
+*Last Updated: 2026-10-14*

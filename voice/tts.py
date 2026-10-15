@@ -28,7 +28,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 # Cross-process TTS mutex (CORA instances)
 try:
-    from voice.tts_mutex import get_mutex
+    from voice.tts_mutex import get_mutex, heartbeat as _mutex_heartbeat
     TTS_MUTEX_AVAILABLE = True
 except ImportError:
     TTS_MUTEX_AVAILABLE = False
@@ -273,11 +273,16 @@ class UnityVoiceTTS(TTSEngine):
                             break
                         except uv.VoiceRefused as e:
                             self.last_error = f"refused: {e}"
-                            print(f"[TTS] line refused by her voice: {e} :: {s[:60]}")
+                            print(f"[TTS] line refused by her voice: {e} :: {s[:240]}")
                             continue
                         if not self._play(audio):
                             break
                         spoke_any = True
+                        if TTS_MUTEX_AVAILABLE:
+                            try:
+                                _mutex_heartbeat()
+                            except Exception:
+                                pass
             finally:
                 uv.give_turn()
         except Exception as e:

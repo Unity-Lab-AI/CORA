@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 1.0.0
+  Version: 3.0.0
   Unity AI Lab | https://www.unityailab.com
   ================================================================
 ```
@@ -18,7 +18,7 @@
 ## What is CORA?
 
 CORA is your computer friend who can:
-- **Talk to you** (she speaks out loud with a neural voice!)
+- **Talk to you** (she speaks out loud with her own trained voice)
 - **Listen to you** (say "Hey Cora" and she wakes up)
 - **Remember things** for you (tasks, notes, facts)
 - **See you** through your webcam
@@ -32,8 +32,9 @@ CORA is your computer friend who can:
 
 ### Full Boot (Recommended):
 ```
-python src/boot_sequence.py
+windows\start.bat        (Linux: linux/start.sh)
 ```
+Stop her with `windows\stop.bat` / `linux/stop.sh`.
 This shows the cool cyberpunk visual boot display!
 
 ### GUI Mode:
@@ -52,7 +53,7 @@ python src/boot_sequence.py --quick
 
 1. **Visual Boot Display** - Cyberpunk-themed boot screen appears
 2. **10-Phase Diagnostic** - CORA checks everything:
-   - Voice Synthesis (Kokoro TTS)
+   - Voice Synthesis (unity-voice-v2, her own voice)
    - AI Engine (Ollama)
    - Hardware (CPU, RAM, GPU, VRAM)
    - Core Tools (Memory, Tasks, Files, Browser)
@@ -71,7 +72,7 @@ python src/boot_sequence.py --quick
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  C.O.R.A v1.0.0 - Visual Boot Display                          │
+│  C.O.R.A v3.0.0 - Visual Boot Display                          │
 ├──────────────────────────┬─────────────────────────────────────┤
 │  STATUS PANEL            │  BOOT LOG                           │
 │                          │                                     │
@@ -107,7 +108,7 @@ python src/boot_sequence.py --quick
 └─────────────────────────────────────────┘
 ```
 
-**Just type what you want and press Enter!**
+**Just type what you want and press Enter!** Anything that is not a CLI verb goes to her brain: she picks the tools herself (tasks, reminders, camera, screen, web, apps, media, git, email) and tells you what she did.
 
 ---
 
@@ -216,7 +217,7 @@ Images are saved to `data/images/` folder.
 
 ### CORA won't start?
 1. Make sure Ollama is running: `ollama serve`
-2. Check Python 3.10+ installed: `python --version`
+2. Check Python 3.13 (or 3.12) installed: `python --version`
 3. Install dependencies: `pip install -r requirements.txt`
 
 ### CORA can't hear you?
@@ -225,7 +226,7 @@ Images are saved to `data/images/` folder.
 
 ### CORA won't talk?
 1. Check speakers on and volume up
-2. Try: `pip install kokoro sounddevice`
+2. Her voice runs as a sidecar: check `http://127.0.0.1:5123/health` and `data/voice-sidecar.log`
 
 ### No images generating?
 1. Check internet connection (uses Pollinations AI)
@@ -309,5 +310,5 @@ CORA is your helper. Just talk to her like a friend.
 
 ---
 
-*C.O.R.A v1.0.0 - Cognitive Operations & Reasoning Assistant*
-*Unity AI Lab - Hackall360, Sponge, GFourteen*
+*C.O.R.A v3.0.0 - Cognitive Operations & Reasoning Assistant*
+*Unity AI Lab - Hackall360, Sponge, GFourteen, Alfreddo*

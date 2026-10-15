@@ -172,7 +172,6 @@ def _open_and_read(index: int, backend: int, timeout: float):
         return None, None
     if 'cap' in box:
         return box['cap'], box['frame']
-    _dead.add((index, backend))
     _last_error = f"camera {index} ({backend_name(backend)}): {box.get('err', 'failed')}"
     return None, None
 
@@ -210,10 +209,14 @@ def capture_frame(timeout: Optional[float] = None):
         return None
     with _lock:
         if _working is not None:
-            cap, frame = _open_and_read(_working[0], _working[1], timeout or open_timeout())
-            if cap is not None:
-                cap.release()
-                return frame
+            for attempt in range(2):          # the device may still be releasing (live feed just closed)
+                cap, frame = _open_and_read(_working[0], _working[1], timeout or open_timeout())
+                if cap is not None:
+                    cap.release()
+                    return frame
+                if (_working[0], _working[1]) in _dead:
+                    break
+                time.sleep(0.4)
             globals()['_working'] = None     # it broke; probe again next time
         _, frame = _probe(keep_open=False)
         return frame
@@ -240,9 +243,13 @@ def open_capture():
         return None
     with _lock:
         if _working is not None:
-            cap, _ = _open_and_read(_working[0], _working[1], open_timeout())
-            if cap is not None:
-                return cap
+            for attempt in range(2):
+                cap, _ = _open_and_read(_working[0], _working[1], open_timeout())
+                if cap is not None:
+                    return cap
+                if (_working[0], _working[1]) in _dead:
+                    break
+                time.sleep(0.4)
             globals()['_working'] = None
         cap, _ = _probe(keep_open=True)
         return cap

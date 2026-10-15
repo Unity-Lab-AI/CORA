@@ -10,7 +10,7 @@
 
   Cognitive Operations & Reasoning Assistant
   ================================================================
-  Version: 1.0.0
+  Version: 3.0.0
   Unity AI Lab
   Website: https://www.unityailab.com
   GitHub: https://github.com/Unity-Lab-AI
@@ -19,332 +19,147 @@
   ================================================================
 ```
 
-**Version 1.0.0** | **75+ Python Files** | **Unity AI Lab 2025**
+**Version 3.0.0** | **73 Python files** | **Unity AI Lab 2026**
 
-A Windows 11 AI-powered personal assistant with full autonomous capabilities: visual boot display, dynamic AI responses, task management, knowledge base, voice input/output, vision analysis, image generation, and live system monitoring.
-
-**Try the Web Version:** [unityailab.com/CORA](https://unityailab.com/CORA) (requires local Ollama)
-
----
-
-## What's New in v1.0.0
-
-- **Visual Boot Display** - Cyberpunk-themed boot screen with waveform visualization
-- **Dynamic AI Responses** - CORA generates unique responses via Ollama (no hardcoded phrases)
-- **Live System Stats** - Real-time CPU, RAM, GPU, VRAM, Disk monitoring during boot
-- **Kokoro TTS** - High-quality neural voice synthesis with af_bella voice
-- **Image Generation** - AI-generated art using Pollinations Flux model
-- **Full Location Announcement** - City, State, Country announced at boot
-- **Persistent Boot Display** - Window stays open with live stats after boot
-- **Web Version** - Full CORA in your browser with backend terminal
+CORA is a local, voice-first desktop companion. Her brain is `unity-brain`, Unity AI Lab's own text LoRA (Qwen3.5-9B) running in Ollama; her voice is `unity-voice-v2`, the lab's own trained voice; her ears are faster-whisper on the GPU. She has 116 tools for tasks, reminders, calendar, memory, knowledge, the screen and the webcam, the web, files, apps and windows, media, code, git and email. Nothing leaves the machine except the web requests you ask her to make.
 
 ![CORA Boot Display](docs/images/boot_display.png)
 
 ---
 
-## Web Version
+## Quick start
 
-Run CORA in your browser at [unityailab.com/CORA](https://unityailab.com/CORA)
+```
+windows\start.bat        (Windows)  -> venv, bootstrap, boot sequence
+linux/start.sh           (Linux/macOS)
+CORA.bat                 (Windows, the same launcher at the root)
+```
 
-### Web Features
-- **Backend Terminal** - Shows Ollama/model checks like CORA.bat
-- **Live Boot Sequence** - All 18 phases with real checks
-- **Real System Stats** - Via stats_server.py on localhost:11435
-- **CORA's Full Personality** - Edgy, profane, sarcastic responses
-- **Camera/Screenshot Analysis** - Uses llava for vision
-- **Ambient Awareness** - Proactive interjections based on context
-- **Image Generation** - Pollinations Flux integration
-- **YouTube Playback** - Search and embed videos
+`stop.bat` / `stop.sh` end everything she started and unload her models from the GPU.
 
-### Web Requirements
-1. **Ollama** running locally (`ollama serve`)
-2. **Models**: dolphin-mistral:7b, llava, qwen2.5-coder:7b
-3. **Stats Server** (optional): `python services/stats_server.py`
+What the launcher does: finds Python 3.13 (or 3.12), creates `.venv`, installs `requirements.txt` when it changes, runs `scripts/bootstrap.py` (checks Ollama, pulls the configured models, upgrades yt-dlp, installs the Playwright browser, starts her voice sidecar), then runs `src/boot_sequence.py`.
 
-### Backend Terminal
-Click `[ BACKEND TERMINAL ]` to see:
-- CORA ASCII header
-- Ollama status check
-- Model availability (with pull commands if missing)
-- API gate checks (Kokoro TTS, Weather)
-- First-time setup notice
+Other doors into the same brain:
+
+| Entry point | What it is |
+|---|---|
+| `src/boot_sequence.py` | The main app: boot display with waveform and live stats, the chat box, wake word, ambient awareness |
+| `src/gui_launcher.py` | The full GUI (chat, tasks, knowledge, settings) |
+| `src/cora.py` | The CLI; CLI verbs run directly, anything else goes to her |
+| `services/stats_server.py` | Serves the web version locally with her voice and the configured models |
 
 ---
 
-## Quick Start
+## Talking to her
 
-### Full Boot (Recommended)
-```bash
-python src/boot_sequence.py
-```
+- Type in the box on the boot display, or say **"Cora"** and then your request. "stop" or "quiet" cuts her off.
+- Every message goes through one conversation loop (`ai/dispatcher.py`): the model picks tools, runs them, then speaks the result in her own voice with the emotion and delivery she chooses.
+- Anything destructive (deleting, sending, running scripts) she asks you to confirm first.
+- Ask "what can you do" and she reads her own tool catalog back.
 
-### GUI Mode
-```batch
-python src/gui_launcher.py
-```
-
-### CLI Mode
-```bash
-python cora.py
-```
-
-### Quick Boot (No TTS)
-```bash
-python src/boot_sequence.py --quick
-```
+Examples: "add a task to call the dentist, priority 2" / "what's overdue" / "remind me to stretch in 20 minutes" / "what's on my calendar" / "remember my plate is ..." / "what's on my screen" / "look at the camera, what am I holding" / "search for ..." / "open youtube" / "play lofi" / "what's the weather" / "git status" / "email karen saying hi" / "imagine a neon city at night".
 
 ---
 
-## Boot Sequence
+## What runs
 
-When CORA boots, she runs a 10-phase diagnostic with TTS announcements:
-
-| Phase | Check | What Happens |
-|-------|-------|--------------|
-| 1 | Voice Synthesis | Kokoro TTS initialization |
-| 2 | AI Engine | Ollama connection check |
-| 3 | Hardware Check | CPU, RAM, GPU, VRAM stats |
-| 4 | Core Tools | Memory, Tasks, Files, Browser |
-| 5 | Voice Systems | STT, Echo Filter, Wake Word |
-| 6 | External Services | Weather, Location, Notifications |
-| 7 | News Headlines | Top 3 headlines from Google News |
-| 8 | Vision Test | Screenshot & webcam capture |
-| 9 | Image Generation | AI art via Pollinations Flux |
-| 10 | Final Check | Summary & readiness status |
-
-**CORA generates her own unique responses for each phase using Ollama AI.**
+| Part | What | Where |
+|---|---|---|
+| Brain | `unity-brain` (Qwen3.5-9B LoRA, native tool calling, vision) in Ollama; fallback `huihui_ai/qwen3-abliterated:8b` | `ai/settings.py`, `config/config.json` `models` |
+| Loop | one dispatcher for every entry point; 116 tools as JSON-schema tools, relevance-ranked per message; confirmation gating; shared transcript with summary folding | `ai/dispatcher.py`, `ai/tools_registry.py`, `ai/history.py` |
+| Voice | `unity-voice-v2` sidecar on 127.0.0.1:5123; `say(text, emotion, act)` from the brain goes straight to it | `voice/tts.py`, `voice/unity_voice.py` |
+| Ears | faster-whisper (CUDA) for commands and the transcript stream; fuzzy wake word; optional openWakeWord model | `voice/stt.py`, `voice/wake_word.py` |
+| Eyes | webcam through a timeout-guarded, host-agnostic camera layer; screenshots; the brain reads images itself | `services/camera.py`, `cora_tools/vision.py`, `cora_tools/screenshots.py` |
+| Web | search (DuckDuckGo, Brave, Bing through a headless browser when the plain endpoints block), readable page fetch | `cora_tools/web.py` |
+| Boot | 10 phases with spoken status, daily briefing (calendar, overdue tasks, reminders), reminder checker | `src/boot_sequence.py` |
+| Config | one file, one loader, atomic saves | `config/config.json`, `ai/config.py` |
+| Logs | everything printed also lands in `data/logs/cora-YYYYMMDD.log` | `ai/log.py` |
 
 ---
 
-## Features
+## Boot sequence
 
-### Visual Boot Display
-- Two-column layout: Status panel + Scrolling log
-- Audio waveform visualization during speech
-- Color-coded status indicators (green/yellow/red)
-- Live updating system stats panel
-- Cyberpunk/goth dark theme
+| Phase | What happens |
+|---|---|
+| 0.x | Window, waveform, About (all four creators, spoken) |
+| 1 | Her voice (sidecar health, test line) |
+| 2 / 2.1 | Ollama and the configured models |
+| 3 / 3.1 | Hardware stats; camera open, snapshot, vision, close (bounded) |
+| 4 / 4.5 | Core tools; daily briefing spoken; reminder checker started |
+| 5 | Ears: STT, echo filter, wake word |
+| 6 / 7 | Weather, location, news |
+| 8 / 9 | Vision and image generation checks |
+| 10 | Summary, then she is listening |
 
-### Task Management
-- Add, list, complete, delete tasks
-- Priority levels (1-10)
-- Due dates and reminders
-- Notes and status tracking
-- Search functionality
-- Undo last delete
-
-### Knowledge Base
-- Learn facts with tags
-- Recall by tag or search
-- Persistent storage
-
-### AI Integration
-- Ollama-powered chat (llama3.2, llava)
-- Dynamic boot responses via AI
-- Context-aware conversations
-- Vision/image analysis via llava
-- Image generation via Pollinations
-
-### Voice Systems
-- **TTS Output:** Kokoro neural TTS (af_bella voice)
-- **Emotion-aware speech** with mood tracking
-- **STT Input:** Speech recognition with wake word detection
-- **Wake words:** "cora", "hey cora", "yo cora", "okay cora"
-- **TTS Mutex:** Prevents overlapping speech across processes
-
-### System Tools
-- Screenshot capture (3840x2160 support)
-- Webcam capture and vision analysis
-- Hotkey support
-- Image generation (Pollinations)
-- Browser control
-- Reminders and calendar integration
-- Live system monitoring (CPU, RAM, GPU, VRAM, Network)
+Demo phases (YouTube, GitHub import, image popups) are off by default: `boot.demo_phases`, `boot.popups` in config.
 
 ---
 
-## Commands
+## Web version
 
-### Task Management
-| Command | Description |
-|---------|-------------|
-| `add <text>` | Create new task |
-| `list` / `ls` | Show all tasks |
-| `list pri` | Sort by priority |
-| `done <id>` | Mark complete |
-| `delete <id>` | Remove task |
-| `pri <id> <1-10>` | Set priority |
-| `due <id> <date>` | Set due date |
-| `note <id> <text>` | Add note |
-| `search <query>` | Find tasks |
-| `today` | Show due/overdue |
-| `undo` | Restore deleted |
-
-### AI & Voice
-| Command | Description |
-|---------|-------------|
-| `chat <msg>` | Talk to CORA |
-| `speak <text>` | TTS output |
-| `see [question]` | Camera vision |
-| `imagine <desc>` | Generate image |
-
-### System
-| Command | Description |
-|---------|-------------|
-| `time` | Current time |
-| `weather` | Weather info |
-| `screenshot` | Capture screen |
-| `backup` | Save data |
+Served by `services/stats_server.py` on 127.0.0.1:11435. The page gets the launch token, the Ollama URL, the configured models and context size, the same system prompt as the desktop, and her voice through `/voice/say`. Opened without the local server it runs text only against a local Ollama.
 
 ---
 
 ## Requirements
 
-- **Python 3.10+**
-- **Ollama** (for AI)
-- **NVIDIA GPU** (recommended)
-- **mpv** (optional, for YouTube playback)
+- Python 3.13 (3.12 works), NVIDIA GPU recommended (16 GB fits the brain, the voice and whisper together)
+- Ollama; the launcher pulls `unity-brain` and the fallback. `unity-brain` and `unity-voice-v2` are built in the lab's Backrooms repo (`models/unity-brain`, `models/unity-voice-v2`); the voice sidecar needs a Python with torch and misaki (the launcher finds one or you set `UNITY_VOICE_PYTHON`)
+- mpv (optional, YouTube playback): extract into `tools/mpv/` or install with winget/choco/scoop
+- Optional keys in `.claude/.env`: `POLLINATIONS_API_KEY` (image generation)
 
-### Install
-```bash
-pip install -r requirements.txt
+Install by hand:
+
 ```
-
-### Ollama Setup
-```bash
-winget install Ollama.Ollama
-ollama pull llama3.2
-ollama pull llava
-```
-
-### mpv Setup (Optional - for YouTube)
-mpv is optional - only needed for YouTube playback. CORA prompts you if missing.
-
-**Download and Extract:**
-1. Download: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
-2. Extract .7z/.zip to `./tools/` folder
-3. CORA auto-detects mpv.exe (any subfolder works)
-
-**Option 2: Package Manager**
-```bash
-winget install mpv
-# or
-choco install mpv
-# or
-scoop install mpv
+py -3.13 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python scripts\bootstrap.py
+.venv\Scripts\python src\boot_sequence.py
 ```
 
 ---
 
-## Project Structure
+## Project layout
 
 ```
 C.O.R.A/
-├── src/
-│   ├── boot_sequence.py     # Main boot with TTS
-│   ├── cora.py              # CLI application
-│   └── gui_launcher.py      # GUI launcher
-├── ui/
-│   ├── boot_display.py      # Visual boot display with waveform
-│   ├── app.py               # Main GUI application
-│   ├── camera_feed.py       # Live webcam window
-│   └── panels.py            # Task/Settings/Knowledge panels
-├── voice/
-│   ├── tts.py               # Kokoro TTS engine (af_bella)
-│   ├── stt.py               # Speech recognition
-│   ├── commands.py          # Voice command processing
-│   └── wake_word.py         # Wake word detection
-├── ai/
-│   ├── ollama.py            # Ollama API client
-│   └── context.py           # Context management
-├── cora_tools/              # CORA's Python tool modules
-│   ├── image_gen.py         # Pollinations AI image gen
-│   ├── screenshots.py       # Screen/window capture
-│   ├── tasks.py             # Task management
-│   ├── memory.py            # Working memory
-│   ├── calendar.py          # Calendar & events
-│   ├── media.py             # YouTube & media control
-│   └── ...                  # 20+ tool modules
-├── tools/                   # Downloaded binaries ONLY
-│   └── mpv/                 # mpv player (extract here)
-├── services/
-│   ├── weather.py           # Weather API (wttr.in)
-│   ├── location.py          # IP geolocation
-│   └── presence.py          # Webcam presence detection
-├── config/
-│   └── settings.json        # Configuration
-├── data/
-│   ├── images/              # Generated images
-│   └── camera/              # Camera captures
-└── READMEs/
-    ├── UserGuide.md         # User documentation
-    └── NerdReadme.md        # Developer documentation
+├── src/        boot_sequence.py (main), cora.py (CLI), gui_launcher.py (GUI)
+├── ai/         dispatcher.py, tools_registry.py, history.py, ollama.py, settings.py, config.py, log.py
+├── voice/      tts.py, unity_voice.py, stt.py, wake_word.py, converse.py, commands.py, ambient_awareness.py, emotion.py
+├── ui/         boot_display.py, app.py, panels.py, camera_feed.py, code_editor.py, query_panel.py, ...
+├── cora_tools/ tasks, calendar, reminders, memory, knowledge, files, system, windows, web, browser, media, code, git_ops, email_tool, image_gen, screenshots, vision, self_modify ...
+├── services/   camera.py, presence.py, stats_server.py, weather.py, location.py, cli_popup.py
+├── scripts/    bootstrap.py
+├── windows/    start.bat, stop.bat          linux/  start.sh, stop.sh
+├── web/        index.html (served locally)
+├── config/     config.json, system_prompt.txt, hotbar.json
+├── data/       tasks, knowledge, history, logs, camera (untracked)
+└── docs/       ARCHITECTURE, SKILL_TREE, ROADMAP, TODO, FINALIZED, NOW, SYSTEM_AUDIT
 ```
 
-**Note:** `cora_tools/` = Python source code. `tools/` = downloaded binaries only (mpv, ffmpeg).
-
----
-
-## Hardware Detection
-
-| Component | Method |
-|-----------|--------|
-| CPU | psutil.cpu_percent() |
-| RAM | psutil.virtual_memory() |
-| Disk | psutil.disk_usage() |
-| GPU | nvidia-smi subprocess |
-| VRAM | nvidia-smi memory query |
-| Network | psutil.net_if_stats() |
-| Camera | OpenCV VideoCapture |
-
----
-
-## Recent Updates (v1.0.0)
-
-- Visual Boot Display with cyberpunk theme
-- Dynamic AI responses via Ollama for all boot phases
-- Live system stats panel with 1-second refresh
-- Kokoro TTS with af_bella neural voice
-- Image generation test creates AI art during boot
-- Full location announcement (City, State, Country)
-- Waveform visualization during TTS playback
-- GPU detection via nvidia-smi (RTX 4070 Ti SUPER tested)
-- 75+ Python files across all modules
+`cora_tools/` is source. `tools/` holds downloaded binaries only (mpv, ffmpeg).
 
 ---
 
 ## Documentation
 
 | File | Purpose |
-|------|---------|
-| [README.md](README.md) | Overview & quick start |
-| [SETUP.md](SETUP.md) | Installation guide |
-| [HOW_TO_USE.md](HOW_TO_USE.md) | Simple user guide |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture |
+|---|---|
+| [SETUP.md](SETUP.md) | Installation |
+| [HOW_TO_USE.md](HOW_TO_USE.md) | Using her day to day |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture: current state first, the original design spec below it |
+| [docs/SKILL_TREE.md](docs/SKILL_TREE.md) | Capabilities by domain |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones |
+| [docs/SYSTEM_AUDIT_2026-10-14.md](docs/SYSTEM_AUDIT_2026-10-14.md) | The audit that drove version 3.0.0 |
 | [READMEs/UserGuide.md](READMEs/UserGuide.md) | Full user docs |
 | [READMEs/NerdReadme.md](READMEs/NerdReadme.md) | Developer docs |
-
----
-
-## Roadmap
-
-- [x] Phase 1: CLI Task Manager
-- [x] Phase 2: Kokoro TTS + Emotion
-- [x] Phase 3: CustomTkinter GUI
-- [x] Phase 4: Voice Input (STT)
-- [x] Phase 5: Boot Diagnostics
-- [x] Phase 6: Vision/Camera
-- [x] Phase 7: Visual Boot Display + Dynamic AI
-- [ ] Phase 8: Auto-updater + Installer
+| [READMEs/APIReference.md](READMEs/APIReference.md) | Module reference |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, by version |
 
 ---
 
 ## License
 
-Unity AI Lab - 2025
+Unity AI Lab, 2025-2026. MIT (see `pyproject.toml`).
 
----
-
-*C.O.R.A v1.0.0 - Cognitive Operations & Reasoning Assistant*
-*Last Updated: 2025-12-25*
-*Built by Unity AI Lab*
+*C.O.R.A v3.0.0 - Cognitive Operations & Reasoning Assistant - built by Unity AI Lab*

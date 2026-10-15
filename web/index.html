@@ -727,7 +727,7 @@
             <div class="speech-container">
                 <div class="speech-label">▶ CORA SPEAKING</div>
                 <div id="speechText">"Initializing..."</div>
-                <div class="tts-notice" id="ttsNotice">Loading Kokoro neural voice (af_bella)...</div>
+                <div class="tts-notice" id="ttsNotice">Connecting to Unity voice v2 (her own voice)...</div>
             </div>
 
             <div class="progress-container">
@@ -804,6 +804,20 @@
     </div>
 
     <script>
+        // ------------------------------------------------------------
+        // Served by CORA's own stats server (services/stats_server.py), the page
+        // gets window.CORA_LOCAL: the launch token, the Ollama URL, the configured
+        // models and context size, and her voice behind /voice/say. Opened as a
+        // bare file or from a remote host there is no local server: Ollama is
+        // assumed on localhost and there is no voice (her voice is local only).
+        // ------------------------------------------------------------
+        const CORA_LOCAL = window.CORA_LOCAL || null;
+        const OLLAMA_URL = (CORA_LOCAL && CORA_LOCAL.ollama) || 'http://localhost:11434';
+        const STATS_BASE = (CORA_LOCAL && CORA_LOCAL.stats) || 'http://localhost:11435';
+        const CORA_MODELS = Object.assign({ chat: 'unity-brain', vision: 'unity-brain', code: 'unity-brain' },
+                                          (CORA_LOCAL && CORA_LOCAL.models) || {});
+        const CORA_NUM_CTX = (CORA_LOCAL && CORA_LOCAL.num_ctx) || 32768;
+        const CORA_VERSION = (CORA_LOCAL && CORA_LOCAL.version) || '3.0.0';
         // ============================================================
         // C.O.R.A Web Interface - Full Boot Sequence with TTS
         // Matches desktop boot_sequence.py exactly
@@ -1095,7 +1109,7 @@ WHEN RESPONDING:
 
         async function checkOllamaRunning() {
             try {
-                const resp = await fetch('http://localhost:11434/api/tags', {
+                const resp = await fetch(OLLAMA_URL + '/api/tags', {
                     method: 'GET',
                     signal: AbortSignal.timeout(3000)
                 });
@@ -1177,7 +1191,7 @@ WHEN RESPONDING:
                             // Re-check
                             ollamaStatus = await checkOllamaRunning();
                             if (ollamaStatus.running) {
-                                setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                                setupLog('[OK] Ollama running at ' + OLLAMA_URL, '#00ff00');
                             } else {
                                 setupLog('[WARN] Ollama started but not responding yet - may need more time', '#ffaa00');
                             }
@@ -1198,7 +1212,7 @@ WHEN RESPONDING:
                         return;
                     }
                 } else {
-                    setupLog('[OK] Ollama running at localhost:11434', '#00ff00');
+                    setupLog('[OK] Ollama running at ' + OLLAMA_URL, '#00ff00');
                 }
                 setupLog('', '#ffffff');
 
@@ -1206,10 +1220,10 @@ WHEN RESPONDING:
                 setupLog('[CHECK] Required AI Models...', '#ffff00');
 
                 const requiredModels = [
-                    { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', desc: 'Main chat model (CORA brain)' },
-                    { name: 'llava', display: 'llava', desc: 'Vision model (image analysis)' },
-                    { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', desc: 'Coding model' }
-                ];
+                    { name: CORA_MODELS.chat, display: CORA_MODELS.chat, desc: 'Main chat model (CORA brain)' },
+                    { name: CORA_MODELS.vision, display: CORA_MODELS.vision, desc: 'Vision model (image analysis)' },
+                    { name: CORA_MODELS.code, display: CORA_MODELS.code, desc: 'Coding model' }
+                ].filter((m, i, a) => m.name && a.findIndex(x => x.name === m.name) === i);
 
                 let missingModels = [];
                 for (const model of requiredModels) {
@@ -1254,15 +1268,12 @@ WHEN RESPONDING:
                 setupLog('[CHECK] API Connections...', '#ffff00');
 
                 try {
-                    const kokoroResp = await fetch('http://localhost:8880/v1/audio/speech', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ model: 'kokoro', input: 'test', voice: 'af_bella' }),
-                        signal: AbortSignal.timeout(2000)
-                    });
-                    setupLog(kokoroResp.ok ? '  [OK] Kokoro TTS - localhost:8880' : '  [WARN] Kokoro TTS - not responding', kokoroResp.ok ? '#00ff00' : '#ffaa00');
+                    if (!CORA_LOCAL) throw new Error('not served by the local CORA server');
+                    const vh = await fetch(STATS_BASE + '/voice/health', { signal: AbortSignal.timeout(2000) });
+                    const vj = vh.ok ? await vh.json() : {};
+                    setupLog(vj.up ? '  [OK] Unity voice v2 - her own voice is up' : '  [WARN] Unity voice v2 - sidecar not responding', vj.up ? '#00ff00' : '#ffaa00');
                 } catch (e) {
-                    setupLog('  [WARN] Kokoro TTS - not running (voice disabled)', '#ffaa00');
+                    setupLog('  [WARN] Unity voice v2 - needs the local CORA server (text only here)', '#ffaa00');
                 }
 
                 const weatherKey = localStorage.getItem('cora_weather_key');
@@ -1285,7 +1296,22 @@ WHEN RESPONDING:
         const originalToggleView = typeof toggleView !== 'undefined' ? toggleView : null;
 
         async function loadSystemPrompt() {
-            // Fetch live system prompt from GitHub - falls back to embedded if fetch fails
+            // Local server first (the same prompt the desktop uses), then GitHub, then the embedded copy
+            if (CORA_LOCAL) {
+                try {
+                    const r = await fetch(STATS_BASE + '/api/prompt', { signal: AbortSignal.timeout(3000) });
+                    if (r.ok) {
+                        const t = await r.text();
+                        if (t && t.length > 100) {
+                            CORA_SYSTEM_PROMPT = t;
+                            console.log(`[CORA] System prompt loaded from the local server (${t.length} chars)`);
+                            return 'local';
+                        }
+                    }
+                } catch (e) {
+                    console.log('[CORA] local prompt fetch failed:', e.message);
+                }
+            }
             try {
                 const res = await fetch('https://raw.githubusercontent.com/Unity-Lab-AI/CORA/main/config/system_prompt.txt');
                 if (res.ok) {
@@ -1306,7 +1332,7 @@ WHEN RESPONDING:
 
         // Flag to track if AI is ready for CORA responses
         let aiReady = false;
-        let CORA_MODEL = 'dolphin-mistral:7b';  // Default, updated during boot
+        let CORA_MODEL = CORA_MODELS.chat;  // from config; confirmed against installed models during boot
 
         // CORA generates her own responses using AI
         // System prompt (CORA_SYSTEM_PROMPT) contains full personality
@@ -1337,7 +1363,7 @@ WHEN RESPONDING:
                     maxTokens = 400;
                 }
 
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1345,7 +1371,8 @@ WHEN RESPONDING:
                         prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: temperature, num_predict: maxTokens }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: temperature, num_predict: maxTokens }
                     })
                 });
 
@@ -1401,95 +1428,124 @@ WHEN RESPONDING:
         }
 
         // ============================================================
-        // KOKORO TTS - Neural voice (same as desktop af_bella)
-        // Falls back to Web Speech API if Kokoro fails
+        // UNITY VOICE V2 - her own trained voice, served next to the desktop app
+        // (POST /voice/say on the local CORA server -> 24 kHz WAV). No other voice:
+        // without the local server the page is text only.
         // ============================================================
 
-        let kokoroWorker = null;
-        let kokoroReady = false;
+        let kokoroWorker = null;          // kept for old references; always null now
+        let kokoroReady = false;          // true when her voice answered /voice/health
         let kokoroLoading = false;
         let audioContext = null;
         let pendingCallbacks = {};
         let messageId = 0;
-        let useFallbackTTS = false;
+        let useFallbackTTS = false;       // there is no fallback voice
 
-        async function initKokoro(progressCallback) {
+        async function initVoice(progressCallback) {
             if (kokoroReady) return true;
             if (kokoroLoading) return false;
-
             kokoroLoading = true;
-
             try {
-                // Create audio context (must happen on user interaction for some browsers)
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
-
-                // Create web worker
-                kokoroWorker = new Worker('kokoro-worker.js', { type: 'module' });
-
-                return new Promise((resolve) => {
-                    const initId = ++messageId;
-
-                    kokoroWorker.onmessage = (e) => {
-                        const { type, id, data, error } = e.data;
-
-                        // Log ALL messages from worker for debugging
-                        console.log(`[WORKER] Message: type=${type}, id=${id}, hasData=${!!data}, hasError=${!!error}`);
-
-                        if (type === 'progress' && id === initId) {
-                            if (progressCallback) progressCallback(data.message, data.progress);
-                        }
-                        else if (type === 'initComplete' && id === initId) {
-                            console.log('[WORKER] Init complete, Kokoro ready');
-                            kokoroReady = true;
-                            kokoroLoading = false;
-                            resolve(true);
-                        }
-                        else if (type === 'error' && id === initId) {
-                            console.error('[WORKER] Kokoro init error:', error);
-                            kokoroLoading = false;
-                            resolve(false);
-                        }
-                        else if (type === 'audioReady') {
-                            console.log(`[WORKER→MAIN] audioReady id=${id}, data keys=${Object.keys(data || {})}, audio=${!!data?.audio}, byteLength=${data?.audio?.byteLength || 'N/A'}`);
-                            if (!data || !data.audio) {
-                                console.error(`[WORKER→MAIN] MISSING AUDIO DATA for id=${id}!`);
-                            }
-                            handleAudioReady(id, data);
-                        }
-                        else if (type === 'generating') {
-                            console.log(`[WORKER] Generating audio for id=${id}`);
-                            // Audio is being generated - could show a loading indicator here
-                        }
-                        else if (type === 'error') {
-                            // Audio generation failed - resolve the pending callback so boot continues
-                            console.error(`[WORKER] TTS error for id=${id}:`, error);
-                            if (pendingCallbacks[id]) {
-                                const { resolve, text, timeoutId } = pendingCallbacks[id];
-                                delete pendingCallbacks[id];
-                                if (timeoutId) clearTimeout(timeoutId);
-                                // Log the text anyway so user sees it
-                                if (text) {
-                                    document.getElementById('speechText').textContent = `"${text}"`;
-                                    log(`CORA: "${text}"`, 'cora');
-                                }
-                                stopWaveform();
-                                resolve();
-                            }
-                        }
-                        else {
-                            console.log(`[WORKER] Unknown message type: ${type}`);
-                        }
-                    };
-
-                    kokoroWorker.postMessage({ type: 'init', id: initId, data: {} });
-                });
-
+                if (!CORA_LOCAL) {
+                    if (progressCallback) progressCallback('No local CORA server: her voice is not available here', 100);
+                    return false;
+                }
+                if (progressCallback) progressCallback('Checking her voice...', 30);
+                const r = await fetch(STATS_BASE + '/voice/health', { signal: AbortSignal.timeout(4000) });
+                const j = r.ok ? await r.json() : {};
+                kokoroReady = !!j.up;
+                if (progressCallback) progressCallback(kokoroReady ? 'Unity voice v2 online' : ('Her voice is down: ' + (j.error || 'sidecar not responding')), 100);
+                return kokoroReady;
             } catch (e) {
-                console.error('Failed to init Kokoro:', e);
-                kokoroLoading = false;
+                console.error('[VOICE] health check failed:', e);
                 return false;
+            } finally {
+                kokoroLoading = false;
+            }
+        }
+        const initKokoro = initVoice;     // old call sites
+
+        // Her phoneme vocabulary holds exactly four marks: space , . ?  Every other
+        // mark becomes the pause she has (a comma, or a full stop); words are never
+        // dropped; [laughter] and [breath] keep their brackets. Same rules as
+        // voice/unity_voice.py voice_text().
+        function voiceText(text) {
+            let t = String(text || '');
+            const keep = [];
+            t = t.replace(/\[(laughter|breath)\]/gi, (m) => { keep.push(m.toLowerCase()); return `\u0000${keep.length - 1}\u0000`; });
+            t = t.replace(/\u2026/g, '...').replace(/\.{2,}/g, '.');
+            t = t.replace(/[?!]*!+[?!]*/g, (m) => (m.includes('?') ? '?' : '.'));
+            t = t.replace(/&/g, ' and ').replace(/%/g, ' percent ').replace(/\+/g, ' plus ').replace(/@/g, ' at ');
+            t = t.replace(/[;:\u2014\u2013]|--+/g, ',');
+            t = t.replace(/[()\[\]{}<>"\u201c\u201d*_#=|\\\/~^`]/g, ',');
+            t = t.replace(/[\u2018\u2019]/g, "'").replace(/(^|\s)'|'(\s|$)/g, '$1$2');
+            t = t.replace(/\s*,\s*(,\s*)+/g, ', ').replace(/\s*([,.?])/g, '$1').replace(/([,.?])(?=\S)/g, '$1 ');
+            t = t.replace(/^[\s,.]+/, '').replace(/\s+/g, ' ').trim();
+            t = t.replace(/\u0000(\d+)\u0000/g, (m, i) => keep[+i]);
+            return t;
+        }
+
+        // Delivery for a plain line (the rules her training data used)
+        function inferDelivery(text) {
+            const low = (text || '').toLowerCase();
+            const rules = [
+                ['sad', /\b(died|dead|death|passed away|rip|funeral|grave|buried|miss (him|her|them)|lost (him|her))\b/],
+                ['concerned', /\b(careful|danger|injur|bleed|sick|infection|starv|low on|toxic|overdue|urgent|worried|warning)\b/],
+                ['frustrated', /\b(again|ugh|why would|seriously|every time|keeps? (doing|breaking|failing))\b/],
+                ['surprised', /\b(wait|what\?|whoa|no way|huh)\b/],
+                ['warm', /\b(welcome|thank|thanks|glad you|love (you|this)|appreciate|hi |hey |got you|i'm here)/],
+                ['amused', /\[laughter\]|\b(funny|lol|hilarious|ridiculous)\b/],
+                ['happy', /\b(finally|done|we did it|yes|nice|perfect|great|awesome)\b/],
+            ];
+            let emotion = 'neutral';
+            for (const [e, re] of rules) { if (re.test(low)) { emotion = e; break; } }
+            if (low.includes('[laughter]') && ['neutral', 'sad', 'concerned'].includes(emotion)) emotion = 'amused';
+            const body = (text || '').replace(/\s*\[(laughter|breath|sigh)\]\s*/g, ' ').trim();
+            let act = 'statement';
+            if (body.endsWith('?')) {
+                act = /^(what|where|why|how|who|which|when)\b/i.test(body) ? 'wh_question' : 'yes_no_question';
+            } else if (body.endsWith('!')) {
+                act = 'exclamation';
+                if (emotion === 'neutral') emotion = 'excited';
+            }
+            return { emotion, speech_act: act };
+        }
+
+        // Ask her voice for one line and hand the samples to handleAudioReady (same
+        // playback + waveform path the page always had).
+        async function unityVoiceSay(speakText, displayText, callback) {
+            const id = ++messageId;
+            pendingCallbacks[id] = { resolve: callback || (() => {}), startTime: Date.now(), text: displayText, timeoutId: null };
+            try {
+                const delivery = inferDelivery(speakText);
+                const res = await fetch(STATS_BASE + '/voice/say', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CORA-Token': CORA_LOCAL.token },
+                    body: JSON.stringify({ text: voiceText(speakText), emotion: delivery.emotion, speech_act: delivery.speech_act })
+                });
+                if (!res.ok) {
+                    let why = String(res.status);
+                    try { why = (await res.json()).error || why; } catch (e) {}
+                    throw new Error(why);
+                }
+                const wav = await res.arrayBuffer();
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const decoded = await audioContext.decodeAudioData(wav);
+                const ch = decoded.getChannelData(0);
+                const copy = new Float32Array(ch.length);
+                copy.set(ch);
+                await handleAudioReady(id, { audio: copy.buffer, sampleRate: decoded.sampleRate });
+            } catch (e) {
+                console.error('[VOICE] her voice refused the line:', e.message);
+                const pending = pendingCallbacks[id];
+                delete pendingCallbacks[id];
+                document.getElementById('speechText').textContent = `"${displayText}"`;
+                log(`CORA: "${displayText}"`, 'cora');
+                log(`Voice: ${e.message}`, 'warn');
+                if (pending && pending.resolve) pending.resolve();
             }
         }
 
@@ -1678,76 +1734,15 @@ WHEN RESPONDING:
                 return;
             }
 
-            console.log(`[TTS] speak() called: kokoroReady=${kokoroReady}, useFallback=${useFallbackTTS}, text="${speakText.substring(0,50)}..."`);
+            console.log(`[TTS] speak() called: voiceReady=${kokoroReady}, text="${speakText.substring(0,50)}..."`);
 
-            if (kokoroReady && !useFallbackTTS && kokoroWorker) {
-                // Use Kokoro neural TTS - speakText for TTS, displayText for log
-                const id = ++messageId;
-                console.log(`[TTS] Using Kokoro, id=${id}, current pending: ${Object.keys(pendingCallbacks).join(',') || 'none'}`);
-
-                pendingCallbacks[id] = {
-                    resolve: callback || (() => {}),
-                    startTime: Date.now(),
-                    text: displayText  // Full text with URLs for log display
-                };
-
-                // NO TIMEOUT - let audio generation complete no matter how long
-                // Kokoro is slow but it WILL complete. Don't give up and lose audio.
-                // The boot sequence will wait via speakAndWait() which is correct behavior.
-                console.log(`[TTS] Waiting for Kokoro id=${id} (text length=${speakText.length}) - no timeout, will wait for completion`);
-
-                // No timeout - we wait as long as needed
-                const timeoutId = null;
-
-                // Store timeout so we can clear it when audio arrives
-                pendingCallbacks[id].timeoutId = timeoutId;
-
-                // Send CLEAN text (no URLs) to TTS
-                console.log(`[TTS] Posting to worker, id=${id}, text length=${speakText.length}`);
-                try {
-                    kokoroWorker.postMessage({
-                        type: 'generate',
-                        id,
-                        data: { text: speakText, voice: 'af_bella', speed: 1.0 }
-                    });
-                    console.log(`[TTS] Message posted to worker for id=${id}`);
-                } catch (e) {
-                    console.error(`[TTS] Failed to post to worker: ${e.message}`);
-                    delete pendingCallbacks[id];
-                    clearTimeout(timeoutId);
-                    if (callback) callback();
-                }
+            if (kokoroReady && CORA_LOCAL) {
+                unityVoiceSay(speakText, displayText, callback);
             } else {
-                // Fallback to Web Speech API
-                if ('speechSynthesis' in window) {
-                    const synth = window.speechSynthesis;
-                    synth.cancel();
-
-                    // speakText = clean (no URLs), displayText = full
-                    const utterance = new SpeechSynthesisUtterance(speakText);
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.1;
-
-                    const voices = synth.getVoices();
-                    const femaleVoice = voices.find(v =>
-                        v.name.includes('Zira') || v.name.includes('Samantha') ||
-                        v.name.toLowerCase().includes('female')
-                    ) || voices[0];
-                    if (femaleVoice) utterance.voice = femaleVoice;
-
-                    // Show FULL text in log, but TTS speaks CLEAN text
-                    utterance.onstart = () => {
-                        document.getElementById('speechText').textContent = `"${displayText}"`;
-                        log(`CORA: "${displayText}"`, 'cora');
-                        startWaveform();
-                    };
-                    utterance.onend = () => { stopWaveform(); if (callback) callback(); };
-                    utterance.onerror = () => { stopWaveform(); if (callback) callback(); };
-
-                    synth.speak(utterance);
-                } else {
-                    if (callback) setTimeout(callback, 100);
-                }
+                // No voice here (not served locally, or her sidecar is down): show the line, keep moving
+                document.getElementById('speechText').textContent = `"${displayText}"`;
+                log(`CORA: "${displayText}"`, 'cora');
+                if (callback) setTimeout(callback, 400);
             }
         }
 
@@ -2676,7 +2671,7 @@ WHEN RESPONDING:
         // Stats Server (localhost:11435) - Real GPU/CPU/RAM from host
         // ============================================================
 
-        const STATS_URL = 'http://localhost:11435';
+        const STATS_URL = STATS_BASE;
         let statsServerAvailable = false;
 
         async function fetchSystemStats() {
@@ -2750,7 +2745,7 @@ WHEN RESPONDING:
 
         async function checkOllama() {
             try {
-                const r = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
+                const r = await fetch(OLLAMA_URL + '/api/tags', { method: 'GET' });
                 return r.ok;
             } catch { return false; }
         }
@@ -2949,10 +2944,10 @@ WHEN RESPONDING:
                 setupLog('[AUTO] Checking AI models...', '#ffff00');
 
                 const requiredModels = [
-                    { name: 'dolphin-mistral', display: 'dolphin-mistral:7b', desc: 'Main brain' },
-                    { name: 'llava', display: 'llava', desc: 'Vision' },
-                    { name: 'qwen2.5-coder', display: 'qwen2.5-coder:7b', desc: 'Coding' }
-                ];
+                    { name: CORA_MODELS.chat, display: CORA_MODELS.chat, desc: 'Main chat model (CORA brain)' },
+                    { name: CORA_MODELS.vision, display: CORA_MODELS.vision, desc: 'Vision model (image analysis)' },
+                    { name: CORA_MODELS.code, display: CORA_MODELS.code, desc: 'Coding model' }
+                ].filter((m, i, a) => m.name && a.findIndex(x => x.name === m.name) === i);
 
                 const ollamaStatus = await checkOllamaRunning();
                 for (const model of requiredModels) {
@@ -3011,9 +3006,8 @@ WHEN RESPONDING:
             // Quick voice check
             updateProgress(20, 'Checking voice...');
             try {
-                await initKokoro((msg, pct) => {});
-                ttsEnabled = true;
-                setPhase('voice', 'ok');
+                ttsEnabled = await initVoice((msg, pct) => {});
+                setPhase('voice', ttsEnabled ? 'ok' : 'warn');
             } catch {
                 ttsEnabled = false;
                 setPhase('voice', 'warn');
@@ -3022,7 +3016,7 @@ WHEN RESPONDING:
             // Quick AI check
             updateProgress(30, 'Checking AI...');
             try {
-                const r = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
+                const r = await fetch(OLLAMA_URL + '/api/tags', { signal: AbortSignal.timeout(3000) });
                 if (r.ok) {
                     aiReady = true;
                     setPhase('ai_engine', 'ok');
@@ -3089,7 +3083,7 @@ WHEN RESPONDING:
             // CORA says something quick - system prompt handles personality
             if (aiReady) {
                 try {
-                    const res = await fetch('http://localhost:11434/api/generate', {
+                    const res = await fetch(OLLAMA_URL + '/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -3097,7 +3091,8 @@ WHEN RESPONDING:
                             prompt: `Quick boot finished.`,
                             system: CORA_SYSTEM_PROMPT,
                             stream: false,
-                            options: { temperature: 0.95, num_predict: 25 }
+                        think: false,
+                            options: { num_ctx: CORA_NUM_CTX, temperature: 0.95, num_predict: 25 }
                         })
                     });
                     if (res.ok) {
@@ -3121,7 +3116,7 @@ WHEN RESPONDING:
 
         async function getOllamaModels() {
             try {
-                const r = await fetch('http://localhost:11434/api/tags');
+                const r = await fetch(OLLAMA_URL + '/api/tags');
                 const d = await r.json();
                 return d.models || [];
             } catch { return []; }
@@ -3522,15 +3517,16 @@ WHEN RESPONDING:
         // Analyze image with llava model
         async function analyzImageWithLlava(base64Image, prompt) {
             try {
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'llava',
+                        model: CORA_MODELS.vision,
                         prompt: prompt,
                         images: [base64Image],
                         stream: false,
-                        options: { temperature: 0.5, num_predict: 150 }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: 0.5, num_predict: 150 }
                     })
                 });
                 if (res.ok) {
@@ -3776,7 +3772,7 @@ WHEN RESPONDING:
             }
 
             try {
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3784,7 +3780,8 @@ WHEN RESPONDING:
                         prompt: prompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 100 }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: 0.9, num_predict: 100 }
                     })
                 });
 
@@ -3864,7 +3861,7 @@ WHEN RESPONDING:
 
             // Ask AI for a contextual response
             try {
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3872,7 +3869,8 @@ WHEN RESPONDING:
                         prompt: `${fullContext}\n\nHey CORA.`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 150 }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: 0.9, num_predict: 150 }
                     })
                 });
 
@@ -3885,7 +3883,7 @@ WHEN RESPONDING:
                         await speakAndWait(response);
                     } else {
                         // Retry once if empty response
-                        const retry = await fetch('http://localhost:11434/api/generate', {
+                        const retry = await fetch(OLLAMA_URL + '/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -3893,7 +3891,8 @@ WHEN RESPONDING:
                                 prompt: 'Someone just called your name.',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
-                                options: { temperature: 0.95, num_predict: 30 }
+                        think: false,
+                                options: { num_ctx: CORA_NUM_CTX, temperature: 0.95, num_predict: 30 }
                             })
                         });
                         if (retry.ok) {
@@ -3980,53 +3979,40 @@ WHEN RESPONDING:
             await sleep(200);
 
             // ================================================================
-            // PHASE 1.0: VOICE SYNTHESIS (Kokoro TTS)
+            // PHASE 1.0: VOICE SYNTHESIS (unity-voice-v2, her own voice)
             // ================================================================
             setPhase('voice', 'running');
             log('PHASE 1.0: VOICE SYNTHESIS', 'phase');
-            updateProgress(8, 'Loading Kokoro TTS...');
-            log('Loading Kokoro TTS engine...', 'info');
-            log('Initializing Kokoro-82M neural TTS model...', 'info');
-            log('Voice: af_bella (CORA\'s voice)', 'info');
+            updateProgress(8, 'Connecting to her voice...');
+            log('Connecting to unity-voice-v2 (her own trained voice)...', 'info');
 
-            const kokoroOk = await initKokoro((msg, progress) => {
+            const voiceOk = await initVoice((msg, progress) => {
                 log(msg, 'info');
                 updateProgress(8 + (progress * 0.07), msg);
             });
 
-            if (kokoroOk) {
-                log('Kokoro TTS initialized successfully', 'ok');
-                log('Voice: af_bella loaded', 'ok');
-                document.getElementById('ttsNotice').textContent = 'Kokoro TTS (af_bella) - Neural voice active';
+            if (voiceOk) {
+                log('Unity voice v2 online', 'ok');
+                document.getElementById('ttsNotice').textContent = 'Unity voice v2 - her own voice';
                 document.getElementById('ttsNotice').style.color = '#00ff88';
                 setPhase('voice', 'ok');
                 ttsEnabled = true;
-                updateProgress(15, 'Neural voice online');
-
-                // TTS TEST - speak immediately after Kokoro loads (matches desktop behavior)
-                // Resume audio context first (browser requires this)
+                updateProgress(15, 'Voice online');
                 if (audioContext && audioContext.state === 'suspended') {
                     await audioContext.resume();
                     log('AudioContext resumed', 'info');
                 }
-                log('Testing TTS...', 'info');
-                await speakAndWait('Voice synthesis online. Kokoro TTS loaded and ready.');
-                log('TTS test passed', 'ok');
+                log('Testing her voice...', 'info');
+                await speakAndWait('Voice synthesis online. Her own voice, version two.');
+                log('Voice test passed', 'ok');
             } else {
-                log('Kokoro failed - using browser TTS', 'warn');
-                document.getElementById('ttsNotice').textContent = 'Browser TTS (fallback mode)';
+                log(CORA_LOCAL ? 'Her voice is not reachable (unity-voice-v2 sidecar down) - text only' : 'No local CORA server - text only here', 'warn');
+                document.getElementById('ttsNotice').textContent = CORA_LOCAL ? 'Voice offline (sidecar down) - text only' : 'Text only (run CORA locally for her voice)';
                 document.getElementById('ttsNotice').style.color = '#ffaa00';
-                useFallbackTTS = true;
-                ttsEnabled = true;
+                ttsEnabled = false;
                 setPhase('voice', 'warn');
-                updateProgress(15, 'Fallback voice');
-
-                // Test browser TTS fallback
-                log('Testing browser TTS fallback...', 'info');
-                await speakAndWait('Voice synthesis online. Using browser speech.');
-                log('Browser TTS test passed', 'ok');
+                updateProgress(15, 'Text only');
             }
-
             // ================================================================
             // PHASE 2.0: AI ENGINE (Ollama)
             // ================================================================
@@ -4065,19 +4051,14 @@ WHEN RESPONDING:
                 aiReady = true;
                 log('CORA AI responses enabled', 'ok');
 
-                // Find a model to use (prefer dolphin-mistral, fall back to first available)
-                const preferredModels = ['dolphin-mistral:7b', 'dolphin-mistral', 'llama3.2', 'mistral'];
-                CORA_MODEL = models[0]?.name || 'dolphin-mistral:7b';
-                for (const pref of preferredModels) {
-                    if (models.some(m => m.name.includes(pref))) {
-                        CORA_MODEL = models.find(m => m.name.includes(pref)).name;
-                        break;
-                    }
-                }
+                // The configured brain if it is installed, else the first installed model
+                const wanted = CORA_MODELS.chat;
+                const installed = models.find(m => m.name === wanted || m.name.split(':')[0] === wanted.split(':')[0]);
+                CORA_MODEL = installed ? installed.name : (models[0]?.name || wanted);
                 log(`CORA brain: ${CORA_MODEL}`, 'ok');
 
                 // CORA introduces herself - JUST DATA, system prompt is the personality
-                const introData = `Just came online. CORA v1.0.0. Unity AI Lab. Creators: Hackall360, Sponge, GFourteen, Alfreddo. Website https://www.unityailab.com, GitHub https://github.com/Unity-Lab-AI, Discord https://discord.gg/D33Bk6Ay. Introduce yourself.`;
+                const introData = `Just came online. CORA v${CORA_VERSION}. Unity AI Lab. Creators: Hackall360, Sponge, GFourteen, Alfreddo. Website https://www.unityailab.com, GitHub https://github.com/Unity-Lab-AI, Discord https://discord.gg/D33Bk6Ay. Introduce yourself.`;
                 const coraIntro = await coraRespond('Introduction', introData, 'ok', 'full');
                 await speakAndWait(coraIntro);
 
@@ -4087,7 +4068,7 @@ WHEN RESPONDING:
                 log('No models found - need to pull some', 'warn');
                 setPhase('ai_models', 'warn');
                 // Can't use AI since no models - this is a system error message, not CORA
-                log('SYSTEM: No AI models found. Pull models with: ollama pull dolphin-mistral:7b', 'fail');
+                log(`SYSTEM: No AI models found. Pull the brain with: ollama pull ${CORA_MODELS.chat}`, 'fail');
             }
 
             // ================================================================
@@ -4917,7 +4898,7 @@ WHEN RESPONDING:
             try {
                 const bootContext = `Boot done in ${bootTime} seconds. ${okCount} systems OK, ${warnCount} warnings, ${failCount} failures. Report.`;
 
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4925,7 +4906,8 @@ WHEN RESPONDING:
                         prompt: bootContext,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 100 }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: 0.9, num_predict: 100 }
                     })
                 });
                 if (res.ok) {
@@ -4958,7 +4940,7 @@ WHEN RESPONDING:
 
             // CORA asks what user is working on - system prompt handles personality
             try {
-                const nosyRes = await fetch('http://localhost:11434/api/generate', {
+                const nosyRes = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4966,7 +4948,8 @@ WHEN RESPONDING:
                         prompt: `Boot complete. Ready.`,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
-                        options: { temperature: 0.9, num_predict: 60 }
+                        think: false,
+                        options: { num_ctx: CORA_NUM_CTX, temperature: 0.9, num_predict: 60 }
                     })
                 });
                 if (nosyRes.ok) {
@@ -4978,7 +4961,7 @@ WHEN RESPONDING:
                         await speakAndWait(nosyResponse);
                     } else {
                         // Retry with simpler prompt
-                        const retry = await fetch('http://localhost:11434/api/generate', {
+                        const retry = await fetch(OLLAMA_URL + '/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4986,7 +4969,8 @@ WHEN RESPONDING:
                                 prompt: 'Boot done.',
                                 system: CORA_SYSTEM_PROMPT,
                                 stream: false,
-                                options: { temperature: 0.95, num_predict: 25 }
+                        think: false,
+                                options: { num_ctx: CORA_NUM_CTX, temperature: 0.95, num_predict: 25 }
                             })
                         });
                         if (retry.ok) {
@@ -5056,7 +5040,7 @@ WHEN RESPONDING:
                 // Include context in prompt for full awareness
                 const fullPrompt = context ? `${context}\n\nUSER: ${msg}` : msg;
 
-                const res = await fetch('http://localhost:11434/api/generate', {
+                const res = await fetch(OLLAMA_URL + '/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -5064,7 +5048,9 @@ WHEN RESPONDING:
                         prompt: fullPrompt,
                         system: CORA_SYSTEM_PROMPT,
                         stream: false,
+                        think: false,
                         options: {
+                            num_ctx: CORA_NUM_CTX,
                             temperature: 0.8,
                             num_predict: 500
                         }

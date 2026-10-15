@@ -95,6 +95,8 @@ class TTSMutex:
 
             # Update state file
             self._update_state('acquired')
+            global _held
+            _held = self
             return True
 
         except portalocker.LockException:
@@ -114,8 +116,18 @@ class TTSMutex:
                 self._lock_file = None
             return False
 
+    def heartbeat(self):
+        """Refresh acquired_at while a long reply is being spoken, so other
+        processes never mistake a live lock for a stale one (is_locked() treats
+        anything older than LOCK_TIMEOUT as abandoned)."""
+        if self._lock_file:
+            self._update_state('acquired')
+
     def release(self):
         """Release the TTS lock."""
+        global _held
+        if _held is self:
+            _held = None
         try:
             if self._lock_file:
                 self._update_state('released')
@@ -213,6 +225,16 @@ class TTSMutex:
 
 # Global mutex instance
 _mutex: Optional[TTSMutex] = None
+_held: Optional[TTSMutex] = None      # the mutex this process currently holds (for heartbeat())
+
+
+def heartbeat():
+    """Called by the voice engine between sentences of one reply."""
+    if _held is not None:
+        try:
+            _held.heartbeat()
+        except Exception:
+            pass
 
 
 def get_mutex(caller: str = "CORA") -> TTSMutex:
