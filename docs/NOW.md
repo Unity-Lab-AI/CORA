@@ -15,67 +15,43 @@ LAW #0 applies: every snapshot of the active task preserves the user's verbatim 
 
 ## Active
 
-**Repair job delivered 2026-10-14: v3.0.0 tagged and pushed (main + develop -> Forgejo + GitHub). Open, by choice, for a later session: UPG-021 (web/index.html into ES modules), UPG-043 (the nine remaining files over 800 lines, documented exceptions), UPG-026 (stale copy under the gitignored tools/). Everything else in docs/TODO.md UPG-001..043 is closed.**
+_(none — no work currently in motion)_
 
-**Rules learned today (binding for every later check):** checks never write to her real data (`CORA_HISTORY_FILE` scratch transcript + `allowed_tools` read-only set); GPU is unloaded (`keep_alive: 0` on every loaded model) before a boot run; the user's words go in TODO/FINALIZED verbatim.
+**Verbatim user request:** _(when work is active, paste their exact words here)_
 
-**Verbatim user request:**
-- "get to fixing it all we need it 100% operationsal and complete with all code wired up and working with edits and fixes where needed"
-- "also set a cron to wake you every two minutes with that goal in mind"
-- "make sure crone is one and working and you have proper todo of everyhting in totality weve gone over and from here on out do not use ask me question till everything is comppleted and working, solve isssues yourself and continue the work toward the final goal of having all done"
-- "and we will use our V2 voice model from the backrooms folder and voice lab. so make sure you read up on it all"
-- "need to write now.md NOW"
-- "and remember our V2 voice of Unity for Cora has its own text lora that knows how to use the voice models tools and emotion designators"
-- "and make sure prompts and meta prompts dont use the word assistant,, that allways prompts the ai to be a bitch corprate thing, not its perosnality as a human correctly"
+**Started:** _(ISO timestamp when the task became active)_
 
-**Started:** 2026-10-14T22:30:00Z (Phase 3 began after commit ae201c5; whole repair job started 2026-10-14 after AUD-001)
+**Goal:** _(one-sentence statement of what "done" looks like)_
 
-**Goal:** Every way of talking to CORA (boot display, GUI app, CLI, converse mode, voice commands, web) goes through `ai/dispatcher.py` → native Ollama tool calls → `ai/tools_registry.py` → sentence-streamed speech on unity-voice-v2. No dead routers, no hardcoded models, no Google/pyttsx3/kokoro anywhere.
+**Files touched so far:** _(running list, updated as edits happen)_
 
-**Decisions locked (user answers, do not re-ask):**
-- Chat + vision model: `unity-brain` (Unity's own text LoRA on Qwen3.5-9B, `Backrooms/models/unity-brain`; trained to call `say(text, emotion, act)` with the exact designators unity-voice-v2 knows; num_ctx 32768 always). Fallback for "which ever is best for our uncensored needs": `huihui_ai/qwen3-abliterated:8b` (streamed-sentence voice path)
-- The word "assistant" never appears in anything the model reads (system prompt, context, tool descriptions, identity strings)
-- Dead code: "Keep everything, wire every module in" → NOTHING deleted, legacy paths stay reachable (`assistant.legacy_regex` flag, CLI command table kept)
-- Python: 3.13.16 (3.12 has no Windows installer), project `.venv`
-- Web version: served locally by `services/stats_server.py`
-- Voice: unity-voice-v2 sidecar only (127.0.0.1:5123), no fallback voice by design
-- No AskUserQuestion until everything is complete and working
+**Verification plan:** _(how we'll confirm the task is actually done — test, smoke-check, manual review, etc.)_
 
-**Files touched so far (Phase 3, UNCOMMITTED):**
-- `ai/tools_registry.py` (new, 114 tools: time/weather/tasks/knowledge/memory/calendar/vision/web/files/system/windows/code/media/git/email/scripts/UI/voice)
-- `ai/dispatcher.py` (new: `Dispatcher.handle()`, native tools + JSON fallback, confirmation gating, sentence streaming to TTS, `get_dispatcher()`, `ask()`)
-- `ui/boot_display.py` (`_process_user_input` → `_dispatch_input`, `_confirm_on_ui`, shell-injection fix in yt-dlp pipeline)
-- `ui/app.py` (`_process_command` → dispatcher with direct CLI verb passthrough, `_confirm_on_ui`, `_on_voice_command` via `parse_voice_input`, tasks panel from shared `cora_tools.tasks`, knowledge panel refresh)
-- `ui/panels.py` (rewritten: TasksPanel add/toggle/delete via tools registry, SettingsPanel writes `config/config.json` with no pyttsx3, KnowledgePanel on `data/knowledge.json` with learn/forget)
-- `voice/converse.py` (rewritten: local `voice.stt.SpeechRecognizer`, dispatcher thinking, unity-voice speaking, shared echo filter, waits for her voice to drain before listening)
-- `src/cora.py` (module-level `COMMANDS` table via `build_commands()`, non-command input → `cmd_chat` → dispatcher; Ollama/TTS checks via shared modules)
-- `cora_tools/browser.py`, `cora_tools/email_tool.py`, `cora_tools/media.py` (raw docstrings, SyntaxWarning fix)
-- `ai/settings.py` (`_MODEL_OPTIONS`, `model_options()`, `num_ctx(model)`, `base_options(model=)`, defaults = unity-brain), `ai/ollama.py` (per-model options on every request)
-- `voice/unity_voice.py` (`synth_delivery()` for the brain's designators), `voice/tts.py` (`speech_act` through engine/queue/`queue_speak`/`speak_async`/`speak_interrupt`), `voice/tts_mutex.py` (portalocker 4.x lock fix)
-- `ai/tools_registry.py` (`say` tool, `CORE_TOOLS` + `select_tools()`, tighter `ask_user`), `ai/dispatcher.py` (`voice_mode()`, say-tool turn handling, `infer_delivery()`, relevance-ranked tool schemas, never-claim rule)
-- `voice/commands.py` (handler signatures, weather/remind/camera fixes), `cora_tools/code.py` (model from settings), `config/system_prompt.txt` + `web/index.html` prompt wording, `cora_tools/ai_tools.py`, `cora_tools/image_gen.py`
-- `config/config.json` (primary/vision = unity-brain, `models.options`, `assistant` block), `docs/TODO.md` (UPG-027..030), `docs/FINALIZED.md` (Phase 3 session block)
+**Blockers / open questions:** _(anything waiting on user input or external system)_
 
-**Verified so far (manual, live):**
-- All Phase 3 files `py_compile` clean; `ui.app`, `ui.panels`, `voice.converse`, `cora` import clean; `cora.COMMANDS` = 69 verbs
-- unity-brain live (fresh history): "Hey, how are you doing tonight?" → `say(neutral, statement)`; "Remind me to stretch in 3 minutes." → `set_reminder` then `say(warm, reassurance)`; "What's the weather and what time is it?" → `get_weather`, `get_time`, `say`. 2.6-3.6 s per turn warm, voice queue drained with no errors
-- Before the mutex fix every line was skipped ("someone else speaking"); after it audio plays
+---
 
-**Verification plan (manual, no tests):**
-1. DONE: TTS mutex fix (portalocker 4.x), cora.py banner warning, `voice/commands.py` handlers, docs updated.
-2. IN PROGRESS: real entry point `.venv\Scripts\python.exe src\boot_sequence.py` running under a 4-minute timeout, log in `%TEMP%\cora_boot.log`: confirm boot phases, daily briefing speaks, no tracebacks.
-3. Then commit "Phase 3: one conversation loop, unity-brain + say designators, all entry points wired" (no AI attribution lines, per CONSTRAINTS).
-4. Then move on to UPG-009/021 web leftovers, UPG-012 leftovers, UPG-018/019/020/022, UPG-025/026.
+## Where things stand (2026-10-14, end of the repair day)
 
-**Next phases after this one (from docs/TODO.md):**
-- UPG-009 hardcoded models (`cora_tools/code.py`, `voice/commands.py`, `web/index.html`)
-- UPG-012 leftovers (web TTS via `/voice/say`, retire `web/kokoro-worker.js`)
-- UPG-018/019 (duplicates, >800-line splits, config loader, logging, atomic writes, waveform after_cancel, mutex heartbeat)
-- UPG-020/021/022 (pyproject, CI compile check, CHANGELOG, web split on `window.CORA_LOCAL`, docs truth pass)
-- UPG-025/026 (seed memory templates, stale `tools/mpv/stats_server.py`)
-- Final: push cascade main+develop → origin (Forgejo) + github
+**Delivered:** the full repair, `docs/TODO.md` UPG-001 through UPG-045, all closed. Version 3.0.0 is tagged; main + develop are pushed to origin (Forgejo) and github after every phase. The two-minute cron that drove the day is stopped. The user's last instructions were "do both, go" (the web split and the oversized-file split, both done) and "wehn u are done, write the now.md file and kill the cron" (this file, and the cron is cancelled).
 
-**Blockers / open questions:** None that need the user. Cron job `f4c9db56` re-prompts the goal every 2 minutes (session-only, expires in 7 days). Branch is `main` with Git Flow marker ENABLED; the user chose to work on main for this repair and the hooks allow it, so commits go to main and the push cascade covers develop.
+**What CORA is now, in one breath:** `unity-brain` (Unity's own LoRA) as brain and eyes, `unity-voice-v2` as her voice, faster-whisper as her ears, one conversation loop (`ai/dispatcher.py`) behind every entry point with 115 tools, a timeout-guarded camera layer, browser-backed web search and page fetch, config loader + daily log, models unloaded from the GPU on every exit, start/stop scripts for Windows and Linux, the web page served locally with her voice, docs that tell the truth, and no source file over 800 lines.
+
+**Last verified runs (all on 2026-10-14):**
+- Full boot with voice: runs 4 and 5, 13/13 systems.
+- Silent boot (`--quick`) of the phased entry point after the splits: run 7, 12/12 systems (voice skipped by the flag), every phase to BOOT COMPLETE, GPU released after (9886 MiB -> 2375 MiB).
+- Web page split (13 ordered scripts + css): headless load through the stats server, 0 page errors.
+- Every split module verified against its original: names, signatures, command tables, singletons, paths.
+
+**Tools that now live in `scripts/`:** `split_web.py`, `split_module.py`, `split_class.py`, `split_function.py`, `move_main.py`, `analyze_function.py`, `gpu_release.py`, `bootstrap.py`.
+
+**Rules that bind every later session (learned today):**
+- Checks never write to her real data: `CORA_HISTORY_FILE` scratch transcript, `handle(..., allowed_tools=...)` read-only set.
+- Checks never make sound: `--quick` for the boot, `speak=False` for the dispatcher; never launch the GUI or CLI for a check.
+- Unload the GPU after anything that touched her brain: `python scripts/gpu_release.py` (CORA does it herself on every normal exit).
+- The user's words go into TODO / FINALIZED verbatim.
+
+**Open, for whoever picks this up next:** `web/js/06-boot-sequence-exact-match-to.js` is one 1102-line function and was left whole (documented, UPG-021 b); the phase module names in `src/boot_phases/` carry the banner text (`phase_10_phase_4_1_...`), ugly but exact; the sidecar for her voice is shared with the stream rig and only killed by the stop scripts when CORA started it.
 
 ---
 
