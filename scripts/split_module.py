@@ -142,6 +142,106 @@ def used_names(stmt):
     return v.names, v.globals
 
 
+class _ModuleLevelNames(cst.CSTVisitor):
+    """Names a statement needs when it is EXECUTED at import time: class bases and
+    decorators, default values, module-level expressions; function bodies are skipped
+    (those can import lazily)."""
+
+    def __init__(self):
+        self.names = set()
+        self._depth = 0
+
+    def visit_FunctionDef(self, node):
+        for d in node.decorators:
+            d.visit(_NameGrab(self.names))
+        node.params.visit(_NameGrab(self.names))
+        if node.returns is not None:
+            node.returns.visit(_NameGrab(self.names))
+        return False      # do not descend into the body
+
+    def visit_Name(self, node):
+        self.names.add(node.value)
+
+
+class _NameGrab(cst.CSTVisitor):
+    def __init__(self, acc):
+        self.acc = acc
+
+    def visit_Name(self, node):
+        self.acc.add(node.value)
+
+
+def module_level_names(stmt):
+    v = _ModuleLevelNames()
+    stmt.visit(v)
+    return v.names
+
+
+class SiblingLazyImporter(cst.CSTTransformer):
+    """Function bodies (including methods) that name something defined in a sibling
+    part import it lazily at the top of the body, so parts never import each other at
+    module level (no cycles, no load-order traps)."""
+
+    def __init__(self, owner_of, pkg_import, skip_names):
+        self.owner_of = owner_of
+        self.pkg_import = pkg_import
+        self.skip_names = skip_names
+
+    def leave_FunctionDef(self, original, updated):
+        # names used in the BODY only
+        v = NameCollector()
+        original.body.visit(v)
+        needed = defaultdict(list)
+        for n in sorted(v.names):
+            if n in self.owner_of and n not in self.skip_names:
+                needed[self.owner_of[n]].append(n)
+        if not needed:
+            return updated
+        stmts = [cst.parse_statement(f"from {self.pkg_import}.{q} import {', '.join(ns)}") for q, ns in needed.items()]
+        body = updated.body
+        if isinstance(body, cst.IndentedBlock):
+            return updated.with_changes(body=body.with_changes(body=list(stmts) + list(body.body)))
+        return updated
+
+
+class OneLevelDeeper(cst.CSTTransformer):
+    """_base.py lives one folder deeper than the original module, so every path built
+    from __file__ needs one more step up: Path(__file__).parent -> .parent.parent,
+    os.path.dirname(os.path.abspath(__file__)) -> wrapped in one more dirname."""
+
+    def leave_Attribute(self, original, updated):
+        # the OUTERMOST .parent of a chain rooted at Path(__file__)
+        if updated.attr.value == 'parent' and self._rooted_in_file(updated.value) and not self._parent_of_parent_marker:
+            return cst.Attribute(value=updated, attr=cst.Name('parent'))
+        return updated
+
+    _parent_of_parent_marker = False
+
+    def visit_Attribute(self, node):
+        # mark inner .parent nodes so only the outermost gets the extra step
+        if node.attr.value == 'parent' and isinstance(node.value, cst.Attribute) and node.value.attr.value == 'parent':
+            pass
+        return True
+
+    @staticmethod
+    def _rooted_in_file(node):
+        while isinstance(node, cst.Attribute):
+            node = node.value
+        return (isinstance(node, cst.Call) and isinstance(node.func, cst.Name) and node.func.value == 'Path'
+                and node.args and isinstance(node.args[0].value, cst.Name) and node.args[0].value.value == '__file__')
+
+    def leave_Call(self, original, updated):
+        # os.path.dirname(<something containing __file__>) chains: wrap the OUTERMOST in one more dirname
+        f = updated.func
+        if (isinstance(f, cst.Attribute) and f.attr.value == 'dirname' and isinstance(f.value, cst.Attribute)
+                and f.value.attr.value == 'path' and isinstance(f.value.value, cst.Name) and f.value.value.value == 'os'):
+            grab = set()
+            updated.visit(_NameGrab(grab))
+            if '__file__' in grab and not getattr(updated, '_wrapped', False):
+                return cst.Call(func=cst.parse_expression('os.path.dirname'), args=[cst.Arg(value=updated)])
+        return updated
+
+
 class RebindRewriter(cst.CSTTransformer):
     """X -> _base.X for reads of rebound module globals (only bare Name loads that are
     not attribute targets, not keyword names, not local definitions)."""
@@ -171,6 +271,28 @@ class RebindRewriter(cst.CSTTransformer):
         if original.value in self.names and id(original) not in self.skip:
             return cst.Attribute(value=cst.Name('_base'), attr=cst.Name(original.value))
         return updated
+
+
+def _deepen(stmt):
+    """Apply OneLevelDeeper to the outermost Path(__file__)...parent chain / dirname chain only."""
+    class Outer(cst.CSTTransformer):
+        def __init__(self):
+            self.done_parents = set()
+
+        def leave_Attribute(self, original, updated):
+            if updated.attr.value == 'parent' and OneLevelDeeper._rooted_in_file(updated.value):
+                # outermost = no enclosing Attribute(.parent) around this one; we detect by returning
+                # a marker-free node and letting the parent (if any) see a Call/Attribute value
+                return updated
+            return updated
+    # simpler and exact: textual regex on this statement's code for the two idioms
+    code = cst.Module(body=[stmt]).code
+    new = re.sub(r'Path\(__file__\)((?:\.resolve\(\))?(?:\.parent)+)', lambda m: f"Path(__file__){m.group(1)}.parent", code)
+    new = re.sub(r'((?:os\.path\.dirname\()+os\.path\.abspath\(__file__\)\)+)', lambda m: f"os.path.dirname({m.group(1)})", new)
+    new = re.sub(r'((?:os\.path\.dirname\()+__file__\)+)', lambda m: f"os.path.dirname({m.group(1)})", new)
+    if new != code:
+        return cst.parse_module(new).body[0]
+    return stmt
 
 
 def main():
@@ -258,52 +380,56 @@ def main():
     for s in header:
         _, g = used_names(s)
         rebound |= g
+    # the DEFINITION of every rebound global moves to _base too (a rebinding function in
+    # _base and the variable in a part would be two different variables)
+    for p, stmts in list(parts.items()):
+        keep = []
+        for s in stmts:
+            if set(defined_names(s)) & rebound and not isinstance(s, (cst.FunctionDef, cst.ClassDef)):
+                header.append(s)
+                header_names |= set(defined_names(s))
+            else:
+                keep.append(s)
+        parts[p] = keep
     rebound &= header_names
     part_names = {p: set(names_of(s)) for p, s in parts.items()}
 
-    # ---- dependencies and cycles
-    deps = {}
-    for p, stmts in parts.items():
-        used = set()
-        for s in stmts:
-            u, _ = used_names(s)
-            used |= u
-        deps[p] = {'base': sorted((used & header_names) - rebound - part_names[p]),
-                   'rebound': sorted(used & rebound),
-                   'sib': {q: sorted(used & part_names[q]) for q in parts if q != p and used & part_names[q]}}
-    # merge cycles
+    # ---- dependencies: module-level sibling needs import at the top (cycles there merge the
+    # parts); function-level sibling needs import lazily inside the function
+    def compute_deps():
+        d = {}
+        for p, stmts in parts.items():
+            used, top = set(), set()
+            for s in stmts:
+                u, _ = used_names(s)
+                used |= u
+                top |= module_level_names(s)
+            d[p] = {'base': sorted((used & header_names) - rebound - part_names[p]),
+                    'rebound': sorted(used & rebound),
+                    'sib': {q: sorted(top & part_names[q]) for q in parts if q != p and top & part_names[q]},
+                    'sib_lazy': {q: sorted((used - top) & part_names[q]) for q in parts if q != p and (used - top) & part_names[q]}}
+        return d
+    deps = compute_deps()
     changed = True
     while changed:
         changed = False
         for p in list(parts):
             for q in list(deps[p]['sib']):
                 if p in deps.get(q, {}).get('sib', {}):
-                    # merge q into p
-                    parts[p] += parts.pop(q)
+                    parts[p] += parts.pop(q)          # a module-level cycle: merge q into p
                     part_names[p] |= part_names.pop(q)
-                    deps.pop(q)
-                    for r in deps:
-                        deps[r]['sib'].pop(q, None)
                     changed = True
                     break
             if changed:
                 break
         if changed:
-            # recompute deps
-            for p, stmts in parts.items():
-                used = set()
-                for s in stmts:
-                    u, _ = used_names(s)
-                    used |= u
-                deps[p] = {'base': sorted((used & header_names) - rebound - part_names[p]),
-                           'rebound': sorted(used & rebound),
-                           'sib': {q: sorted(used & part_names[q]) for q in parts if q != p and used & part_names[q]}}
+            deps = compute_deps()
 
     print(f"module {a.module} -> package {pkg_import}")
     print(f"  _base: {len(header)} statements, names: {len(header_names)}; rebound globals: {sorted(rebound)}")
     for p, stmts in parts.items():
         lines = sum(len(tree.code_for_node(s).splitlines()) for s in stmts)
-        print(f"  {p}: {len(stmts)} statements, ~{lines} lines, imports from _base: {len(deps[p]['base'])}, rebound reads: {deps[p]['rebound']}, siblings: {list(deps[p]['sib'])}")
+        print(f"  {p}: {len(stmts)} statements, ~{lines} lines, imports from _base: {len(deps[p]['base'])}, rebound reads: {deps[p]['rebound']}, siblings top: {list(deps[p]['sib'])}, lazy: {list(deps[p]['sib_lazy'])}")
     if a.check:
         return
 
@@ -331,18 +457,22 @@ def main():
 
     part_of = {n: p for p, ns in part_names.items() for n in ns}
     header = [h.visit(LazyImporter(part_of)) if isinstance(h, cst.FunctionDef) else h for h in header]
+    header = [_deepen(h) for h in header]
     base_mod = tree.with_changes(body=header)
-    base_code = ('#!/usr/bin/env python3\n"""Shared base of the %s package (split from %s on 2026-10-14): imports, module\nstate, the helpers and every function that rebinds a module global."""\n' % (pkg_import, a.module)) + base_mod.code
+    base_code = ('#!/usr/bin/env python3\n"""Shared base of the %s package (split from %s on 2026-10-14): imports, module\nstate, the helpers and every function that rebinds a module global."""\nfrom __future__ import annotations\n' % (pkg_import, a.module)) + base_mod.code
     (pkg_dir / '_base.py').write_text(base_code, encoding='utf-8', newline='\n')
 
     init_lines = ['#!/usr/bin/env python3', f'"""{pkg_import}: parts of {a.module}; importing the package loads every part."""',
                   f'from {pkg_import} import _base  # noqa: F401']
     facade_imports = [f'from {pkg_import}._base import {", ".join(sorted(header_names))}  # noqa: F401']
     for p, stmts in parts.items():
-        body = stmts
+        body = [_deepen(st) for st in stmts]     # parts sit one folder deeper too
         if deps[p]['rebound']:
             rw = RebindRewriter(set(deps[p]['rebound']))
             body = [s.visit(rw) for s in body]
+        owner_of = {n: q for q, ns in part_names.items() if q != p for n in ns}
+        if deps[p]['sib_lazy']:
+            body = [s.visit(SiblingLazyImporter(owner_of, pkg_import, set().union(*deps[p]['sib'].values()) if deps[p]['sib'] else set())) for s in body]
         imports = [f'from {pkg_import} import _base  # noqa: F401']
         if deps[p]['base']:
             imports.append(f'from {pkg_import}._base import {", ".join(deps[p]["base"])}  # noqa: F401')
@@ -351,7 +481,7 @@ def main():
         # the header's own imports (stdlib etc.) are needed by name too: re-import everything the header imports
         hdr_imports = [s for s in header if isinstance(s, cst.SimpleStatementLine) and any(isinstance(x, (cst.Import, cst.ImportFrom)) for x in s.body)]
         pre = cst.Module(body=hdr_imports).code if hdr_imports else ''
-        code = ('#!/usr/bin/env python3\n"""%s: %s (split from %s on 2026-10-14)."""\n' % (pkg_import, p, a.module)) + pre + '\n'.join(imports) + '\n\n\n' + cst.Module(body=body).code
+        code = ('#!/usr/bin/env python3\n"""%s: %s (split from %s on 2026-10-14)."""\nfrom __future__ import annotations\n' % (pkg_import, p, a.module)) + pre + '\n'.join(imports) + '\n\n\n' + cst.Module(body=body).code
         (pkg_dir / f'{p}.py').write_text(code, encoding='utf-8', newline='\n')
         init_lines.append(f'from {pkg_import} import {p} as _{p}  # noqa: F401')
         if part_names[p]:

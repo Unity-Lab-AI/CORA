@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """voice.cmd_parts: built_in_commands (split from voice/commands.py on 2026-10-14)."""
+from __future__ import annotations
 
 import os
 import sys

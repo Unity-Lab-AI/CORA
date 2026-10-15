@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Shared base of the voice.cmd_parts package (split from voice/commands.py on 2026-10-14): imports, module
 state, the helpers and every function that rebinds a module global."""
+from __future__ import annotations
 #!/usr/bin/env python3
 """
 C.O.R.A Voice Commands
@@ -22,9 +23,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Callable, List
 from dataclasses import dataclass
-
-# Project root
-PROJECT_DIR = Path(__file__).parent.parent
+PROJECT_DIR = Path(__file__).parent.parent.parent
 CONFIG_FILE = PROJECT_DIR / 'config' / 'voice_commands.json'
 
 # Voice command configuration (loaded from JSON)
