@@ -86,5 +86,84 @@ def main(check: bool = False):
     print(f"index.html: {len(new_html.splitlines())} lines (was {len(html.splitlines())})")
 
 
+def depth_zero_lines(lines):
+    """Line indexes at brace depth 0 (outside strings, template literals and comments)."""
+    out, depth, in_block, in_str = [], 0, False, None
+    for i, line in enumerate(lines):
+        if depth == 0 and not in_block and in_str is None:
+            out.append(i)
+        j = 0
+        while j < len(line):
+            c = line[j]
+            nxt = line[j + 1] if j + 1 < len(line) else ''
+            if in_block:
+                if c == '*' and nxt == '/':
+                    in_block = False
+                    j += 1
+            elif in_str:
+                if c == '\\':
+                    j += 1
+                elif c == in_str:
+                    in_str = None
+            else:
+                if c == '/' and nxt == '/':
+                    break
+                if c == '/' and nxt == '*':
+                    in_block = True
+                    j += 1
+                elif c in ('"', "'", '`'):
+                    in_str = c
+                elif c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+            j += 1
+    return out
+
+
+def second_pass(max_lines: int = 800, target: int = 560):
+    """Cut js files over max_lines at depth-0 declaration lines nearest multiples of `target`."""
+    html = INDEX.read_text(encoding='utf-8')
+    for js in sorted((WEB / 'js').glob('*.js')):
+        lines = js.read_text(encoding='utf-8').split('\n')
+        if len(lines) <= max_lines:
+            continue
+        starts = [i for i in depth_zero_lines(lines)
+                  if re.match(r'^(async function |function |const |let |var |class )', lines[i]) and i > 0 and lines[i - 1].strip() == '']
+        cuts, want = [], target
+        for i in starts:
+            if i >= want:
+                cuts.append(i)
+                want = i + target
+        if not cuts or len(lines) - cuts[-1] < 80:
+            cuts = cuts[:-1] if cuts and len(lines) - cuts[-1] < 80 else cuts
+        if not cuts:
+            print(f"  {js.name}: {len(lines)} lines, no safe cut (one block), left whole")
+            continue
+        pieces, prev = [], 0
+        for c in cuts + [len(lines)]:
+            pieces.append(lines[prev:c])
+            prev = c
+        stem = js.stem
+        names = []
+        for k, piece in enumerate(pieces):
+            name = f"{stem}{chr(ord('a') + k)}"
+            body = '\n'.join(piece).rstrip() + '\n'
+            if k:
+                body = f"// {stem} (part {k + 1}): continues the previous file, same global scope\n\n" + body
+            (WEB / 'js' / f'{name}.js').write_text(body, encoding='utf-8', newline='\n')
+            names.append(name)
+        js.unlink()
+        tag = f'<script src="js/{js.name}"></script>'
+        indent = re.search(r'^([ \t]*)' + re.escape(tag), html, re.M)
+        ind = indent.group(1) if indent else '    '
+        html = html.replace(ind + tag, '\n'.join(f'{ind}<script src="js/{n}.js"></script>' for n in names))
+        print(f"  {js.name}: {len(lines)} lines -> " + ', '.join(f"{n}.js ({len(pc)})" for n, pc in zip(names, pieces)))
+    INDEX.write_text(html, encoding='utf-8', newline='\n')
+
+
 if __name__ == '__main__':
-    main(check='--check' in sys.argv)
+    if '--pass2' in sys.argv:
+        second_pass()
+    else:
+        main(check='--check' in sys.argv)
