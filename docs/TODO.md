@@ -113,7 +113,7 @@
 ### Phase 5 — cleanup and fundamentals
 - [~] **UPG-018 (M)** Delete dead modules (`src/cora.py`, `src/gui_launcher.py`, `ui/app.py`, `ui/panels.py`, `ai/tool_executor.py`, `ai/prompts.py`, `ai/router.py`, `ui/code_editor.py`, `ui/fullscreen_image.py`, `ui/image_panel.py`, `ui/monitor_panel.py`, `ui/query_panel.py`, `voice/converse.py`, transitively `voice/commands.py`, `cora_tools/modal_tools.py`) or finish one GUI; consolidate the two webcam pipelines + three windowing helpers; split the 12 files over 800 lines
 - [x] **UPG-019 (M)** Single config loader with schema validation; one version constant; atomic JSON writes; shared logger; remove `atexit os._exit(0)`; cancel the waveform timer on close; heartbeat the TTS mutex
-- [~] **UPG-020 (S)** `pyproject.toml`, `py_compile`/ruff CI job, CHANGELOG, git tags
+- [x] **UPG-020 (S)** `pyproject.toml`, `py_compile`/ruff CI job, CHANGELOG, git tags
 - [~] **UPG-021 (M)** Web: split `index.html` into ES modules + css; generate phases/prompt JSON at deploy; serve locally via `stats_server.py` (fixes mixed content, CORS and the V2 sidecar); one public URL; fix the `innerHTML` sinks
 - [x] **UPG-022 (S)** Docs truth pass: file/phase counts, entry point, default model, nonexistent files in ARCHITECTURE/NerdReadme/APIReference, SKILL_TREE percentages
 

@@ -15,7 +15,7 @@ LAW #0 applies: every snapshot of the active task preserves the user's verbatim 
 
 ## Active
 
-**Wrapping the day: Phase 5 committed (d6e482f), registry split into `ai/tools/` (UPG-018 part), docs truth pass done. IN MOTION: commit, tag `v3.0.0` (UPG-020), push cascade main + develop -> origin (Forgejo) + github. Open after that: UPG-021 web module split, UPG-026 stale copy under tools/, UPG-043 remaining oversized files (documented exceptions).**
+**Repair job delivered 2026-10-14: v3.0.0 tagged and pushed (main + develop -> Forgejo + GitHub). Open, by choice, for a later session: UPG-021 (web/index.html into ES modules), UPG-043 (the nine remaining files over 800 lines, documented exceptions), UPG-026 (stale copy under the gitignored tools/). Everything else in docs/TODO.md UPG-001..043 is closed.**
 
 **Rules learned today (binding for every later check):** checks never write to her real data (`CORA_HISTORY_FILE` scratch transcript + `allowed_tools` read-only set); GPU is unloaded (`keep_alive: 0` on every loaded model) before a boot run; the user's words go in TODO/FINALIZED verbatim.
 
